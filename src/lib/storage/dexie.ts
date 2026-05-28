@@ -1,0 +1,81 @@
+import Dexie, { type Table } from 'dexie';
+import { browser } from '$app/environment';
+
+export interface MemoryRecord {
+	path: string;
+	content: string;
+	updated: number;
+}
+
+export interface FileRecord {
+	scope: string;
+	path: string;
+	content: string;
+	updated: number;
+}
+
+export interface ThreadRecord {
+	threadId: string;
+	createdAt: number;
+	checkpoints: unknown;
+}
+
+export class LangxDb extends Dexie {
+	memories!: Table<MemoryRecord, string>;
+	files!: Table<FileRecord, [string, string]>;
+	threads!: Table<ThreadRecord, string>;
+
+	constructor() {
+		super('langx');
+		this.version(1).stores({
+			memories: 'path, updated',
+			files: '[scope+path], scope, updated',
+			threads: 'threadId, createdAt'
+		});
+	}
+}
+
+let _db: LangxDb | null = null;
+export function db(): LangxDb {
+	if (!browser) {
+		throw new Error('Dexie is browser-only.');
+	}
+	if (!_db) _db = new LangxDb();
+	return _db;
+}
+
+export async function getMemory(path: string) {
+	return (await db().memories.get(path)) ?? null;
+}
+
+export async function putMemory(path: string, content: string) {
+	await db().memories.put({ path, content, updated: Date.now() });
+}
+
+export async function listMemories() {
+	return await db().memories.orderBy('updated').reverse().toArray();
+}
+
+export async function deleteMemory(path: string) {
+	await db().memories.delete(path);
+}
+
+export async function listFiles(scope: string) {
+	return await db().files.where('scope').equals(scope).toArray();
+}
+
+export async function getFile(scope: string, path: string) {
+	return (await db().files.get([scope, path])) ?? null;
+}
+
+export async function putFile(scope: string, path: string, content: string) {
+	await db().files.put({ scope, path, content, updated: Date.now() });
+}
+
+export async function deleteFile(scope: string, path: string) {
+	await db().files.delete([scope, path]);
+}
+
+export async function clearScope(scope: string) {
+	await db().files.where('scope').equals(scope).delete();
+}
