@@ -15,6 +15,11 @@
 		interrupt,
 		Command
 	} from '@langchain/langgraph/web';
+	import { ChatPromptTemplate } from '@langchain/core/prompts';
+	import { StringOutputParser } from '@langchain/core/output_parsers';
+	import { getModel } from '$lib/runtime/llm';
+	import { withRunCache, loadCachedRun } from '$lib/runtime/runs';
+	import { onMount } from 'svelte';
 
 	const State = Annotation.Root({
 		topic: Annotation<string>(),
@@ -31,13 +36,30 @@
 	let interrupted = $state(false);
 	let interruptValue = $state<{ type: string; draft: string } | null>(null);
 	let edited = $state('');
-	let result = $state<unknown>(null);
+	let result = $state<{ draft?: string; final?: string; decision?: string } | null>(null);
 
-	function buildGraph() {
+	interface DraftPayload {
+		topic: string;
+		draft: string;
+	}
+
+	async function buildGraph() {
+		const model = await getModel({ temperature: 0.3, maxTokens: 280 });
+		const draftPrompt = ChatPromptTemplate.fromMessages([
+			[
+				'system',
+				'You are an internal-comms editor. Draft a short, professional team email (≤ 90 words). Return ONLY the email body, including a "Subject:" line.'
+			],
+			['human', 'Topic: {topic}']
+		]);
+		const parser = new StringOutputParser();
+
 		return new StateGraph(State)
-			.addNode('draft', async (s) => ({
-				draft: `Subject: ${s.topic}\n\nHi team,\n\nQuick note about ${s.topic}. (Draft auto-generated.)\n\n— LangX`
-			}))
+			.addNode('draft', async (s) => {
+				if (s.draft && s.draft.length > 0) return { draft: s.draft };
+				const text = await draftPrompt.pipe(model).pipe(parser).invoke({ topic: s.topic });
+				return { draft: text };
+			})
 			.addNode('approve', async (s) => {
 				const decision = interrupt({
 					type: 'approve_draft',
@@ -63,17 +85,37 @@
 		interrupted = false;
 		interruptValue = null;
 		try {
-			const graph = buildGraph();
-			const out = await graph.invoke({ topic, draft: '', final: '', decision: '' }, config);
+			const draftPayload = await withRunCache<DraftPayload>(
+				{ demoId: `l2-interrupts-draft-${topic.slice(0, 32)}` },
+				async () => {
+					const graph = await buildGraph();
+					const out = (await graph.invoke(
+						{ topic, draft: '', final: '', decision: '' },
+						config
+					)) as Record<string, unknown>;
+					const interrupts = out['__interrupt__'] as
+						| Array<{ value: { type: string; draft: string } }>
+						| undefined;
+					const draft = interrupts?.[0]?.value?.draft ?? '';
+					return { topic, draft };
+				}
+			);
+
+			const graph = await buildGraph();
+			const out = (await graph.invoke(
+				{ topic, draft: draftPayload.draft, final: '', decision: '' },
+				config
+			)) as Record<string, unknown>;
 			handleOutput(out);
 		} finally {
 			busy = false;
 		}
 	}
 
-	function handleOutput(out: unknown) {
-		const obj = out as Record<string, unknown>;
-		const interrupts = obj['__interrupt__'] as Array<{ value: { type: string; draft: string } }> | undefined;
+	function handleOutput(out: Record<string, unknown>) {
+		const interrupts = out['__interrupt__'] as
+			| Array<{ value: { type: string; draft: string } }>
+			| undefined;
 		if (interrupts && interrupts.length) {
 			interrupted = true;
 			interruptValue = interrupts[0].value;
@@ -81,18 +123,21 @@
 		} else {
 			interrupted = false;
 			interruptValue = null;
-			result = out;
+			result = out as { draft?: string; final?: string; decision?: string };
 		}
 	}
 
 	async function resume(decision: 'approve' | 'edit' | 'reject') {
 		busy = true;
 		try {
-			const graph = buildGraph();
+			const graph = await buildGraph();
 			const cmd = new Command({
 				resume: { decision, text: decision === 'edit' ? edited : undefined }
 			});
-			const out = await graph.invoke(cmd as unknown as never, config);
+			const out = (await graph.invoke(cmd as unknown as never, config)) as Record<
+				string,
+				unknown
+			>;
 			handleOutput(out);
 		} finally {
 			busy = false;
@@ -107,6 +152,17 @@
 		result = null;
 		edited = '';
 	}
+
+	onMount(async () => {
+		const cached = await loadCachedRun<DraftPayload>({
+			demoId: `l2-interrupts-draft-${topic.slice(0, 32)}`
+		});
+		if (cached) {
+			interrupted = true;
+			interruptValue = { type: 'approve_draft', draft: cached.payload.draft };
+			edited = cached.payload.draft;
+		}
+	});
 
 	const code = `import { interrupt, Command, MemorySaver } from '@langchain/langgraph';
 
@@ -137,7 +193,15 @@ if (decision !== 'approve') return { aborted: true };
 // proceed only after explicit approval`;
 </script>
 
-<Lesson title="Interrupts & HITL" eyebrow="Phase 2 · Lesson 04">
+<Lesson
+	title="Interrupts & HITL"
+	eyebrow="Phase 2 · Lesson 04"
+	motivation="Some decisions belong to humans. Interrupts make 'pause and ask' a first-class language feature, not a gluey hack."
+	hero={{
+		id: 'l2-interrupts',
+		alt: 'A scholar pauses mid-stride as a human steps out with a sealed envelope'
+	}}
+>
 	{#snippet intro()}
 		<p>
 			An <Term t="Interrupt" /> turns any node into a "wait for the human" gate. The graph
@@ -147,16 +211,26 @@ if (decision !== 'approve') return { aborted: true };
 	{/snippet}
 
 	{#snippet narrative()}
-		<Slide title="Why interrupts">
+		<Slide eyebrow="Why this shape" title="Approval as a primitive" variant="dropcap">
 			<p>
-				Some actions shouldn't auto-execute: sending an email, charging a card, deleting a
-				file, deploying to production. Interrupts let you pause the graph at the exact moment
-				before the action and surface a payload to a human.
+				Every team that ships an agent eventually invents the same hack: a regex, a
+				confirmation prompt, a side-channel queue. Interrupts make that hack a first-class
+				graph feature. The runtime owns the pause; the checkpointer owns the state; your code
+				just declares <em>where</em> the pause lives.
+			</p>
+			<p>
+				This is the same primitive the Deep Agents harness uses for its HITL middleware in
+				Phase 3. Wrapping a tool call in <code>interruptOn</code> compiles down to a node that
+				calls <code>interrupt(...)</code> and waits for a <code>Command</code>. Once you see
+				how thin the underlying surface is, you stop reinventing it.
 			</p>
 		</Slide>
 
-		<Slide title="The mechanics">
-			<CodeBlock code={code} caption="Interrupt + Command(resume) is a complete pause/resume API." />
+		<Slide title="The mechanics" variant="code-first">
+			<CodeBlock
+				code={code}
+				caption="Interrupt + Command(resume) is a complete pause/resume API."
+			/>
 			<p>
 				Behind the scenes, <code>interrupt(value)</code> throws a special signal that the
 				runtime catches. The checkpointer saves state with <code>next: ['approve']</code>; the
@@ -164,21 +238,37 @@ if (decision !== 'approve') return { aborted: true };
 			</p>
 		</Slide>
 
-		<Slide title="Demo · email approval">
+		<Slide variant="pull-quote">
 			<p>
-				The graph drafts an email, then interrupts. On the right you can <em>approve</em>,{' '}
-				<em>edit</em> (the textarea content becomes the resume value), or <em>reject</em>. Try
-				editing then approving — you'll see the final state reflect the edit.
+				The runtime owns the pause. Your code owns the policy. That separation is what makes
+				HITL a feature instead of a project.
 			</p>
 		</Slide>
 
-		<Slide title="Where you'll use this">
+		<Slide title="Demo · email approval">
 			<p>
-				Approve a tool call before running it; let a human edit the model's plan; require
-				sign-off before sending. Phase 3's HITL middleware in Deep Agents is built directly on
-				top of this primitive.
+				The graph drafts a real internal email with the model, then interrupts. On the right
+				you can <em>approve</em>, <em>edit</em> (the textarea content becomes the resume
+				value), or <em>reject</em>. Try editing then approving — you'll see the final state
+				reflect the edit.
+			</p>
+		</Slide>
+
+		<Slide title="Where you'll use this" variant="code-first">
+			<p>
+				Approve a tool call before running it. Let a human edit the model's plan. Require
+				sign-off before sending. The same primitive scales from "send email" to "deploy to
+				production" — the value object is whatever your UI needs.
 			</p>
 			<CodeBlock code={dangerCode} caption="Same primitive, different stakes." />
+		</Slide>
+
+		<Slide title="One pattern, many UIs" ornament>
+			<p>
+				Approval queues. Plan editors. Confirmation dialogs. Agent rooms with reviewers. They
+				all read the same payload off <code>__interrupt__</code> and resume with a
+				<code>Command</code>. The graph is the contract; the UI is the wrapper.
+			</p>
 		</Slide>
 	{/snippet}
 
@@ -186,7 +276,12 @@ if (decision !== 'approve') return { aborted: true };
 		<Panel title="Topic">
 			<input type="text" bind:value={topic} disabled={interrupted || busy} />
 			<div class="actions">
-				<RunButton onclick={start} running={busy && !interrupted} disabled={interrupted} label="Draft email" />
+				<RunButton
+					onclick={start}
+					running={busy && !interrupted}
+					disabled={interrupted}
+					label="Draft email"
+				/>
 				<button class="ghost" onclick={reset}>Reset</button>
 			</div>
 		</Panel>
@@ -197,7 +292,7 @@ if (decision !== 'approve') return { aborted: true };
 					<div class="lbl">Type</div>
 					<code>{interruptValue.type}</code>
 					<div class="lbl">Proposed draft</div>
-					<textarea bind:value={edited} rows="6"></textarea>
+					<textarea bind:value={edited} rows="8"></textarea>
 					<div class="cta">
 						<button class="primary" onclick={() => resume('approve')} disabled={busy}>
 							Approve as-is
@@ -225,15 +320,15 @@ if (decision !== 'approve') return { aborted: true };
 	input {
 		width: 100%;
 		background: var(--color-bg);
-		border: 1px solid var(--color-border);
+		border: 1px solid var(--color-rule);
 		border-radius: 0.4rem;
 		padding: 0.5rem 0.6rem;
 		font-size: 0.88rem;
-		color: var(--color-fg);
+		color: var(--color-ink-100);
 	}
 	input:focus {
 		outline: none;
-		border-color: var(--accent);
+		border-color: var(--accent-ink);
 	}
 	.actions {
 		display: flex;
@@ -244,12 +339,12 @@ if (decision !== 'approve') return { aborted: true };
 		font-size: 0.82rem;
 		padding: 0.45rem 0.7rem;
 		background: var(--color-bg);
-		color: var(--color-fg-muted);
-		border: 1px solid var(--color-border);
+		color: var(--color-ink-200);
+		border: 1px solid var(--color-rule);
 		border-radius: 0.4rem;
 	}
 	.ghost:hover:not(:disabled) {
-		color: var(--color-fg);
+		color: var(--color-ink-100);
 	}
 
 	.payload {
@@ -258,26 +353,26 @@ if (decision !== 'approve') return { aborted: true };
 		gap: 0.4rem;
 	}
 	.lbl {
-		font-size: 0.7rem;
+		font-size: 0.66rem;
 		text-transform: uppercase;
-		letter-spacing: 0.1em;
-		color: var(--color-fg-faint);
+		letter-spacing: 0.14em;
+		color: var(--color-ink-300);
 		font-family: var(--font-mono);
 	}
 	textarea {
 		background: var(--color-bg);
-		border: 1px solid var(--color-border);
+		border: 1px solid var(--color-rule);
 		border-radius: 0.4rem;
 		padding: 0.55rem 0.7rem;
 		font-family: var(--font-mono);
 		font-size: 0.82rem;
-		color: var(--color-fg);
-		line-height: 1.5;
+		color: var(--color-ink-100);
+		line-height: 1.55;
 		resize: vertical;
 	}
 	textarea:focus {
 		outline: none;
-		border-color: var(--accent);
+		border-color: var(--accent-ink);
 	}
 	.cta {
 		display: flex;
@@ -287,7 +382,7 @@ if (decision !== 'approve') return { aborted: true };
 	.primary {
 		font-size: 0.85rem;
 		padding: 0.5rem 0.85rem;
-		background: var(--accent);
+		background: var(--accent-ink);
 		color: var(--color-bg);
 		border: none;
 		border-radius: 0.4rem;

@@ -1,107 +1,101 @@
 <script lang="ts">
 	import Lesson from '$lib/components/Lesson.svelte';
 	import Slide from '$lib/components/Slide.svelte';
+	import Term from '$lib/components/Term.svelte';
 	import Panel from '$lib/components/Panel.svelte';
 	import CodeBlock from '$lib/components/CodeBlock.svelte';
 	import RunButton from '$lib/components/RunButton.svelte';
 	import StateInspector from '$lib/components/StateInspector.svelte';
 	import { z } from 'zod';
-	import { MockChatModel } from '$lib/runtime/llm/mock';
+	import { getModel } from '$lib/runtime/llm';
+	import { withRunCache, loadCachedRun } from '$lib/runtime/runs';
+	import { onMount } from 'svelte';
 
 	const bugReportSchema = z.object({
 		title: z.string().describe('Short, action-oriented summary.'),
 		severity: z.enum(['low', 'medium', 'high', 'critical']),
-		component: z.string(),
-		stepsToReproduce: z.array(z.string()).max(5),
+		component: z.string().describe('Page, module, or component that misbehaves.'),
+		stepsToReproduce: z.array(z.string()).max(5).describe('Up to five short reproduction steps.'),
 		expected: z.string(),
 		actual: z.string()
 	});
+	type BugReport = z.infer<typeof bugReportSchema>;
 
 	const sentimentSchema = z.object({
 		sentiment: z.enum(['positive', 'neutral', 'negative']),
-		confidence: z.number().min(0).max(1),
-		summary: z.string()
+		confidence: z.number().min(0).max(1).describe('Confidence in the chosen label.'),
+		summary: z.string().describe('One short sentence justifying the label.')
 	});
+	type Sentiment = z.infer<typeof sentimentSchema>;
 
 	let bugInput = $state(
-		'Customers say the export button on /reports does nothing the first time they click it but works on the second click. Happened after Friday\'s deploy.'
+		"Customers say the export button on /reports does nothing the first time they click it but works on the second click. Happened after Friday's deploy."
 	);
 	let bugRun = $state(false);
-	let bugResult = $state<z.infer<typeof bugReportSchema> | null>(null);
+	let bugResult = $state<BugReport | null>(null);
 
 	async function runBug() {
 		bugRun = true;
 		bugResult = null;
 		try {
-			const model = new MockChatModel({
-				responses: [
-					{
-						content: '',
-						toolCalls: [
-							{
-								name: 'extract',
-								args: {
-									title: 'Export button needs two clicks to fire',
-									severity: 'medium',
-									component: '/reports',
-									stepsToReproduce: [
-										'Open /reports',
-										'Click "Export"',
-										'Observe nothing happens',
-										'Click again — works'
-									],
-									expected: 'A single click triggers the export.',
-									actual: 'The first click is a no-op.'
-								}
-							}
-						]
-					}
-				]
-			});
-			const structured = model.withStructuredOutput(bugReportSchema, { name: 'extract' });
-			bugResult = await structured.invoke([
-				{ role: 'system', content: 'Extract a bug report from the user message.' },
-				{ role: 'user', content: bugInput }
-			]);
+			const out = await withRunCache<BugReport>(
+				{ demoId: 'l1-structured-bug' },
+				async () => {
+					const model = await getModel({ temperature: 0, maxTokens: 400 });
+					const extractor = model.withStructuredOutput(bugReportSchema, { name: 'extract' });
+					return (await extractor.invoke([
+						{
+							role: 'system',
+							content:
+								'Extract a bug report from the user message. Be concise. Fill every field. Use at most five reproduction steps.'
+						},
+						{ role: 'user', content: bugInput }
+					])) as BugReport;
+				}
+			);
+			bugResult = out;
 		} finally {
 			bugRun = false;
 		}
 	}
 
-	let sentInput = $state('I\'ve been using LangChain for two days and I\'m blown away.');
+	let sentInput = $state("I've been using LangChain for two days and I'm blown away.");
 	let sentRun = $state(false);
-	let sentResult = $state<z.infer<typeof sentimentSchema> | null>(null);
+	let sentResult = $state<Sentiment | null>(null);
 
 	async function runSent() {
 		sentRun = true;
 		sentResult = null;
 		try {
-			const isPositive = /good|love|great|blown|awesome|amazing|wonderful/i.test(sentInput);
-			const isNegative = /bad|hate|terrible|broken|awful/i.test(sentInput);
-			const sentiment = isPositive ? 'positive' : isNegative ? 'negative' : 'neutral';
-			const model = new MockChatModel({
-				responses: [
-					{
-						content: '',
-						toolCalls: [
-							{
-								name: 'classify',
-								args: {
-									sentiment,
-									confidence: sentiment === 'neutral' ? 0.55 : 0.92,
-									summary: `Detected ${sentiment} tone in user input.`
-								}
-							}
-						]
-					}
-				]
-			});
-			const structured = model.withStructuredOutput(sentimentSchema, { name: 'classify' });
-			sentResult = await structured.invoke(sentInput);
+			const out = await withRunCache<Sentiment>(
+				{ demoId: 'l1-structured-sentiment' },
+				async () => {
+					const model = await getModel({ temperature: 0, maxTokens: 200 });
+					const classifier = model.withStructuredOutput(sentimentSchema, {
+						name: 'classify'
+					});
+					return (await classifier.invoke([
+						{
+							role: 'system',
+							content:
+								'Classify the sentiment of the user comment. Confidence is a number between 0 and 1. Summary is one short sentence.'
+						},
+						{ role: 'user', content: sentInput }
+					])) as Sentiment;
+				}
+			);
+			sentResult = out;
 		} finally {
 			sentRun = false;
 		}
 	}
+
+	onMount(async () => {
+		const cb = await loadCachedRun<BugReport>({ demoId: 'l1-structured-bug' });
+		if (cb) bugResult = cb.payload;
+		const cs = await loadCachedRun<Sentiment>({ demoId: 'l1-structured-sentiment' });
+		if (cs) sentResult = cs.payload;
+	});
 
 	const code = `import { z } from 'zod';
 
@@ -126,37 +120,60 @@ const report = await extractor.invoke([
 // report is fully typed as z.infer<typeof BugReport>.`;
 </script>
 
-<Lesson title="Structured output" eyebrow="Phase 1 · Lesson 03">
+<Lesson
+	title="Structured output"
+	eyebrow="Phase 1 · Lesson 03"
+	motivation="Models speak prose; software speaks types. Structured output is the bridge — and Zod gives you guarantees the model alone cannot."
+	hero={{
+		id: 'l1-structured-output',
+		alt: "A printer's typecase with hand-set metal type"
+	}}
+>
 	{#snippet intro()}
 		<p>
-			Free-form text is easy for the model and miserable for the rest of your code. Schema-driven
-			structured output makes the model emit JSON that matches a Zod schema you define, so the
-			downstream code stays typed and predictable.
+			Free-form text is easy for the model and miserable for the rest of your code.
+			Schema-driven structured output makes the model emit JSON that matches a Zod schema you
+			define, so the downstream code stays typed and predictable.
 		</p>
 	{/snippet}
 
 	{#snippet narrative()}
-		<Slide title="The problem">
+		<Slide eyebrow="Why this shape" title="From prose to type" variant="dropcap">
 			<p>
-				Without a schema, you write parsers, regexes, and apologies. Every model upgrade
-				changes the formatting in some subtle way and breaks them.
+				A model is most natural when it writes paragraphs; a program is most natural when it
+				reads records. Between them is a thin border crossing where data has to switch
+				languages, and every shaky regex you have ever written has lived along that border.
+			</p>
+			<p>
+				The newer idea is to skip the border altogether. You hand the model a <Term
+					t="schema"
+				/> — a precise description of the record you want — and the provider's tool-calling
+				API forces the response into that shape. The model no longer narrates a result; it
+				produces one.
 			</p>
 		</Slide>
 
-		<Slide title="withStructuredOutput">
+		<Slide title="withStructuredOutput" variant="code-first">
+			<CodeBlock code={code} lang="ts" caption="Define once, get a typed function." />
 			<p>
 				LangChain's <code>withStructuredOutput</code> wraps a chat model so it returns a typed
-				value instead of an <code>AIMessage</code>. Under the hood it uses the provider's
-				tool-calling API to force the model into your schema.
+				value instead of an <code>AIMessage</code>. Under the hood it registers your Zod
+				schema as a tool and asks the model to fill it.
 			</p>
-			<CodeBlock code={code} caption="Define once, get a typed function." />
+		</Slide>
+
+		<Slide variant="pull-quote">
+			<p>
+				A schema is a contract the model has to sign before it speaks — and the contract is
+				written in your type system, not its.
+			</p>
 		</Slide>
 
 		<Slide title="Two demos">
 			<p>
 				Demo 1 extracts a structured bug report from a free-form support message. Demo 2
-				classifies sentiment with confidence. Both schemas live in this very file — see how the
-				inspector shows the raw model tool call alongside the parsed object.
+				classifies sentiment with a confidence number. Both schemas live in this very file
+				— the inspector shows you the parsed object as the model returns it.
 			</p>
 		</Slide>
 
@@ -164,8 +181,13 @@ const report = await extractor.invoke([
 			<p>
 				Use schemas for: ticket extraction, classification, function arguments, evaluator
 				rubrics, structured agent plans, and any handoff between an LLM and the rest of your
-				system. Pair with retries (<code>withRetry</code>) for robustness.
+				system. Pair with retries (<code>withRetry</code>) for robustness, and prefer narrow
+				enums over open strings whenever you can.
 			</p>
+		</Slide>
+
+		<Slide ornament>
+			<p>Type the boundary. The model will meet you there.</p>
 		</Slide>
 	{/snippet}
 
@@ -203,22 +225,23 @@ const report = await extractor.invoke([
 	}
 	.row span {
 		font-size: 0.78rem;
-		color: var(--color-fg-faint);
+		color: var(--color-ink-300);
+		font-family: var(--font-mono);
 	}
 	textarea,
 	input {
 		background: var(--color-bg);
-		border: 1px solid var(--color-border);
+		border: 1px solid var(--color-rule);
 		border-radius: 0.4rem;
-		padding: 0.5rem 0.6rem;
+		padding: 0.5rem 0.65rem;
 		font-size: 0.88rem;
-		color: var(--color-fg);
+		color: var(--color-ink-100);
 		font-family: var(--font-sans);
 		resize: vertical;
 	}
 	textarea:focus,
 	input:focus {
 		outline: none;
-		border-color: var(--accent);
+		border-color: var(--accent-ink);
 	}
 </style>

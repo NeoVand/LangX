@@ -1,17 +1,74 @@
 <script lang="ts">
 	import Lesson from '$lib/components/Lesson.svelte';
 	import Slide from '$lib/components/Slide.svelte';
+	import Term from '$lib/components/Term.svelte';
 	import Panel from '$lib/components/Panel.svelte';
 	import CodeBlock from '$lib/components/CodeBlock.svelte';
 	import RunButton from '$lib/components/RunButton.svelte';
 	import MessageStream from '$lib/components/MessageStream.svelte';
 	import { calculatorTool, weatherTool, knownWeatherCities } from '$lib/runtime/tools';
-	import { MockChatModel } from '$lib/runtime/llm/mock';
-	import { AIMessage, HumanMessage, type BaseMessage, ToolMessage } from '@langchain/core/messages';
+	import { getModel } from '$lib/runtime/llm';
+	import { withRunCache, loadCachedRun } from '$lib/runtime/runs';
+	import {
+		AIMessage,
+		HumanMessage,
+		SystemMessage,
+		ToolMessage,
+		type BaseMessage
+	} from '@langchain/core/messages';
 	import type { Runnable } from '@langchain/core/runnables';
 	import type { BaseChatModelCallOptions } from '@langchain/core/language_models/chat_models';
+	import { onMount } from 'svelte';
 
 	type BoundModel = Runnable<BaseMessage[], AIMessage, BaseChatModelCallOptions>;
+
+	interface SerializedMsg {
+		role: 'human' | 'system' | 'ai' | 'tool';
+		content: string;
+		tool_call_id?: string;
+		tool_calls?: { name: string; args: Record<string, unknown>; id?: string }[];
+	}
+
+	function serializeMsg(m: BaseMessage): SerializedMsg {
+		if (m instanceof HumanMessage) return { role: 'human', content: String(m.content) };
+		if (m instanceof SystemMessage) return { role: 'system', content: String(m.content) };
+		if (m instanceof ToolMessage)
+			return { role: 'tool', content: String(m.content), tool_call_id: m.tool_call_id };
+		if (m instanceof AIMessage) {
+			return {
+				role: 'ai',
+				content: String(m.content ?? ''),
+				tool_calls: (m.tool_calls ?? []).map((tc) => ({
+					name: tc.name,
+					args: tc.args as Record<string, unknown>,
+					id: tc.id
+				}))
+			};
+		}
+		return { role: 'ai', content: String(m.content) };
+	}
+
+	function deserializeMsg(s: SerializedMsg): BaseMessage {
+		switch (s.role) {
+			case 'human':
+				return new HumanMessage(s.content);
+			case 'system':
+				return new SystemMessage(s.content);
+			case 'tool':
+				return new ToolMessage({
+					tool_call_id: s.tool_call_id ?? '',
+					content: s.content
+				});
+			case 'ai':
+			default:
+				return new AIMessage({
+					content: s.content,
+					tool_calls: s.tool_calls?.map((tc) => ({ ...tc })) ?? []
+				});
+		}
+	}
+
+	type ConvoPayload = { messages: SerializedMsg[] };
 
 	let weatherCity = $state('Tokyo');
 	let weatherRun = $state(false);
@@ -22,40 +79,38 @@
 		weatherMessages = [];
 		try {
 			const cityForRun = weatherCity;
-			const model = new MockChatModel({
-				responder: (_msgs, turn) => {
-					if (turn === 0) {
-						return {
-							content: '',
-							toolCalls: [{ name: 'get_weather', args: { city: cityForRun }, id: 'call_1' }]
-						};
+			const out = await withRunCache<ConvoPayload>(
+				{ demoId: 'l1-tools-weather' },
+				async () => {
+					const baseModel = await getModel({ temperature: 0, maxTokens: 256 });
+					const model = baseModel.bindTools!([weatherTool]) as unknown as BoundModel;
+					const messages: BaseMessage[] = [
+						new HumanMessage(`What's the weather in ${cityForRun}?`)
+					];
+					weatherMessages = [...messages];
+
+					let safety = 0;
+					while (safety++ < 4) {
+						const ai = (await model.invoke(messages)) as AIMessage;
+						messages.push(ai);
+						weatherMessages = [...messages];
+						if (!ai.tool_calls?.length) break;
+						for (const tc of ai.tool_calls) {
+							const result = await weatherTool.invoke(tc.args as { city: string });
+							messages.push(
+								new ToolMessage({
+									tool_call_id: tc.id ?? '',
+									content: typeof result === 'string' ? result : JSON.stringify(result)
+								})
+							);
+							weatherMessages = [...messages];
+						}
 					}
-					return { content: 'Got it — see the tool result above.' };
+
+					return { messages: messages.map(serializeMsg) };
 				}
-			}).bindTools([weatherTool]) as unknown as BoundModel;
-
-			const messages: BaseMessage[] = [new HumanMessage(`What's the weather in ${cityForRun}?`)];
-			weatherMessages = [...messages];
-
-			const ai = (await model.invoke(messages)) as AIMessage;
-			messages.push(ai);
-			weatherMessages = [...messages];
-
-			for (const tc of ai.tool_calls ?? []) {
-				const result = await weatherTool.invoke(
-					tc.args as { city: string }
-				);
-				const toolMsg = new ToolMessage({
-					tool_call_id: tc.id ?? '',
-					content: typeof result === 'string' ? result : JSON.stringify(result)
-				});
-				messages.push(toolMsg);
-				weatherMessages = [...messages];
-			}
-
-			const final = await model.invoke(messages);
-			messages.push(final as AIMessage);
-			weatherMessages = [...messages];
+			);
+			weatherMessages = out.messages.map(deserializeMsg);
 		} finally {
 			weatherRun = false;
 		}
@@ -70,47 +125,47 @@
 		calcMessages = [];
 		try {
 			const exprForRun = calcExpr;
-			const model = new MockChatModel({
-				responder: (_msgs, turn) => {
-					if (turn === 0) {
-						return {
-							content: '',
-							toolCalls: [
-								{ name: 'calculator', args: { expression: exprForRun }, id: 'call_1' }
-							]
-						};
+			const out = await withRunCache<ConvoPayload>(
+				{ demoId: 'l1-tools-calc' },
+				async () => {
+					const baseModel = await getModel({ temperature: 0, maxTokens: 256 });
+					const model = baseModel.bindTools!([calculatorTool]) as unknown as BoundModel;
+					const messages: BaseMessage[] = [new HumanMessage(`Compute ${exprForRun}.`)];
+					calcMessages = [...messages];
+
+					let safety = 0;
+					while (safety++ < 4) {
+						const ai = (await model.invoke(messages)) as AIMessage;
+						messages.push(ai);
+						calcMessages = [...messages];
+						if (!ai.tool_calls?.length) break;
+						for (const tc of ai.tool_calls) {
+							const result = await calculatorTool.invoke(tc.args as { expression: string });
+							messages.push(
+								new ToolMessage({
+									tool_call_id: tc.id ?? '',
+									content: typeof result === 'string' ? result : JSON.stringify(result)
+								})
+							);
+							calcMessages = [...messages];
+						}
 					}
-					const cleaned = exprForRun.replace(/[^0-9+\-*/(). ]/g, '');
-					const value = Function(`"use strict"; return (${cleaned});`)();
-					return { content: `The result is ${value}.` };
+
+					return { messages: messages.map(serializeMsg) };
 				}
-			}).bindTools([calculatorTool]) as unknown as BoundModel;
-
-			const messages: BaseMessage[] = [new HumanMessage(`Compute ${exprForRun}.`)];
-			calcMessages = [...messages];
-
-			const ai = (await model.invoke(messages)) as AIMessage;
-			messages.push(ai);
-			calcMessages = [...messages];
-
-			for (const tc of ai.tool_calls ?? []) {
-				const result = await calculatorTool.invoke(tc.args as { expression: string });
-				messages.push(
-					new ToolMessage({
-						tool_call_id: tc.id ?? '',
-						content: typeof result === 'string' ? result : JSON.stringify(result)
-					})
-				);
-				calcMessages = [...messages];
-			}
-
-			const final = await model.invoke(messages);
-			messages.push(final as AIMessage);
-			calcMessages = [...messages];
+			);
+			calcMessages = out.messages.map(deserializeMsg);
 		} finally {
 			calcRun = false;
 		}
 	}
+
+	onMount(async () => {
+		const cw = await loadCachedRun<ConvoPayload>({ demoId: 'l1-tools-weather' });
+		if (cw) weatherMessages = cw.payload.messages.map(deserializeMsg);
+		const cc = await loadCachedRun<ConvoPayload>({ demoId: 'l1-tools-calc' });
+		if (cc) calcMessages = cc.payload.messages.map(deserializeMsg);
+	});
 
 	const codeTool = `import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
@@ -126,46 +181,79 @@ export const weatherTool = tool(
   }
 );
 
-const model = new ChatOpenAI({ model: 'gpt-4o-mini' })
+const model = new ChatAnthropic({ model: 'claude-haiku-4-5' })
   .bindTools([weatherTool]);
 
 const ai = await model.invoke('What is the weather in Tokyo?');
 // ai.tool_calls = [{ name: 'get_weather', args: { city: 'Tokyo' }, id: 'call_...' }]`;
 </script>
 
-<Lesson title="Tools" eyebrow="Phase 1 · Lesson 04">
+<Lesson
+	title="Tools"
+	eyebrow="Phase 1 · Lesson 04"
+	motivation="A model that can call functions stops being a chat partner and becomes a participant in your system. Everything in agent design starts here."
+	hero={{
+		id: 'l1-tools',
+		alt: 'A scholar reaches for a wall of pegboard tools'
+	}}
+>
 	{#snippet intro()}
 		<p>
-			A tool is a typed function the model is allowed to call. The runtime handles the
-			plumbing: a JSON schema goes to the model, the model emits a tool call, you execute it,
-			the result goes back as a tool message, and the loop continues.
+			A <Term t="tool" /> is a typed function the model is allowed to call. The runtime handles
+			the plumbing: a JSON schema goes to the model, the model emits a tool call, you execute
+			it, the result returns as a tool message, and the loop continues.
 		</p>
 	{/snippet}
 
 	{#snippet narrative()}
-		<Slide title="Defining a tool">
+		<Slide
+			eyebrow="Why this shape"
+			title="From oracle to participant"
+			variant="dropcap"
+		>
 			<p>
-				Use the <code>tool()</code> helper from <code>@langchain/core/tools</code>. You give it
-				a function, a name, a description, and a Zod schema for its arguments. The schema is
-				also what's sent to the model as a JSON schema.
+				Early language models were oracles. You asked a question, you got a paragraph back,
+				and any real-world side-effect happened somewhere else, written by you, plumbed by
+				you, debugged by you. The model never touched the world.
 			</p>
-			<CodeBlock code={codeTool} caption="A typed weather tool." />
+			<p>
+				Tool calling inverts that. You hand the model a small toolbox — typed functions with
+				descriptions — and the model decides, turn by turn, which one to reach for. The
+				oracle becomes a colleague. Every agent in this course is, at its heart, a
+				well-designed toolbox plus a loop that lets the model use it.
+			</p>
+		</Slide>
+
+		<Slide title="Defining a tool" variant="code-first">
+			<CodeBlock code={codeTool} lang="ts" caption="A typed weather tool, then bound to a model." />
+			<p>
+				Use the <code>tool()</code> helper from <code>@langchain/core/tools</code>. You give
+				it a function, a name, a description, and a Zod schema for its arguments. The schema
+				doubles as the JSON schema sent to the model.
+			</p>
 		</Slide>
 
 		<Slide title="bindTools, then invoke">
 			<p>
-				Call <code>model.bindTools([...])</code> to attach tools to a chat model. The model can
-				now respond with either content or a list of <code>tool_calls</code>. Your job is to
-				execute each call, return its output as a <code>ToolMessage</code>, and ask the model
-				to continue.
+				Call <code>model.bindTools([...])</code> to attach tools to a chat model. The model
+				can now respond with either content or a list of <code>tool_calls</code>. Your job
+				is to execute each call, return its output as a <code>ToolMessage</code>, and ask
+				the model to continue.
+			</p>
+		</Slide>
+
+		<Slide variant="pull-quote">
+			<p>
+				A tool definition is the smallest unit of agency a model is allowed to have. Choose
+				its description carefully — that is the model's user manual.
 			</p>
 		</Slide>
 
 		<Slide title="Two demos">
 			<p>
-				Demo 1 looks up the weather. Demo 2 evaluates an arithmetic expression. Both are
-				deterministic so the lesson always works — but the tool execution and message routing
-				are real LangChain code. Watch the message timeline on the right grow:
+				Demo 1 looks up the weather for a city. Demo 2 evaluates an arithmetic expression.
+				Both tools run in the browser; the model is whichever provider you have configured.
+				Watch the message timeline on the right grow:
 				<em>human → assistant (tool_call) → tool → assistant (final)</em>.
 			</p>
 		</Slide>
@@ -173,10 +261,14 @@ const ai = await model.invoke('What is the weather in Tokyo?');
 		<Slide title="Why small in-browser models flake here">
 			<p>
 				Tool calling depends on the model emitting precisely-formatted JSON. Smaller models
-				(under ~1B) often hallucinate field names, miss required args, or skip the call
-				entirely. That's why the LangX setup page recommends Qwen3 0.6B for tool demos, or a
-				hosted provider via your own API key.
+				(under ~1B parameters) often hallucinate field names, miss required args, or skip
+				the call entirely. That is why the LangX setup page recommends Qwen3 0.6B for tool
+				demos, or a hosted provider via your own API key.
 			</p>
+		</Slide>
+
+		<Slide ornament>
+			<p>Typed in. Typed out. The loop does the rest.</p>
 		</Slide>
 	{/snippet}
 
@@ -214,19 +306,20 @@ const ai = await model.invoke('What is the weather in Tokyo?');
 	}
 	.row span {
 		font-size: 0.78rem;
-		color: var(--color-fg-faint);
+		color: var(--color-ink-300);
+		font-family: var(--font-mono);
 	}
 	input {
 		background: var(--color-bg);
-		border: 1px solid var(--color-border);
+		border: 1px solid var(--color-rule);
 		border-radius: 0.4rem;
 		padding: 0.45rem 0.6rem;
 		font-size: 0.88rem;
-		color: var(--color-fg);
+		color: var(--color-ink-100);
 	}
 	input:focus {
 		outline: none;
-		border-color: var(--accent);
+		border-color: var(--accent-ink);
 	}
 	.stream {
 		margin-top: 0.85rem;

@@ -5,134 +5,237 @@
 	import Panel from '$lib/components/Panel.svelte';
 	import CodeBlock from '$lib/components/CodeBlock.svelte';
 	import RunButton from '$lib/components/RunButton.svelte';
-	import GraphView from '$lib/components/GraphView.svelte';
+	import LangGraphView from '$lib/components/LangGraphView.svelte';
 	import StateInspector from '$lib/components/StateInspector.svelte';
 	import { Annotation, StateGraph, START, END } from '@langchain/langgraph/web';
+	import { ChatPromptTemplate } from '@langchain/core/prompts';
+	import { StringOutputParser } from '@langchain/core/output_parsers';
+	import { getModel } from '$lib/runtime/llm';
+	import { withRunCache, loadCachedRun } from '$lib/runtime/runs';
+	import { onMount } from 'svelte';
+
+	type Category = 'billing' | 'tech' | 'general';
+
+	interface RoutePayload {
+		query: string;
+		category: Category;
+		answer: string;
+	}
+
+	interface MergePayload {
+		notes: string[];
+		score: number;
+		lastWriter: string;
+	}
 
 	let userQuery = $state('How do I refund order #12345?');
 	let routeRun = $state(false);
-	let routeResult = $state<unknown>(null);
+	let routeResult = $state<RoutePayload | null>(null);
 	let routePath = $state<string[]>([]);
+
+	function isCategory(s: string): s is Category {
+		return s === 'billing' || s === 'tech' || s === 'general';
+	}
 
 	async function runRouter() {
 		routeRun = true;
 		routePath = [];
 		routeResult = null;
 		try {
+			const model = await getModel({ temperature: 0, maxTokens: 60 });
+			const replyModel = await getModel({ temperature: 0.2, maxTokens: 220 });
+
 			const State = Annotation.Root({
 				query: Annotation<string>(),
-				category: Annotation<string>(),
+				category: Annotation<Category>(),
 				answer: Annotation<string>()
 			});
 
-			const classify = (s: typeof State.State) => {
-				const q = s.query.toLowerCase();
-				if (/refund|charge|payment|invoice/.test(q)) return { category: 'billing' };
-				if (/error|broken|crash|bug/.test(q)) return { category: 'tech' };
-				return { category: 'general' };
-			};
+			const classifyPrompt = ChatPromptTemplate.fromMessages([
+				[
+					'system',
+					'Classify a customer message into exactly one of: billing, tech, general. Respond with only the lowercase label.'
+				],
+				['human', '{query}']
+			]);
+			const replyPromptFor = (kind: Category) =>
+				ChatPromptTemplate.fromMessages([
+					[
+						'system',
+						`You are a ${kind} support agent. Reply concisely (≤ 50 words). Be helpful and warm; no greetings.`
+					],
+					['human', '{query}']
+				]);
+			const parser = new StringOutputParser();
 
-			const billing = (s: typeof State.State) => ({
-				answer: `[Billing] We can issue a refund for "${s.query}". Allow 3–5 business days.`
-			});
-			const tech = (s: typeof State.State) => ({
-				answer: `[Tech] Sorry to hear "${s.query}". Try clearing your cache and reloading.`
-			});
-			const general = (s: typeof State.State) => ({
-				answer: `[General] Thanks for reaching out about "${s.query}". A teammate will reply soon.`
-			});
+			const out = await withRunCache<RoutePayload>(
+				{ demoId: `l2-conditional-route` },
+				async () => {
+					const graph = new StateGraph(State)
+						.addNode('classify', async (s) => {
+							routePath = [...routePath, 'classify'];
+							const raw = await classifyPrompt
+								.pipe(model)
+								.pipe(parser)
+								.invoke({ query: s.query });
+							const guess = raw.trim().toLowerCase().split(/\s+/)[0];
+							const category = isCategory(guess) ? guess : 'general';
+							return { category };
+						})
+						.addNode('billing', async (s) => {
+							routePath = [...routePath, 'billing'];
+							const a = await replyPromptFor('billing')
+								.pipe(replyModel)
+								.pipe(parser)
+								.invoke({ query: s.query });
+							return { answer: `[Billing] ${a}` };
+						})
+						.addNode('tech', async (s) => {
+							routePath = [...routePath, 'tech'];
+							const a = await replyPromptFor('tech')
+								.pipe(replyModel)
+								.pipe(parser)
+								.invoke({ query: s.query });
+							return { answer: `[Tech] ${a}` };
+						})
+						.addNode('general', async (s) => {
+							routePath = [...routePath, 'general'];
+							const a = await replyPromptFor('general')
+								.pipe(replyModel)
+								.pipe(parser)
+								.invoke({ query: s.query });
+							return { answer: `[General] ${a}` };
+						})
+						.addEdge(START, 'classify')
+						.addConditionalEdges('classify', (s) => s.category, {
+							billing: 'billing',
+							tech: 'tech',
+							general: 'general'
+						})
+						.addEdge('billing', END)
+						.addEdge('tech', END)
+						.addEdge('general', END)
+						.compile();
 
-			const graph = new StateGraph(State)
-				.addNode('classify', async (s) => {
-					routePath = [...routePath, 'classify'];
-					await new Promise((r) => setTimeout(r, 200));
-					return classify(s);
-				})
-				.addNode('billing', async (s) => {
-					routePath = [...routePath, 'billing'];
-					await new Promise((r) => setTimeout(r, 200));
-					return billing(s);
-				})
-				.addNode('tech', async (s) => {
-					routePath = [...routePath, 'tech'];
-					await new Promise((r) => setTimeout(r, 200));
-					return tech(s);
-				})
-				.addNode('general', async (s) => {
-					routePath = [...routePath, 'general'];
-					await new Promise((r) => setTimeout(r, 200));
-					return general(s);
-				})
-				.addEdge(START, 'classify')
-				.addConditionalEdges('classify', (s) => s.category, {
-					billing: 'billing',
-					tech: 'tech',
-					general: 'general'
-				})
-				.addEdge('billing', END)
-				.addEdge('tech', END)
-				.addEdge('general', END)
-				.compile();
-
-			routeResult = await graph.invoke({ query: userQuery, category: '', answer: '' });
-			routePath = [...routePath, 'end'];
+					const final = (await graph.invoke({
+						query: userQuery,
+						category: 'general',
+						answer: ''
+					})) as RoutePayload;
+					routePath = [...routePath, '__end__'];
+					return final;
+				}
+			);
+			routeResult = out;
 		} finally {
 			routeRun = false;
 		}
 	}
 
 	let mergeRun = $state(false);
-	let mergeResult = $state<unknown>(null);
+	let mergeResult = $state<MergePayload | null>(null);
 
 	async function runMerge() {
 		mergeRun = true;
 		mergeResult = null;
 		try {
-			const State = Annotation.Root({
-				notes: Annotation<string[]>({
-					reducer: (a, b) => [...a, ...b],
-					default: () => []
-				}),
-				score: Annotation<number>({
-					reducer: (a, b) => a + b,
-					default: () => 0
-				}),
-				lastWriter: Annotation<string>()
-			});
+			const out = await withRunCache<MergePayload>(
+				{ demoId: 'l2-conditional-merge' },
+				async () => {
+					const State = Annotation.Root({
+						notes: Annotation<string[]>({
+							reducer: (a, b) => [...a, ...b],
+							default: () => []
+						}),
+						score: Annotation<number>({
+							reducer: (a, b) => a + b,
+							default: () => 0
+						}),
+						lastWriter: Annotation<string>()
+					});
 
-			const research = () => ({ notes: ['research: found 3 sources'], score: 1, lastWriter: 'research' });
-			const draft = () => ({ notes: ['draft: 250 words'], score: 2, lastWriter: 'draft' });
-			const review = () => ({ notes: ['review: 4 nits found'], score: -1, lastWriter: 'review' });
+					const research = () => ({
+						notes: ['research: found 3 sources'],
+						score: 1,
+						lastWriter: 'research'
+					});
+					const draft = () => ({
+						notes: ['draft: 250 words'],
+						score: 2,
+						lastWriter: 'draft'
+					});
+					const review = () => ({
+						notes: ['review: 4 nits found'],
+						score: -1,
+						lastWriter: 'review'
+					});
 
-			const graph = new StateGraph(State)
-				.addNode('research', research)
-				.addNode('draft', draft)
-				.addNode('review', review)
-				.addEdge(START, 'research')
-				.addEdge(START, 'draft')
-				.addEdge('research', 'review')
-				.addEdge('draft', 'review')
-				.addEdge('review', END)
-				.compile();
-			mergeResult = await graph.invoke({});
+					const graph = new StateGraph(State)
+						.addNode('research', research)
+						.addNode('draft', draft)
+						.addNode('review', review)
+						.addEdge(START, 'research')
+						.addEdge(START, 'draft')
+						.addEdge('research', 'review')
+						.addEdge('draft', 'review')
+						.addEdge('review', END)
+						.compile();
+					return (await graph.invoke({})) as MergePayload;
+				}
+			);
+			mergeResult = out;
 		} finally {
 			mergeRun = false;
 		}
 	}
 
+	onMount(async () => {
+		const cachedRoute = await loadCachedRun<RoutePayload>({ demoId: 'l2-conditional-route' });
+		if (cachedRoute) {
+			routeResult = cachedRoute.payload;
+			routePath = ['classify', cachedRoute.payload.category, 'end'];
+		}
+		const cachedMerge = await loadCachedRun<MergePayload>({ demoId: 'l2-conditional-merge' });
+		if (cachedMerge) mergeResult = cachedMerge.payload;
+		// Map cached path 'end' → real LangGraph node id '__end__'.
+		if (routePath.includes('end')) routePath = routePath.map((p) => (p === 'end' ? '__end__' : p));
+	});
+
+	// Viz-only graph for the router. Same nodes / same edges, no model calls.
+	const RouteVizState = Annotation.Root({
+		query: Annotation<string>(),
+		category: Annotation<Category>(),
+		answer: Annotation<string>()
+	});
+	const routeVizGraph = new StateGraph(RouteVizState)
+		.addNode('classify', async () => ({}))
+		.addNode('billing', async () => ({}))
+		.addNode('tech', async () => ({}))
+		.addNode('general', async () => ({}))
+		.addEdge(START, 'classify')
+		.addConditionalEdges('classify', () => 'general', {
+			billing: 'billing',
+			tech: 'tech',
+			general: 'general'
+		})
+		.addEdge('billing', END)
+		.addEdge('tech', END)
+		.addEdge('general', END)
+		.compile();
+
 	const codeRoute = `const State = Annotation.Root({
   query: Annotation<string>(),
-  category: Annotation<string>(),
+  category: Annotation<'billing' | 'tech' | 'general'>(),
   answer: Annotation<string>()
 });
 
 const graph = new StateGraph(State)
-  .addNode('classify', classifyFn)
-  .addNode('billing',  billingFn)
-  .addNode('tech',     techFn)
-  .addNode('general',  generalFn)
+  .addNode('classify', classifyWithLLM)        // returns { category }
+  .addNode('billing',  billingReply)
+  .addNode('tech',     techReply)
+  .addNode('general',  generalReply)
   .addEdge(START, 'classify')
-  // The router returns a key into the third arg's lookup table.
+  // Router returns a key into the third arg's lookup table.
   .addConditionalEdges('classify', (s) => s.category, {
     billing: 'billing',
     tech: 'tech',
@@ -145,18 +248,26 @@ const graph = new StateGraph(State)
 
 	const codeMerge = `const State = Annotation.Root({
   notes: Annotation<string[]>({
-    reducer: (a, b) => [...a, ...b],   // concat — accumulates across nodes
+    reducer: (a, b) => [...a, ...b],   // concat — accumulate across nodes
     default: () => []
   }),
   score: Annotation<number>({
-    reducer: (a, b) => a + b,          // sum
+    reducer: (a, b) => a + b,          // sum — combine numeric updates
     default: () => 0
   }),
   lastWriter: Annotation<string>()      // default = last-write-wins
 });`;
 </script>
 
-<Lesson title="Conditional edges & reducers" eyebrow="Phase 2 · Lesson 02">
+<Lesson
+	title="Conditional edges & reducers"
+	eyebrow="Phase 2 · Lesson 02"
+	motivation="The agent's choices need a place to live. Conditional edges plus reducers turn 'what next?' from a prompt-engineering trick into a routing decision your code can read."
+	hero={{
+		id: 'l2-conditional-edges',
+		alt: 'A railway switch viewed from above with two tracks merging into one'
+	}}
+>
 	{#snippet intro()}
 		<p>
 			A graph is a router and a merge strategy in one. Conditional edges decide where execution
@@ -166,74 +277,93 @@ const graph = new StateGraph(State)
 	{/snippet}
 
 	{#snippet narrative()}
-		<Slide title="Conditional edges">
+		<Slide eyebrow="Why this shape" title="Routing is a design surface" variant="dropcap">
 			<p>
-				<code>addConditionalEdges('source', router, mapping)</code> calls the router with the
-				current state and uses the returned key to look up the next node. You can return any
-				string, an array of strings (run multiple branches), or an array of <code>Send</code>{' '}
-				objects (covered in a later lesson).
+				Without conditional edges, every "if/else" inside an agent collapses into a prompt
+				instruction the model may or may not follow. With them, your routing logic becomes a
+				piece of code your colleagues can read, your tests can hit, and your monitoring can
+				count. The model's job becomes <em>producing the signal</em>; the graph decides what
+				to do with it.
 			</p>
-			<CodeBlock code={codeRoute} caption="A simple support-ticket triage graph." />
+			<p>
+				Reducers play the same trick on writes. When two nodes can update the same field, you
+				stop hoping last-write-wins is the right semantics and you spell out exactly how
+				updates combine. The state schema becomes a contract instead of a guess.
+			</p>
 		</Slide>
 
-		<Slide title="Why reducers exist">
+		<Slide title="Conditional edges" variant="code-first">
+			<p>
+				<code>addConditionalEdges('source', router, mapping)</code> calls the router with
+				the current state and uses the returned key to look up the next node. You can return
+				any string, an array of strings (run multiple branches), or an array of <code>Send</code>
+				objects (covered in lesson 06).
+			</p>
+			<CodeBlock code={codeRoute} caption="A real-LLM support-ticket triage graph." />
+		</Slide>
+
+		<Slide variant="pull-quote">
+			<p>
+				The model produces signal. The graph produces structure. Conditional edges are where
+				the two meet, and where most production agent bugs are caught.
+			</p>
+		</Slide>
+
+		<Slide title="Why reducers exist" variant="code-first">
 			<p>
 				When two nodes run in parallel and both write to <code>messages</code>, who wins? With
 				default last-write-wins semantics, you'd silently lose data. Reducers tell the runtime
-				how to merge the two writes — concatenate, sum, dedupe, whatever your domain wants.
+				how to merge writes — concatenate, sum, dedupe, whatever your domain wants.
 			</p>
 			<CodeBlock code={codeMerge} caption="Three reducer styles in one schema." />
 			<p>
-				The most common one is <code>messages</code> with the built-in
-				<code>add_messages</code> reducer (we used it implicitly in the last lesson via{' '}
-				<code>MessagesAnnotation</code>).
+				The most common reducer is <code>messages</code> with the built-in
+				<code>add_messages</code> reducer (you used it implicitly via
+				<code>MessagesAnnotation</code> in lesson 01).
 			</p>
 		</Slide>
 
 		<Slide title="Run them">
 			<p>
-				Demo 1 routes a single query through one of three specialist nodes. Demo 2 fans out to
-				research and draft in parallel; both append to the same <code>notes</code> list and
-				both update <code>score</code> via a sum reducer. Watch the final state on the right —
-				the order of research vs. draft entries depends on which finished first.
+				Demo 1 routes a real customer message through a real LLM classifier. Demo 2 fans
+				research and draft into review; both append to <code>notes</code> and both update
+				<code>score</code> via a sum reducer. The order of research vs. draft entries depends
+				on which finished first — that's the merge in action.
+			</p>
+		</Slide>
+
+		<Slide title="What this unlocks" ornament>
+			<p>
+				Conditional edges are the runtime surface for every router-style agent (triage,
+				multi-tool selection, escalation). Reducers are the substrate every "concurrent
+				writers" pattern in this chapter rests on.
 			</p>
 		</Slide>
 	{/snippet}
 
 	{#snippet demo()}
-		<Panel title="Demo 1 · Conditional routing" subtitle="addConditionalEdges">
+		<Panel title="Demo 1 · LLM-routed triage" subtitle="addConditionalEdges + real classifier">
 			<label class="row">
 				<span>Customer message</span>
 				<input type="text" bind:value={userQuery} />
 			</label>
 			<RunButton onclick={runRouter} running={routeRun} />
 			{#if routeResult}
-				<StateInspector state={routeResult} title="Final state" compact />
+				<div class="route">
+					<div class="lbl">category</div>
+					<code class="cat">{routeResult.category}</code>
+					<div class="lbl">answer</div>
+					<p class="answer">{routeResult.answer}</p>
+				</div>
 			{/if}
 		</Panel>
 
-		<Panel title="Live graph (Demo 1)">
-			<GraphView
-				nodes={[
-					{ id: 'start', label: '·', x: 50, y: 40, kind: 'start' },
-					{ id: 'classify', label: 'classify', x: 50, y: 100 },
-					{ id: 'billing', label: 'billing', x: 180, y: 60 },
-					{ id: 'tech', label: 'tech', x: 180, y: 130 },
-					{ id: 'general', label: 'general', x: 180, y: 200 },
-					{ id: 'end', label: '·', x: 320, y: 130, kind: 'end' }
-				]}
-				edges={[
-					{ from: 'start', to: 'classify' },
-					{ from: 'classify', to: 'billing', conditional: true, label: 'billing' },
-					{ from: 'classify', to: 'tech', conditional: true, label: 'tech' },
-					{ from: 'classify', to: 'general', conditional: true, label: 'general' },
-					{ from: 'billing', to: 'end' },
-					{ from: 'tech', to: 'end' },
-					{ from: 'general', to: 'end' }
-				]}
+		<Panel title="Live graph (Demo 1)" subtitle="rendered from getGraphAsync().drawMermaid()">
+			<LangGraphView
+				graph={routeVizGraph}
 				path={routePath}
-				width={420}
-				height={260}
+				activeNode={routePath[routePath.length - 1]}
+				caption="Native LangGraph diagram · classify → billing/tech/general → end"
 			/>
 		</Panel>
 
@@ -255,18 +385,49 @@ const graph = new StateGraph(State)
 	}
 	.row span {
 		font-size: 0.78rem;
-		color: var(--color-fg-faint);
+		color: var(--color-ink-300);
+		font-family: var(--font-mono);
 	}
 	input {
 		background: var(--color-bg);
-		border: 1px solid var(--color-border);
+		border: 1px solid var(--color-rule);
 		border-radius: 0.4rem;
 		padding: 0.45rem 0.6rem;
 		font-size: 0.88rem;
-		color: var(--color-fg);
+		color: var(--color-ink-100);
 	}
 	input:focus {
 		outline: none;
-		border-color: var(--accent);
+		border-color: var(--accent-ink);
+	}
+
+	.route {
+		margin-top: 0.85rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+	.lbl {
+		font-size: 0.66rem;
+		text-transform: uppercase;
+		letter-spacing: 0.14em;
+		color: var(--color-ink-300);
+		font-family: var(--font-mono);
+	}
+	.cat {
+		font-family: var(--font-mono);
+		color: var(--accent-ink);
+		font-size: 0.85rem;
+	}
+	.answer {
+		margin: 0;
+		padding: 0.6rem 0.75rem;
+		background: var(--color-bg);
+		border: 1px solid var(--color-rule);
+		border-radius: 0.4rem;
+		font-family: var(--font-prose);
+		font-size: 0.95rem;
+		line-height: 1.55;
+		color: var(--color-ink-100);
 	}
 </style>

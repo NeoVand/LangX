@@ -20,10 +20,20 @@ export interface ThreadRecord {
 	checkpoints: unknown;
 }
 
+export interface RunRecord {
+	demoId: string;
+	provider: string;
+	model: string;
+	updated: number;
+	durationMs: number;
+	payload: unknown;
+}
+
 export class LangxDb extends Dexie {
 	memories!: Table<MemoryRecord, string>;
 	files!: Table<FileRecord, [string, string]>;
 	threads!: Table<ThreadRecord, string>;
+	runs!: Table<RunRecord, string>;
 
 	constructor() {
 		super('langx');
@@ -32,6 +42,16 @@ export class LangxDb extends Dexie {
 			files: '[scope+path], scope, updated',
 			threads: 'threadId, createdAt'
 		});
+		this.version(2)
+			.stores({
+				memories: 'path, updated',
+				files: '[scope+path], scope, updated',
+				threads: 'threadId, createdAt',
+				runs: 'demoId, updated'
+			})
+			.upgrade(async () => {
+				/* runs is a new table, no migration needed */
+			});
 	}
 }
 
@@ -78,4 +98,24 @@ export async function deleteFile(scope: string, path: string) {
 
 export async function clearScope(scope: string) {
 	await db().files.where('scope').equals(scope).delete();
+}
+
+export async function getRun(demoId: string): Promise<RunRecord | null> {
+	if (!browser) return null;
+	return (await db().runs.get(demoId)) ?? null;
+}
+
+export async function putRun(record: Omit<RunRecord, 'updated'>): Promise<void> {
+	if (!browser) return;
+	await db().runs.put({ ...record, updated: Date.now() });
+}
+
+export async function listRuns(): Promise<RunRecord[]> {
+	if (!browser) return [];
+	return await db().runs.orderBy('updated').reverse().toArray();
+}
+
+export async function deleteRun(demoId: string): Promise<void> {
+	if (!browser) return;
+	await db().runs.delete(demoId);
 }

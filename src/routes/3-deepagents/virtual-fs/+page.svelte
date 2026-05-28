@@ -1,197 +1,221 @@
 <script lang="ts">
 	import Lesson from '$lib/components/Lesson.svelte';
 	import Slide from '$lib/components/Slide.svelte';
+	import Term from '$lib/components/Term.svelte';
 	import Panel from '$lib/components/Panel.svelte';
 	import CodeBlock from '$lib/components/CodeBlock.svelte';
 	import RunButton from '$lib/components/RunButton.svelte';
 	import FileTreeViewer from '$lib/components/FileTreeViewer.svelte';
 	import TraceLog from '$lib/components/TraceLog.svelte';
 	import { createDeepAgent, StateBackend, type VirtualFile } from '$lib/deepagents';
-	import { MockChatModel, type ScriptedResponse } from '$lib/runtime/llm/mock';
+	import { getModel } from '$lib/runtime/llm';
+	import { withRunCache, loadCachedRun } from '$lib/runtime/runs';
 	import { createTracer } from '$lib/runtime/tracer';
 	import type { TraceEvent } from '$lib/runtime/tracer/types';
 
-	let scenario = $state<'organize' | 'edit'>('organize');
+	type Scenario = 'organize' | 'edit';
+
+	interface RunPayload {
+		scenario: Scenario;
+		files: VirtualFile[];
+		events: TraceEvent[];
+		finalText: string;
+	}
+
+	let scenario = $state<Scenario>('organize');
 	let busy = $state(false);
 	let files = $state<VirtualFile[]>([]);
 	let events = $state<TraceEvent[]>([]);
+	let finalText = $state<string>('');
 
-	function organizeScript(): ScriptedResponse[] {
-		return [
-			{
-				content: '',
-				toolCalls: [
-					{
-						name: 'write_file',
-						args: {
-							path: '/scratch/raw.md',
-							content:
-								'shopping: milk, eggs, bread\nideas: drone delivery for groceries\ntodo: respond to alex'
-						}
-					}
-				]
-			},
-			{
-				content: '',
-				toolCalls: [
-					{
-						name: 'write_file',
-						args: { path: '/notes/shopping.md', content: '- milk\n- eggs\n- bread' }
-					}
-				]
-			},
-			{
-				content: '',
-				toolCalls: [
-					{
-						name: 'write_file',
-						args: { path: '/notes/ideas.md', content: '- drone delivery for groceries' }
-					}
-				]
-			},
-			{
-				content: '',
-				toolCalls: [
-					{
-						name: 'write_file',
-						args: {
-							path: '/notes/todo.md',
-							content: '- respond to alex'
-						}
-					}
-				]
-			},
-			{
-				content: '',
-				toolCalls: [{ name: 'ls', args: {} }]
-			},
-			{
-				content:
-					'Sorted three categories of notes from /scratch/raw.md into /notes/. The originals stay in /scratch/ for traceability.'
-			}
-		];
-	}
+	const PROMPT: Record<Scenario, { input: string; instructions: string }> = {
+		organize: {
+			instructions: `You are an autonomous file organizer. The user will hand you a free-form note
+dump. Split it into one file per category under /notes/, named /notes/<category>.md.
+Each category file must contain a bulleted list of its items, one per line, prefixed with "- ".
+After the writes, run ls() once and reply with one short sentence summarising what you did.
+Do not chat. Only call tools until the work is complete.`,
+			input: `Organize this raw dump into /notes/:
 
-	function editScript(): ScriptedResponse[] {
-		return [
-			{
-				content: '',
-				toolCalls: [
-					{
-						name: 'write_file',
-						args: {
-							path: '/code/util.ts',
-							content: `export function greet(name: string) {
+shopping: milk, eggs, bread
+ideas: drone delivery for groceries, voice-first todo list
+todo: respond to alex, finish the brief`
+		},
+		edit: {
+			instructions: `You are a careful refactor agent. First write the file you're given at the exact
+path requested using write_file. Then use edit_file to replace the marked line with the requested
+replacement (oldString must be unique). Then read_file to confirm. Reply with one short summary line.
+Use tools only; do not chat.`,
+			input: `Create /code/util.ts with this exact contents:
+
+export function greet(name: string) {
   return 'Hello, ' + name;
-}`
-						}
-					}
-				]
-			},
-			{
-				content: '',
-				toolCalls: [
-					{
-						name: 'edit_file',
-						args: {
-							path: '/code/util.ts',
-							oldString: "'Hello, ' + name",
-							newString: '`Hi, ${name}!`'
-						}
-					}
-				]
-			},
-			{
-				content: '',
-				toolCalls: [
-					{ name: 'read_file', args: { path: '/code/util.ts' } }
-				]
-			},
-			{
-				content: 'Replaced the concatenation with a template literal and re-read to verify.'
-			}
-		];
-	}
+}
+
+Then edit it so the body becomes:  return \`Hi, \${name}!\`;
+Then read_file to verify.`
+		}
+	};
 
 	async function run() {
 		busy = true;
 		files = [];
 		events = [];
+		finalText = '';
 		try {
-			const tracer = createTracer();
-			tracer.subscribe((ev) => (events = [...events, ev]));
+			const result = await withRunCache<RunPayload>(
+				{ demoId: `l3-virtual-fs-${scenario}` },
+				async () => {
+					const localEvents: TraceEvent[] = [];
+					const tracer = createTracer();
+					tracer.subscribe((ev) => {
+						localEvents.push(ev);
+						events = [...localEvents];
+					});
 
-			const model = new MockChatModel({
-				responses: scenario === 'organize' ? organizeScript() : editScript(),
-				tokenDelayMs: 0
-			});
-			const backend = new StateBackend();
-			const agent = createDeepAgent({
-				model,
-				backend,
-				instructions: 'Operate on the virtual filesystem to organize the user\'s notes.',
-				tracer
-			});
+					const model = await getModel({ temperature: 0, maxTokens: 800 });
+					const backend = new StateBackend();
+					const agent = createDeepAgent({
+						model,
+						backend,
+						instructions: PROMPT[scenario].instructions,
+						tracer,
+						maxIterations: 14
+					});
+					agent.subscribe((s) => {
+						files = [...s.files];
+					});
 
-			agent.subscribe((s) => {
-				files = [...s.files];
-			});
+					const out = await agent.invoke({
+						input: PROMPT[scenario].input,
+						thread: `fs-${scenario}-${Math.random().toString(36).slice(2, 6)}`
+					});
 
-			const userMsg =
-				scenario === 'organize'
-					? 'Take this raw note dump and split it into separate files under /notes/.'
-					: 'Update /code/util.ts to use a template literal instead of string concatenation.';
-
-			await agent.invoke({ input: userMsg, thread: 'fs-' + Math.random().toString(36).slice(2, 6) });
-
-			files = await backend.list();
+					const last = out.messages[out.messages.length - 1];
+					const text =
+						typeof last?.content === 'string'
+							? last.content
+							: JSON.stringify(last?.content ?? '');
+					const finalFiles = await backend.list();
+					return {
+						scenario,
+						files: finalFiles,
+						events: localEvents,
+						finalText: text
+					};
+				}
+			);
+			files = result.files;
+			events = result.events;
+			finalText = result.finalText;
 		} finally {
 			busy = false;
 		}
 	}
 
-	const code = `// 6 tools, all backed by a pluggable backend protocol.
-//   ls()                                     → list files
-//   read_file(path, offset?, limit?)         → read up to {limit} lines
-//   write_file(path, content)                → create or overwrite
-//   edit_file(path, oldString, newString)    → unique-replace surgery
+	$effect(() => {
+		const which = scenario;
+		(async () => {
+			const cached = await loadCachedRun<RunPayload>({
+				demoId: `l3-virtual-fs-${which}`
+			});
+			if (cached && cached.payload.scenario === which) {
+				files = cached.payload.files;
+				events = cached.payload.events;
+				finalText = cached.payload.finalText;
+			} else {
+				files = [];
+				events = [];
+				finalText = '';
+			}
+		})();
+	});
+
+	const surfaceCode = `// All six tools share one BackendProtocol.
+//   ls()                                      → list files
+//   read_file(path, offset?, limit?)          → read up to {limit} lines
+//   write_file(path, content)                 → create or overwrite
+//   edit_file(path, oldString, newString)     → unique-replace surgery
 //   glob(pattern)                             → "src/**/*.ts" style search
 //   grep(pattern, ignoreCase?)                → regex over file contents`;
+
+	const editCode = `// edit_file is intentionally narrow:
+//   - oldString MUST be unique in the file (or pass replaceAll: true).
+//   - If oldString is not found, the tool returns an error the model can read.
+//   - The model adapts; the file is never silently corrupted.
+//
+// This trade-off — expressiveness for safety — is what makes long-running
+// editing agents trustworthy without a diffing harness on top.`;
 </script>
 
-<Lesson title="Virtual filesystem" eyebrow="Phase 3 · Lesson 02">
+<Lesson
+	title="Virtual filesystem"
+	eyebrow="Phase 3 · Lesson 02"
+	motivation="Conversation is bandwidth-limited. The virtual filesystem is how an agent thinks long-form — pin the artifact, edit it, share it with subagents, and never relitigate it in chat."
+	hero={{
+		id: 'l3-virtual-fs',
+		alt: 'A wall of small wooden file drawers with abstract glyph labels'
+	}}
+>
 	{#snippet intro()}
 		<p>
-			The harness gives the agent a six-tool API for working with files. There's no real disk —
-			files live in graph state (or a Store) — but the model thinks like a coder, and that mental
-			model unlocks long-horizon work.
+			The harness gives the agent a six-tool API for working with files. There is no real
+			disk — files live in graph state (or a <Term t="Store" />) — but the model thinks like a
+			coder, and that mental model is what unlocks long-horizon work.
 		</p>
 	{/snippet}
 
 	{#snippet narrative()}
-		<Slide title="Six tools is enough">
-			<CodeBlock code={code} caption="The full filesystem surface." />
+		<Slide eyebrow="Why this shape" title="Files are slower-burning context" variant="dropcap">
 			<p>
-				Why give the model files at all? Because long outputs and accumulating notes shouldn't
-				live in the conversation. A virtual filesystem turns "render in chat" into "write to a
-				path, reference by name."
+				Long outputs do not belong in the conversation. Past a couple hundred tokens, every
+				re-render of an artifact is wasted budget — the model paraphrases its own work and the
+				signal drifts. A virtual filesystem turns "render in chat" into "write to a path,
+				reference by name," and the same artifact survives planning, delegation, and
+				compaction without being rewritten.
+			</p>
+			<p>
+				The result is an agent that can sustain a multi-step project across dozens of turns:
+				it pins what it has produced, edits it surgically, and asks subagents to extend it —
+				rather than re-narrating the entire body of work every round.
 			</p>
 		</Slide>
 
-		<Slide title="edit_file is surgical">
+		<Slide title="Six tools is enough" variant="code-first">
+			<CodeBlock code={surfaceCode} lang="ts" caption="The full filesystem surface." />
 			<p>
-				<code>edit_file</code> requires <code>oldString</code> to be unique in the file (or you
-				pass <code>replaceAll: true</code>). This trades expressiveness for safety — the agent
-				can't accidentally clobber an unrelated occurrence. Demo 2 below uses it.
+				Six tools cover the whole working set a code agent ever asked for: enumerate the
+				workspace, read a slice, write or overwrite, edit precisely, find by glob, search by
+				regex. Everything else is a composition of these.
+			</p>
+		</Slide>
+
+		<Slide variant="pull-quote">
+			<p>
+				A file is the smallest unit of context that an agent can pin, share, and edit without
+				retyping it. Six tools is the smallest API that makes a file usable as a tool of thought.
+			</p>
+		</Slide>
+
+		<Slide title="edit_file is surgical" variant="code-first">
+			<CodeBlock code={editCode} lang="ts" />
+			<p>
+				The agent cannot accidentally clobber an unrelated occurrence. When the unique-match
+				assumption fails, it sees a tool error and revises — the same loop you would use as a
+				human, made explicit.
 			</p>
 		</Slide>
 
 		<Slide title="Two demos">
 			<p>
-				Demo 1 takes a free-form note dump and spreads it across <code>/notes/*.md</code>.
-				Demo 2 writes a tiny utility, edits it precisely, then reads it back to verify. The
-				right pane shows the resulting filesystem and the trace of every tool call.
+				Demo 1 takes a free-form dump and spreads it across <code>/notes/*.md</code>. Demo 2
+				writes a tiny utility, edits one line, and re-reads it to verify. The right pane
+				shows the live filesystem and every tool call as it happens.
 			</p>
+		</Slide>
+
+		<Slide ornament>
+			<p>· vault · drawer · key ·</p>
 		</Slide>
 	{/snippet}
 
@@ -201,7 +225,7 @@
 				<label class:selected={scenario === 'organize'}>
 					<input type="radio" bind:group={scenario} value="organize" />
 					<span>Organize notes</span>
-					<small>Spread a raw note dump across /notes/.</small>
+					<small>Spread a raw dump across /notes/.</small>
 				</label>
 				<label class:selected={scenario === 'edit'}>
 					<input type="radio" bind:group={scenario} value="edit" />
@@ -212,12 +236,18 @@
 			<RunButton onclick={run} running={busy} label="Run agent" />
 		</Panel>
 
-		<Panel title="Filesystem (live)">
-			<FileTreeViewer files={files} />
+		<Panel title="Filesystem (live)" subtitle="files written by the agent">
+			<FileTreeViewer {files} />
 		</Panel>
 
-		<Panel title="Trace">
-			<TraceLog events={events} compact />
+		{#if finalText}
+			<Panel title="Final response">
+				<p class="finaltext">{finalText}</p>
+			</Panel>
+		{/if}
+
+		<Panel title="Trace" subtitle="every tool call as it happened">
+			<TraceLog {events} compact />
 		</Panel>
 	{/snippet}
 </Lesson>
@@ -226,32 +256,42 @@
 	.modes {
 		display: grid;
 		grid-template-columns: 1fr 1fr;
-		gap: 0.5rem;
+		gap: 0.55rem;
 		margin-bottom: 0.85rem;
 	}
 	.modes label {
 		display: flex;
 		flex-direction: column;
 		gap: 0.2rem;
-		padding: 0.55rem 0.7rem;
-		border: 1px solid var(--color-border);
-		border-radius: 0.4rem;
+		padding: 0.6rem 0.75rem;
+		border: 1px solid var(--color-rule);
+		border-radius: 0.45rem;
 		background: var(--color-bg);
 		cursor: pointer;
 	}
 	.modes label.selected {
-		border-color: var(--accent);
-		box-shadow: inset 0 0 0 1px var(--accent);
+		border-color: var(--accent-ink);
+		box-shadow: inset 0 0 0 1px var(--accent-ink);
 	}
 	.modes input {
 		display: none;
 	}
 	.modes span {
+		font-family: var(--font-display);
 		font-weight: 500;
-		font-size: 0.88rem;
+		font-size: 0.92rem;
+		color: var(--color-ink-100);
 	}
 	.modes small {
 		font-size: 0.78rem;
-		color: var(--color-fg-faint);
+		color: var(--color-ink-300);
+		font-family: var(--font-prose);
+	}
+	.finaltext {
+		margin: 0;
+		font-family: var(--font-prose);
+		font-size: 0.98rem;
+		line-height: 1.6;
+		color: var(--color-ink-100);
 	}
 </style>

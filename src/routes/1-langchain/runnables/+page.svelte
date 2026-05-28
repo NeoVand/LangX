@@ -8,8 +8,14 @@
 	import StateInspector from '$lib/components/StateInspector.svelte';
 	import { ChatPromptTemplate } from '@langchain/core/prompts';
 	import { StringOutputParser } from '@langchain/core/output_parsers';
-	import { RunnableLambda, RunnableParallel, RunnablePassthrough } from '@langchain/core/runnables';
-	import { MockChatModel } from '$lib/runtime/llm/mock';
+	import {
+		RunnableLambda,
+		RunnableParallel,
+		RunnablePassthrough
+	} from '@langchain/core/runnables';
+	import { getModel } from '$lib/runtime/llm';
+	import { withRunCache, loadCachedRun } from '$lib/runtime/runs';
+	import { onMount } from 'svelte';
 
 	let topic = $state('the reactor pattern');
 
@@ -17,35 +23,53 @@
 	let demoAResult = $state('');
 	let demoASteps = $state<{ step: string; data: unknown }[]>([]);
 
+	type DemoAPayload = { topic: string; finalText: string; steps: typeof demoASteps };
+
 	async function runDemoA() {
 		demoARun = true;
 		demoAResult = '';
 		demoASteps = [];
 		try {
-			const prompt = ChatPromptTemplate.fromMessages([
-				['system', 'You are a concise tutor. Answer in 1 short paragraph.'],
-				['human', 'Explain {topic} like the reader is a senior engineer who just hasn\'t met it.']
-			]);
-			const model = new MockChatModel({
-				responses: [
-					{
-						content: `${topic.replace(/^the /, '').toUpperCase()} — A senior-engineer one-paragraph summary that pretends to be from a real model. In production you would swap MockChatModel for any provider.`
-					}
-				]
-			});
-			const parser = new StringOutputParser();
-			const chain = prompt.pipe(model).pipe(parser);
+			const out = await withRunCache<DemoAPayload>(
+				{ demoId: 'l1-runnables-pipe' },
+				async () => {
+					const prompt = ChatPromptTemplate.fromMessages([
+						[
+							'system',
+							'You are a concise tutor. Answer in 1 short paragraph (≤ 60 words).'
+						],
+						[
+							'human',
+							"Explain {topic} like the reader is a senior engineer who hasn't met it."
+						]
+					]);
+					const model = await getModel({ temperature: 0.2, maxTokens: 220 });
+					const parser = new StringOutputParser();
 
-			const promptValue = await prompt.invoke({ topic });
-			demoASteps.push({ step: 'prompt → ChatPromptValue', data: promptValue.toChatMessages() });
+					const promptValue = await prompt.invoke({ topic });
+					const steps: { step: string; data: unknown }[] = [];
+					steps.push({
+						step: 'prompt → ChatPromptValue',
+						data: promptValue.toChatMessages().map((m) => ({
+							role: m._getType(),
+							content: m.content
+						}))
+					});
 
-			const response = await model.invoke(promptValue);
-			demoASteps.push({ step: 'model → AIMessage', data: { content: response.content } });
+					const response = await model.invoke(promptValue);
+					steps.push({
+						step: 'model → AIMessage',
+						data: { content: response.content }
+					});
 
-			const finalText = await parser.invoke(response);
-			demoASteps.push({ step: 'parser → string', data: finalText });
+					const finalText = await parser.invoke(response);
+					steps.push({ step: 'parser → string', data: finalText });
 
-			demoAResult = await chain.invoke({ topic });
+					return { topic, finalText, steps };
+				}
+			);
+			demoAResult = out.finalText;
+			demoASteps = out.steps;
 		} finally {
 			demoARun = false;
 		}
@@ -58,55 +82,72 @@
 		demoBRun = true;
 		demoBResult = null;
 		try {
-			const shortModel = new MockChatModel({
-				responder: ({ }, _t) => ({
-					content: `One-sentence summary of "${topic}": it is the named pattern engineers reach for when they want non-blocking I/O on a single thread.`
-				})
-			});
-			const bulletModel = new MockChatModel({
-				responder: () => ({
-					content: `• Demultiplexes events on one thread.\n• Reactors dispatch to handlers.\n• Common in Node.js, Netty, libuv.`
-				})
-			});
-
-			const shortChain = ChatPromptTemplate.fromMessages([
-				['human', 'In one sentence, what is {topic}?']
-			])
-				.pipe(shortModel)
-				.pipe(new StringOutputParser());
-			const bulletChain = ChatPromptTemplate.fromMessages([
-				['human', 'List 3 bullet facts about {topic}.']
-			])
-				.pipe(bulletModel)
-				.pipe(new StringOutputParser());
-
-			const fanout = RunnableParallel.from({
-				short: shortChain,
-				bullets: bulletChain,
-				passthrough: RunnablePassthrough.assign({}).pipe(new RunnableLambda({ func: (x: { topic: string }) => `(input echoed: ${x.topic})` }))
-			});
-
-			const result = (await fanout.invoke({ topic })) as {
+			const result = await withRunCache<{
 				short: string;
 				bullets: string;
 				passthrough: string;
-			};
+			}>({ demoId: 'l1-runnables-fanout' }, async () => {
+				const model = await getModel({ temperature: 0.2, maxTokens: 220 });
+				const shortChain = ChatPromptTemplate.fromMessages([
+					['human', 'In one sentence (≤ 25 words), what is {topic}?']
+				])
+					.pipe(model)
+					.pipe(new StringOutputParser());
+				const bulletChain = ChatPromptTemplate.fromMessages([
+					[
+						'human',
+						'List exactly three short bullet facts about {topic}. Use a leading "• " and one line per bullet. No prose.'
+					]
+				])
+					.pipe(model)
+					.pipe(new StringOutputParser());
+
+				const fanout = RunnableParallel.from({
+					short: shortChain,
+					bullets: bulletChain,
+					passthrough: RunnablePassthrough.assign({}).pipe(
+						new RunnableLambda({
+							func: (x: { topic: string }) => `(input echoed: ${x.topic})`
+						})
+					)
+				});
+
+				return (await fanout.invoke({ topic })) as {
+					short: string;
+					bullets: string;
+					passthrough: string;
+				};
+			});
 			demoBResult = result;
 		} finally {
 			demoBRun = false;
 		}
 	}
 
+	onMount(async () => {
+		const cachedA = await loadCachedRun<DemoAPayload>({ demoId: 'l1-runnables-pipe' });
+		if (cachedA) {
+			demoAResult = cachedA.payload.finalText;
+			demoASteps = cachedA.payload.steps;
+		}
+		const cachedB = await loadCachedRun<{
+			short: string;
+			bullets: string;
+			passthrough: string;
+		}>({ demoId: 'l1-runnables-fanout' });
+		if (cachedB) demoBResult = cachedB.payload;
+	});
+
 	const codeA = `import { ChatPromptTemplate } from '@langchain/core/prompts';
 import { StringOutputParser } from '@langchain/core/output_parsers';
-import { ChatOpenAI } from '@langchain/openai';
+import { ChatAnthropic } from '@langchain/anthropic';
 
 const prompt = ChatPromptTemplate.fromMessages([
   ['system', 'You are a concise tutor.'],
   ['human', 'Explain {topic} in one paragraph.']
 ]);
 
-const model = new ChatOpenAI({ model: 'gpt-4o-mini' });
+const model = new ChatAnthropic({ model: 'claude-haiku-4-5' });
 const parser = new StringOutputParser();
 
 // LCEL: pipe operator composes Runnables left-to-right.
@@ -125,7 +166,15 @@ const fanout = RunnableParallel.from({
 const { short, bullets, passthrough } = await fanout.invoke({ topic });`;
 </script>
 
-<Lesson title="Runnables and LCEL" eyebrow="Phase 1 · Lesson 01">
+<Lesson
+	title="Runnables and LCEL"
+	eyebrow="Phase 1 · Lesson 01"
+	motivation="Before you can build an agent you need a way to compose work. LangChain's answer is a tiny protocol: every step speaks the same four methods, so the pipe between them is real."
+	hero={{
+		id: 'l1-runnables',
+		alt: 'A factory line of brass machines passing a glowing token hand to hand'
+	}}
+>
 	{#snippet intro()}
 		<p>
 			Everything in LangChain is a <Term t="Runnable" />. A prompt template, a chat model, a
@@ -135,6 +184,20 @@ const { short, bullets, passthrough } = await fanout.invoke({ topic });`;
 	{/snippet}
 
 	{#snippet narrative()}
+		<Slide eyebrow="Why this shape" title="Composition first, model second" variant="dropcap">
+			<p>
+				LangChain's earliest designs hard-coded "chain types" — a SummarizationChain, a
+				QuestionAnsweringChain. That made every new use case a new class. The Runnable protocol
+				inverted the design: <strong>shape the pieces alike, and composition does the work</strong>.
+			</p>
+			<p>
+				A senior engineer can read a Runnable diagram the way a plumber reads pipes. Knobs
+				(prompts) feed into chambers (models), get filtered (parsers), and drain into the next
+				system. You don't memorise twenty chain classes; you learn one verb and use it
+				everywhere.
+			</p>
+		</Slide>
+
 		<Slide title="The Runnable protocol">
 			<p>
 				A <Term t="Runnable" /> is anything that exposes <code>invoke</code>,
@@ -150,13 +213,13 @@ const { short, bullets, passthrough } = await fanout.invoke({ topic });`;
 			</ul>
 		</Slide>
 
-		<Slide title="LCEL — the pipe operator">
+		<Slide title="LCEL — the pipe operator" variant="code-first">
 			<p>
 				<Term t="LCEL" /> uses the pipe (<code>.pipe(...)</code> in TypeScript) to chain
 				Runnables. The output of the left side becomes the input of the right side. The chain is
 				lazy — nothing runs until you call <code>invoke</code>.
 			</p>
-			<CodeBlock code={codeA} caption="A prompt → model → parser chain (Demo 1)." />
+			<CodeBlock code={codeA} lang="ts" caption="A prompt → model → parser chain (Demo 1)." />
 			<p>
 				Run Demo 1 on the right and watch the value's shape change at each stop:
 				<code>{'{ topic }'}</code> → <code>ChatPromptValue</code> → <code>AIMessage</code> →
@@ -164,17 +227,24 @@ const { short, bullets, passthrough } = await fanout.invoke({ topic });`;
 			</p>
 		</Slide>
 
-		<Slide title="Branching: RunnableParallel">
+		<Slide variant="pull-quote">
+			<p>
+				The pipe is the smallest interface that lets every other LangChain primitive — retries,
+				batching, callbacks, streaming — apply uniformly to everything you compose.
+			</p>
+		</Slide>
+
+		<Slide title="Branching: RunnableParallel" variant="code-first">
 			<p>
 				Sometimes you want one input to fan out to several Runnables, gather their outputs into
-				a single object, and continue. That's <code>RunnableParallel</code>. Pair it with{' '}
+				a single object, and continue. That's <code>RunnableParallel</code>. Pair it with
 				<code>RunnablePassthrough</code> when you want to keep the original input alongside
 				derived values.
 			</p>
-			<CodeBlock code={codeB} caption="A 3-way fan-out (Demo 2)." />
+			<CodeBlock code={codeB} lang="ts" caption="A 3-way fan-out (Demo 2)." />
 		</Slide>
 
-		<Slide title="Why this matters">
+		<Slide title="Why this matters" ornament>
 			<p>
 				The pipe is more than syntactic sugar. Because every step is a Runnable, you also get
 				batched execution, streaming, retries, fallbacks, and observable callbacks for free.
@@ -232,30 +302,32 @@ const { short, bullets, passthrough } = await fanout.invoke({ topic });`;
 	}
 	.row span {
 		font-size: 0.78rem;
-		color: var(--color-fg-faint);
+		color: var(--color-ink-300);
+		font-family: var(--font-mono);
 	}
 	input {
 		flex: 1;
 		background: var(--color-bg);
-		border: 1px solid var(--color-border);
+		border: 1px solid var(--color-rule);
 		border-radius: 0.4rem;
 		padding: 0.4rem 0.6rem;
 		font-size: 0.88rem;
-		color: var(--color-fg);
+		color: var(--color-ink-100);
 	}
 	input:focus {
 		outline: none;
-		border-color: var(--accent);
+		border-color: var(--accent-ink);
 	}
 
 	.output {
 		margin-top: 0.85rem;
-		padding: 0.75rem;
+		padding: 0.85rem 0.95rem;
 		background: var(--color-bg);
-		border: 1px solid var(--color-border);
-		border-radius: 0.4rem;
-		font-size: 0.92rem;
-		line-height: 1.55;
+		border: 1px solid var(--color-rule);
+		border-radius: 0.45rem;
+		font-family: var(--font-prose);
+		font-size: 1rem;
+		line-height: 1.6;
 	}
 
 	.grid {
@@ -266,22 +338,22 @@ const { short, bullets, passthrough } = await fanout.invoke({ topic });`;
 	}
 
 	.grid .lbl {
-		font-size: 0.7rem;
+		font-size: 0.66rem;
 		text-transform: uppercase;
-		letter-spacing: 0.08em;
-		color: var(--color-fg-faint);
+		letter-spacing: 0.14em;
+		color: var(--color-ink-300);
 		font-family: var(--font-mono);
-		margin-bottom: 0.2rem;
+		margin-bottom: 0.25rem;
 	}
 
 	.grid p,
 	.grid pre {
 		margin: 0;
-		padding: 0.5rem 0.7rem;
+		padding: 0.55rem 0.75rem;
 		background: var(--color-bg);
-		border: 1px solid var(--color-border);
-		border-radius: 0.35rem;
-		font-size: 0.86rem;
+		border: 1px solid var(--color-rule);
+		border-radius: 0.4rem;
+		font-size: 0.9rem;
 		white-space: pre-wrap;
 		word-break: break-word;
 	}

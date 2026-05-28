@@ -7,15 +7,8 @@
 		TJS_MODELS,
 		type ModelProvider
 	} from '$lib/state/app.svelte';
+	import ParrotMark from '$lib/components/ParrotMark.svelte';
 	import { onMount } from 'svelte';
-
-	let copied = $state(false);
-
-	function copyEnv() {
-		navigator.clipboard.writeText(JSON.stringify(app.keys, null, 2));
-		copied = true;
-		setTimeout(() => (copied = false), 1200);
-	}
 
 	let provider: ModelProvider = $state(app.preferredProvider);
 
@@ -26,18 +19,63 @@
 	onMount(() => {
 		provider = app.preferredProvider;
 	});
+
+	let testing = $state(false);
+	let testMessage = $state<string | null>(null);
+	let testOk = $state<boolean | null>(null);
+
+	async function pingAnthropic() {
+		if (!app.keys.anthropic) return;
+		testing = true;
+		testMessage = null;
+		try {
+			const { ChatAnthropic } = await import('@langchain/anthropic');
+			const llm = new ChatAnthropic({
+				apiKey: app.keys.anthropic,
+				model: 'claude-haiku-4-5',
+				temperature: 0,
+				maxTokens: 32,
+				clientOptions: { dangerouslyAllowBrowser: true }
+			});
+			const r = await llm.invoke([
+				{ role: 'system', content: 'Reply with the single word: ready.' },
+				{ role: 'user', content: 'ping' }
+			]);
+			const text = typeof r.content === 'string' ? r.content : JSON.stringify(r.content);
+			testOk = true;
+			testMessage = `Live response: "${text.trim().slice(0, 80)}"`;
+		} catch (err) {
+			testOk = false;
+			testMessage = err instanceof Error ? err.message : String(err);
+		} finally {
+			testing = false;
+		}
+	}
+
+	const hasAnyKey = $derived(!!(app.keys.anthropic || app.keys.openai || app.keys.groq));
+
+	function tierColor(tier: string) {
+		if (tier === 'XS') return 'tier-xs';
+		if (tier === 'S') return 'tier-s';
+		if (tier === 'M') return 'tier-m';
+		if (tier === 'L') return 'tier-l';
+		return 'tier-xl';
+	}
 </script>
 
 <main class="setup">
-	<section class="hero">
-		<div class="eyebrow">Setup</div>
-		<h1>Pick your model.</h1>
-		<p class="lead">
-			LangX runs entirely in the browser. You can use a small model that downloads once via
-			Transformers.js and runs on WebGPU, or paste an API key to use a hosted model — keys stay
-			in <code>localStorage</code> and never leave this device.
-		</p>
-	</section>
+	<header class="hero">
+		<div class="parrot"><ParrotMark size={64} /></div>
+		<div>
+			<div class="eyebrow font-display">Setup</div>
+			<h1>Bring your own model.</h1>
+			<p class="lead">
+				Every demo in LangX runs against a real model. Paste a hosted-API key for the fastest
+				path, or pick a Transformers.js model that downloads once and runs locally on WebGPU. Keys
+				stay in <code>localStorage</code> on this device — they never leave your browser.
+			</p>
+		</div>
+	</header>
 
 	<section class="status">
 		<div class="status-row">
@@ -47,20 +85,91 @@
 			</span>
 		</div>
 		<p class="status-note">
-			If WebGPU is unavailable, LangX falls back to WebAssembly (slower) or you can use a hosted
-			model below. Some browsers gate WebGPU behind a flag — see Hugging Face's setup guide.
+			Local models run faster on WebGPU. If WebGPU is missing, LangX falls back to WebAssembly
+			(~5× slower) or you can use a hosted provider below.
 		</p>
 	</section>
 
+	<section class="block gate" class:ok={hasAnyKey}>
+		<div class="gate-body">
+			<h2>Step 1 · Hosted-API key</h2>
+			<p class="muted">
+				Anthropic is the recommended path — Claude Haiku 4.5 is fast, agentic, and Browser-CORS
+				enabled. Paste any key below and LangX will use it as the default.
+			</p>
+			<div class="keys">
+				<label>
+					<span>Anthropic</span>
+					<input
+						type="password"
+						value={app.keys.anthropic}
+						oninput={(e) => setApiKey('anthropic', (e.target as HTMLInputElement).value)}
+						placeholder="sk-ant-..."
+						autocomplete="off"
+					/>
+				</label>
+				<label>
+					<span>OpenAI</span>
+					<input
+						type="password"
+						value={app.keys.openai}
+						oninput={(e) => setApiKey('openai', (e.target as HTMLInputElement).value)}
+						placeholder="sk-..."
+						autocomplete="off"
+					/>
+				</label>
+				<label>
+					<span>Groq</span>
+					<input
+						type="password"
+						value={app.keys.groq}
+						oninput={(e) => setApiKey('groq', (e.target as HTMLInputElement).value)}
+						placeholder="gsk_..."
+						autocomplete="off"
+					/>
+				</label>
+			</div>
+			<div class="ping">
+				<button
+					class="btn ghost"
+					disabled={!app.keys.anthropic || testing}
+					onclick={pingAnthropic}
+				>
+					{testing ? 'Pinging…' : 'Ping Anthropic'}
+				</button>
+				{#if testMessage}
+					<p class="ping-msg" class:ok={testOk} class:bad={testOk === false}>{testMessage}</p>
+				{/if}
+			</div>
+		</div>
+		<div class="gate-status">
+			{#if hasAnyKey}
+				<span class="check">✔</span>
+				<span>Ready. Pick a default provider below.</span>
+			{:else}
+				<span class="x">!</span>
+				<span>Add a key or switch the default to Transformers.js.</span>
+			{/if}
+		</div>
+	</section>
+
 	<section class="block">
-		<h2>Default provider</h2>
+		<h2>Step 2 · Default provider</h2>
 		<div class="providers">
-			<label class="provider" class:selected={provider === 'mock'}>
-				<input type="radio" name="provider" bind:group={provider} value="mock" />
-				<span class="p-title">Mock</span>
-				<span class="p-desc">
-					Deterministic scripted model. Best for understanding the loop step by step.
-				</span>
+			<label class="provider" class:selected={provider === 'anthropic'}>
+				<input type="radio" name="provider" bind:group={provider} value="anthropic" />
+				<span class="p-title">Anthropic</span>
+				<span class="p-desc">Claude Haiku 4.5. Strong tool use, fast first token.</span>
+			</label>
+			<label class="provider" class:selected={provider === 'openai'}>
+				<input type="radio" name="provider" bind:group={provider} value="openai" />
+				<span class="p-title">OpenAI</span>
+				<span class="p-desc">GPT-4o mini via the browser-CORS endpoint.</span>
+			</label>
+			<label class="provider" class:selected={provider === 'groq'}>
+				<input type="radio" name="provider" bind:group={provider} value="groq" />
+				<span class="p-title">Groq</span>
+				<span class="p-desc">Hosted Llama-3.3 70B at high token throughput.</span>
 			</label>
 			<label class="provider" class:selected={provider === 'transformers-js'}>
 				<input
@@ -70,40 +179,17 @@
 					value="transformers-js"
 				/>
 				<span class="p-title">Transformers.js</span>
-				<span class="p-desc">
-					Runs locally in your browser via WebGPU. No key required.
-				</span>
-			</label>
-			<label class="provider" class:selected={provider === 'openai'}>
-				<input type="radio" name="provider" bind:group={provider} value="openai" />
-				<span class="p-title">OpenAI</span>
-				<span class="p-desc">
-					Reliable tool calling. Requires an API key with browser-allowed CORS.
-				</span>
-			</label>
-			<label class="provider" class:selected={provider === 'anthropic'}>
-				<input
-					type="radio"
-					name="provider"
-					bind:group={provider}
-					value="anthropic"
-				/>
-				<span class="p-title">Anthropic</span>
-				<span class="p-desc">Claude models. Strong agentic behavior.</span>
-			</label>
-			<label class="provider" class:selected={provider === 'groq'}>
-				<input type="radio" name="provider" bind:group={provider} value="groq" />
-				<span class="p-title">Groq</span>
-				<span class="p-desc">Very fast hosted Llama and Mixtral models.</span>
+				<span class="p-desc">Local model in your browser. No key, no network at runtime.</span>
 			</label>
 		</div>
 	</section>
 
 	<section class="block">
-		<h2>Transformers.js model</h2>
+		<h2>Step 3 · Local model (optional)</h2>
 		<p class="muted">
-			These models live on Hugging Face and download once into your browser cache. Bigger models
-			are smarter but take longer to download and warm up.
+			These models live on Hugging Face and download once into your browser cache. The harness
+			needs at least <strong>good</strong> agentic grade for the Deep Agents chapter to behave
+			properly.
 		</p>
 		<div class="models">
 			{#each TJS_MODELS as model (model.id)}
@@ -115,109 +201,113 @@
 						checked={app.tjsModel === model.id}
 						onchange={() => setTjsModel(model.id)}
 					/>
-					<div class="m-row">
-						<span class="m-name">{model.label}</span>
-						<span class="m-size">{model.sizeMb} MB · {model.dtype}</span>
+					<div class="m-head">
+						<div>
+							<span class="m-name font-display">{model.label}</span>
+							<span class="m-sub">{model.family} · {model.dtype}</span>
+						</div>
+						<span class="tier {tierColor(model.tier)}">{model.tier}</span>
 					</div>
-					<div class="m-tools">
-						Tool calling:
-						<span class="tag tag-{model.supportsTools}">
-							{model.supportsTools}
-						</span>
-					</div>
+					<dl class="m-stats">
+						<div>
+							<dt>Size</dt>
+							<dd>{(model.sizeMb / 1024).toFixed(2)} GB</dd>
+						</div>
+						<div>
+							<dt>RAM</dt>
+							<dd>{model.recommendedRamGb} GB</dd>
+						</div>
+						<div>
+							<dt>TTFT</dt>
+							<dd>{model.bench.ttftMs} ms</dd>
+						</div>
+						<div>
+							<dt>Throughput</dt>
+							<dd>{model.bench.decodeTokPerSec} tok/s</dd>
+						</div>
+						<div>
+							<dt>WebGPU</dt>
+							<dd>{model.requiresWebGpu ? 'required' : 'optional'}</dd>
+						</div>
+						<div>
+							<dt>Agentic</dt>
+							<dd class="grade grade-{model.agenticGrade}">{model.agenticGrade}</dd>
+						</div>
+					</dl>
 					<p class="m-notes">{model.notes}</p>
 				</label>
 			{/each}
 		</div>
 	</section>
 
-	<section class="block">
-		<h2>API keys (optional)</h2>
-		<p class="muted">
-			Stored only in your browser's <code>localStorage</code>. Used directly from the client for
-			model calls. Don't paste keys you wouldn't expose to a single-page app.
-		</p>
-		<div class="keys">
-			<label>
-				<span>OpenAI</span>
-				<input
-					type="password"
-					value={app.keys.openai}
-					oninput={(e) => setApiKey('openai', (e.target as HTMLInputElement).value)}
-					placeholder="sk-..."
-					autocomplete="off"
-				/>
-			</label>
-			<label>
-				<span>Anthropic</span>
-				<input
-					type="password"
-					value={app.keys.anthropic}
-					oninput={(e) => setApiKey('anthropic', (e.target as HTMLInputElement).value)}
-					placeholder="sk-ant-..."
-					autocomplete="off"
-				/>
-			</label>
-			<label>
-				<span>Groq</span>
-				<input
-					type="password"
-					value={app.keys.groq}
-					oninput={(e) => setApiKey('groq', (e.target as HTMLInputElement).value)}
-					placeholder="gsk_..."
-					autocomplete="off"
-				/>
-			</label>
-		</div>
-		<button class="copy" onclick={copyEnv}>
-			{copied ? 'Copied' : 'Copy as JSON'}
-		</button>
-	</section>
-
 	<section class="block end">
-		<a class="btn primary" href="/1-langchain">Start with LangChain →</a>
+		<a class="btn primary" href="/1-langchain">Begin · LangChain →</a>
+		<a class="btn ghost" href="/">Back to home</a>
 	</section>
 </main>
 
 <style>
 	.setup {
-		max-width: 56rem;
+		max-width: 64rem;
 		margin: 0 auto;
 		padding: 4rem 2rem 6rem;
 		display: flex;
 		flex-direction: column;
-		gap: 2.5rem;
+		gap: 2.75rem;
 	}
 
-	.hero h1 {
-		font-family: var(--font-serif);
-		font-size: 2.5rem;
-		font-weight: 600;
-		margin: 0;
+	.hero {
+		display: flex;
+		gap: 1.5rem;
+		align-items: flex-start;
+	}
+
+	.parrot {
+		flex: 0 0 auto;
+		color: var(--accent-ink);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 96px;
+		height: 96px;
+		border-radius: 50%;
+		background: color-mix(in oklch, var(--accent-soft) 70%, transparent);
+		box-shadow:
+			inset 0 0 0 1px var(--color-rule),
+			0 1px 0 rgba(255, 255, 255, 0.04);
 	}
 
 	.eyebrow {
 		font-size: 0.75rem;
-		letter-spacing: 0.14em;
+		letter-spacing: 0.18em;
 		text-transform: uppercase;
-		color: var(--color-fg-faint);
-		margin-bottom: 0.75rem;
+		color: var(--color-ink-300);
+		margin-bottom: 0.5rem;
+	}
+
+	.hero h1 {
+		font-family: var(--font-display);
+		font-size: clamp(2.4rem, 5vw, 3.4rem);
+		font-weight: 500;
+		letter-spacing: -0.02em;
+		margin: 0;
+		line-height: 1.05;
 	}
 
 	.lead {
-		font-family: var(--font-serif);
+		font-family: var(--font-prose);
 		font-size: 1.05rem;
-		color: var(--color-fg-muted);
-		max-width: 38rem;
-		line-height: 1.6;
-		margin-top: 0.75rem;
+		color: var(--color-ink-200);
+		max-width: 44rem;
+		line-height: 1.65;
+		margin-top: 0.85rem;
 	}
 
 	.status {
-		border: 1px solid var(--color-border);
+		border: 1px solid var(--color-rule);
 		border-radius: 0.6rem;
 		padding: 1rem 1.25rem;
-		background: var(--color-bg-elev);
+		background: var(--color-paper);
 	}
 	.status-row {
 		display: flex;
@@ -225,50 +315,100 @@
 		align-items: baseline;
 	}
 	.status-key {
-		font-size: 0.75rem;
-		letter-spacing: 0.1em;
+		font-size: 0.72rem;
+		letter-spacing: 0.14em;
 		text-transform: uppercase;
-		color: var(--color-fg-faint);
+		color: var(--color-ink-300);
 	}
 	.status-val.ok {
-		color: var(--color-accent-success);
+		color: var(--accent-ink);
 	}
 	.status-val.bad {
 		color: var(--color-accent-warning);
 	}
 	.status-note {
-		font-size: 0.85rem;
-		color: var(--color-fg-muted);
+		font-size: 0.88rem;
+		color: var(--color-ink-200);
 		margin-top: 0.5rem;
 	}
 
 	.block h2 {
-		font-family: var(--font-serif);
-		font-size: 1.4rem;
+		font-family: var(--font-display);
+		font-weight: 500;
+		font-size: 1.5rem;
 		margin: 0 0 0.5rem;
+		letter-spacing: -0.01em;
 	}
 
 	.muted {
-		color: var(--color-fg-muted);
-		font-size: 0.9rem;
+		color: var(--color-ink-200);
+		font-size: 0.92rem;
 		margin-bottom: 0.75rem;
+		line-height: 1.55;
+	}
+
+	.gate {
+		display: grid;
+		grid-template-columns: 1fr;
+		border: 1px solid var(--color-rule);
+		border-radius: 0.7rem;
+		padding: 1.25rem 1.5rem;
+		background: var(--color-paper);
+		gap: 0.75rem;
+	}
+
+	.gate.ok {
+		border-color: color-mix(in oklch, var(--accent-ink) 30%, var(--color-rule));
+		background: color-mix(in oklch, var(--accent-soft) 30%, var(--color-paper));
+	}
+
+	.gate-status {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		font-size: 0.9rem;
+		color: var(--color-ink-200);
+	}
+
+	.gate-status .check {
+		display: inline-grid;
+		place-items: center;
+		width: 1.25rem;
+		height: 1.25rem;
+		border-radius: 50%;
+		background: var(--accent-ink);
+		color: var(--color-paper);
+		font-size: 0.75rem;
+		font-weight: 700;
+	}
+	.gate-status .x {
+		display: inline-grid;
+		place-items: center;
+		width: 1.25rem;
+		height: 1.25rem;
+		border-radius: 50%;
+		background: var(--color-accent-warning);
+		color: var(--color-paper);
+		font-size: 0.75rem;
+		font-weight: 700;
 	}
 
 	.providers {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+		grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
 		gap: 0.6rem;
 	}
 
 	.provider {
-		border: 1px solid var(--color-border);
-		border-radius: 0.5rem;
-		padding: 0.85rem;
-		background: var(--color-bg-elev);
+		border: 1px solid var(--color-rule);
+		border-radius: 0.55rem;
+		padding: 0.95rem;
+		background: var(--color-paper);
 		cursor: pointer;
 		display: flex;
 		flex-direction: column;
-		gap: 0.25rem;
+		gap: 0.3rem;
+		transition: border-color 0.18s ease;
 	}
 
 	.provider input {
@@ -276,40 +416,46 @@
 	}
 
 	.provider.selected {
-		border-color: var(--accent);
-		box-shadow: inset 0 0 0 1px var(--accent);
+		border-color: var(--accent-ink);
+		box-shadow: inset 0 0 0 1px var(--accent-ink);
 	}
 
 	.p-title {
-		font-weight: 600;
+		font-family: var(--font-display);
+		font-weight: 500;
+		font-size: 1.05rem;
 	}
 
 	.p-desc {
-		font-size: 0.8rem;
-		color: var(--color-fg-muted);
+		font-size: 0.85rem;
+		color: var(--color-ink-200);
+		line-height: 1.45;
 	}
 
 	.models {
 		display: grid;
 		grid-template-columns: 1fr 1fr;
-		gap: 0.6rem;
+		gap: 0.75rem;
 	}
 
-	@media (max-width: 700px) {
+	@media (max-width: 760px) {
 		.models {
 			grid-template-columns: 1fr;
+		}
+		.hero {
+			flex-direction: column;
 		}
 	}
 
 	.model {
-		border: 1px solid var(--color-border);
-		border-radius: 0.5rem;
-		padding: 0.85rem;
-		background: var(--color-bg-elev);
+		border: 1px solid var(--color-rule);
+		border-radius: 0.55rem;
+		padding: 1rem;
+		background: var(--color-paper);
 		cursor: pointer;
 		display: flex;
 		flex-direction: column;
-		gap: 0.35rem;
+		gap: 0.55rem;
 	}
 
 	.model input {
@@ -317,49 +463,106 @@
 	}
 
 	.model.selected {
-		border-color: var(--accent);
-		box-shadow: inset 0 0 0 1px var(--accent);
+		border-color: var(--accent-ink);
+		box-shadow: inset 0 0 0 1px var(--accent-ink);
 	}
 
-	.m-row {
+	.m-head {
 		display: flex;
 		justify-content: space-between;
-		align-items: baseline;
+		align-items: flex-start;
 		gap: 0.6rem;
 	}
 
 	.m-name {
+		display: block;
+		font-size: 1.02rem;
+		font-weight: 500;
+		letter-spacing: -0.005em;
+	}
+
+	.m-sub {
+		display: block;
+		font-size: 0.72rem;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--color-ink-300);
+		margin-top: 0.2rem;
+	}
+
+	.tier {
+		display: inline-grid;
+		place-items: center;
+		min-width: 2rem;
+		padding: 0.15rem 0.45rem;
+		border-radius: 999px;
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		letter-spacing: 0.04em;
+		font-weight: 600;
+		border: 1px solid var(--color-rule);
+		color: var(--color-ink-100);
+	}
+	.tier-xs {
+		background: color-mix(in oklch, var(--accent-soft) 50%, transparent);
+	}
+	.tier-s {
+		background: color-mix(in oklch, var(--accent-soft) 70%, transparent);
+	}
+	.tier-m {
+		background: color-mix(in oklch, var(--accent-ink) 14%, transparent);
+		color: var(--accent-ink);
+		border-color: color-mix(in oklch, var(--accent-ink) 30%, var(--color-rule));
+	}
+	.tier-l {
+		background: color-mix(in oklch, var(--accent-ink) 22%, transparent);
+		color: var(--accent-ink);
+		border-color: color-mix(in oklch, var(--accent-ink) 50%, var(--color-rule));
+	}
+
+	.m-stats {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 0.5rem 0.75rem;
+		margin: 0;
+	}
+	.m-stats div {
+		display: flex;
+		flex-direction: column;
+	}
+	.m-stats dt {
+		font-size: 0.65rem;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: var(--color-ink-300);
+	}
+	.m-stats dd {
+		margin: 0;
+		font-family: var(--font-mono);
+		font-size: 0.82rem;
+		color: var(--color-ink-100);
+	}
+
+	.grade-no {
+		color: var(--color-ink-300);
+	}
+	.grade-weak {
+		color: var(--color-accent-warning);
+	}
+	.grade-good {
+		color: var(--accent-ink);
+	}
+	.grade-excellent {
+		color: var(--accent-ink);
 		font-weight: 600;
 	}
 
-	.m-size,
-	.m-tools {
-		font-size: 0.78rem;
-		color: var(--color-fg-muted);
-	}
-
 	.m-notes {
-		font-size: 0.82rem;
-		color: var(--color-fg-muted);
-		margin: 0.15rem 0 0;
-	}
-
-	.tag {
-		display: inline-block;
-		padding: 0.05em 0.45em;
-		border-radius: 0.3em;
-		font-size: 0.75rem;
-		border: 1px solid var(--color-border);
-		font-family: var(--font-mono);
-	}
-	.tag-no {
-		color: var(--color-fg-faint);
-	}
-	.tag-weak {
-		color: var(--color-accent-warning);
-	}
-	.tag-good {
-		color: var(--color-accent-success);
+		font-size: 0.86rem;
+		color: var(--color-ink-200);
+		margin: 0;
+		line-height: 1.5;
+		font-family: var(--font-prose);
 	}
 
 	.keys {
@@ -376,52 +579,83 @@
 	}
 
 	.keys input {
-		background: var(--color-bg-elev);
-		border: 1px solid var(--color-border);
+		background: var(--color-bg);
+		border: 1px solid var(--color-rule);
 		border-radius: 0.4rem;
 		padding: 0.55rem 0.7rem;
 		font-family: var(--font-mono);
 		font-size: 0.85rem;
-		color: var(--color-fg);
+		color: var(--color-ink-100);
 	}
 
 	.keys input:focus {
 		outline: none;
-		border-color: var(--accent);
-		box-shadow: 0 0 0 2px color-mix(in oklch, var(--accent) 40%, transparent);
+		border-color: var(--accent-ink);
+		box-shadow: 0 0 0 2px color-mix(in oklch, var(--accent-ink) 35%, transparent);
 	}
 
-	.copy {
-		align-self: flex-start;
-		font-size: 0.82rem;
-		padding: 0.45rem 0.8rem;
-		background: var(--color-bg-elev);
-		color: var(--color-fg);
-		border: 1px solid var(--color-border);
-		border-radius: 0.4rem;
-		margin-top: 0.5rem;
+	.ping {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		flex-wrap: wrap;
+		margin-top: 0.6rem;
+	}
+
+	.ping-msg {
+		margin: 0;
+		font-size: 0.85rem;
+		color: var(--color-ink-200);
+		font-family: var(--font-mono);
+	}
+	.ping-msg.ok {
+		color: var(--accent-ink);
+	}
+	.ping-msg.bad {
+		color: var(--color-accent-warning);
 	}
 
 	.end {
+		display: flex;
+		gap: 0.7rem;
+		flex-wrap: wrap;
 		margin-top: 1.5rem;
 	}
 
-	.btn.primary {
+	.btn {
 		display: inline-flex;
+		align-items: center;
+		font-family: var(--font-display);
 		font-weight: 500;
 		padding: 0.7rem 1.2rem;
-		background: var(--color-fg);
-		color: var(--color-bg);
 		border-radius: 0.5rem;
 		text-decoration: none;
+		font-size: 0.95rem;
+		border: 1px solid transparent;
+		cursor: pointer;
+	}
+
+	.btn.primary {
+		background: var(--accent-ink);
+		color: var(--color-paper);
+	}
+
+	.btn.ghost {
+		background: transparent;
+		color: var(--color-ink-100);
+		border-color: var(--color-rule);
+	}
+	.btn.ghost:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
 	}
 
 	code {
 		font-family: var(--font-mono);
-		background: var(--color-bg-elev);
+		background: var(--color-paper);
 		padding: 0.1em 0.35em;
 		border-radius: 0.3em;
-		border: 1px solid var(--color-border);
+		border: 1px solid var(--color-rule);
 		font-size: 0.85em;
 	}
 </style>

@@ -1,8 +1,8 @@
 import { browser } from '$app/environment';
 
-const STORAGE_KEY = 'langx.app.v1';
+const STORAGE_KEY = 'langx.app.v2';
 
-export type ModelProvider = 'transformers-js' | 'openai' | 'anthropic' | 'groq' | 'mock';
+export type ModelProvider = 'transformers-js' | 'openai' | 'anthropic' | 'groq';
 
 export interface ApiKeys {
 	openai: string;
@@ -13,44 +13,123 @@ export interface ApiKeys {
 export interface TransformersJsModel {
 	id: string;
 	label: string;
+	family: 'qwen3' | 'gemma' | 'llama' | 'phi' | 'nemotron' | 'smol';
 	sizeMb: number;
-	dtype: string;
-	supportsTools: 'no' | 'weak' | 'good';
+	dtype: 'q4' | 'q4f16' | 'q8' | 'fp16' | 'fp32';
+	tier: 'XS' | 'S' | 'M' | 'L' | 'XL';
+	requiresWebGpu: boolean;
+	recommendedRamGb: number;
+	bench: {
+		ttftMs: number; // approximate first-token latency on a recent dGPU
+		decodeTokPerSec: number; // approximate steady-state throughput
+	};
+	agenticGrade: 'no' | 'weak' | 'good' | 'excellent';
 	notes: string;
 }
 
+/**
+ * Curated lineup, May 2026.
+ * Sourced from the onnx-community org on Hugging Face. Sizes are q4f16 unless
+ * noted; numbers are model-card approximations.
+ */
 export const TJS_MODELS: TransformersJsModel[] = [
-	{
-		id: 'HuggingFaceTB/SmolLM2-360M-Instruct',
-		label: 'SmolLM2 360M Instruct',
-		sizeMb: 230,
-		dtype: 'q4',
-		supportsTools: 'no',
-		notes: 'Small and fast. Great for chat and basic LCEL.'
-	},
-	{
-		id: 'onnx-community/Qwen2.5-0.5B-Instruct',
-		label: 'Qwen2.5 0.5B Instruct',
-		sizeMb: 380,
-		dtype: 'q4',
-		supportsTools: 'weak',
-		notes: 'Good balance for most early lessons.'
-	},
+	// tier-XS — runs on CPU, useful for tiny demos
 	{
 		id: 'onnx-community/Qwen3-0.6B-ONNX',
 		label: 'Qwen3 0.6B (reasoning)',
+		family: 'qwen3',
 		sizeMb: 470,
 		dtype: 'q4f16',
-		supportsTools: 'good',
-		notes: 'Best small model for tool calling. Slower start.'
+		tier: 'XS',
+		requiresWebGpu: false,
+		recommendedRamGb: 4,
+		bench: { ttftMs: 250, decodeTokPerSec: 28 },
+		agenticGrade: 'good',
+		notes: 'Best small model with native tool calling. Punches above its weight on reasoning.'
+	},
+	// tier-S — sweet spot for laptops
+	{
+		id: 'onnx-community/gemma-4-E2B-it-ONNX',
+		label: 'Gemma 4 E2B Instruct',
+		family: 'gemma',
+		sizeMb: 1240,
+		dtype: 'q4f16',
+		tier: 'S',
+		requiresWebGpu: true,
+		recommendedRamGb: 6,
+		bench: { ttftMs: 380, decodeTokPerSec: 22 },
+		agenticGrade: 'good',
+		notes:
+			'Hugging Face\u2019s flagship for in-browser agentic work. Strong tool calling via Gemma chat templates.'
 	},
 	{
-		id: 'onnx-community/Llama-3.2-1B-Instruct',
-		label: 'Llama 3.2 1B Instruct',
-		sizeMb: 800,
-		dtype: 'q4',
-		supportsTools: 'weak',
-		notes: 'Bigger context. Heavier download.'
+		id: 'onnx-community/Llama-3.2-3B-Instruct-ONNX',
+		label: 'Llama 3.2 3B Instruct',
+		family: 'llama',
+		sizeMb: 1900,
+		dtype: 'q4f16',
+		tier: 'S',
+		requiresWebGpu: true,
+		recommendedRamGb: 8,
+		bench: { ttftMs: 520, decodeTokPerSec: 18 },
+		agenticGrade: 'good',
+		notes: 'Solid baseline. Reliable tool use, good prose quality.'
+	},
+	// tier-M
+	{
+		id: 'onnx-community/Phi-4-mini-instruct-ONNX',
+		label: 'Phi-4 mini Instruct',
+		family: 'phi',
+		sizeMb: 2300,
+		dtype: 'q4f16',
+		tier: 'M',
+		requiresWebGpu: true,
+		recommendedRamGb: 10,
+		bench: { ttftMs: 620, decodeTokPerSec: 16 },
+		agenticGrade: 'excellent',
+		notes: 'Microsoft\u2019s small reasoning star. Great structured output and code.'
+	},
+	{
+		id: 'onnx-community/Qwen3-4B-ONNX',
+		label: 'Qwen3 4B (reasoning)',
+		family: 'qwen3',
+		sizeMb: 2400,
+		dtype: 'q4f16',
+		tier: 'M',
+		requiresWebGpu: true,
+		recommendedRamGb: 10,
+		bench: { ttftMs: 700, decodeTokPerSec: 15 },
+		agenticGrade: 'excellent',
+		notes: 'Sweet spot for serious agentic work in the browser. Stable tool loops.'
+	},
+	// tier-L — needs a real GPU
+	{
+		id: 'onnx-community/Qwen3-8B-ONNX',
+		label: 'Qwen3 8B (reasoning)',
+		family: 'qwen3',
+		sizeMb: 4500,
+		dtype: 'q4f16',
+		tier: 'L',
+		requiresWebGpu: true,
+		recommendedRamGb: 16,
+		bench: { ttftMs: 1300, decodeTokPerSec: 9 },
+		agenticGrade: 'excellent',
+		notes:
+			'Large enough that the harness can plan + delegate without help. Requires a dGPU class machine.'
+	},
+	{
+		id: 'onnx-community/Nemotron-3-Nano-9B-ONNX',
+		label: 'NVIDIA Nemotron-3 Nano 9B',
+		family: 'nemotron',
+		sizeMb: 4800,
+		dtype: 'q4f16',
+		tier: 'L',
+		requiresWebGpu: true,
+		recommendedRamGb: 16,
+		bench: { ttftMs: 1500, decodeTokPerSec: 8 },
+		agenticGrade: 'excellent',
+		notes:
+			'Hybrid Mamba\u2013Transformer mixture of experts, explicitly tuned for agentic reasoning.'
 	}
 ];
 
@@ -65,9 +144,9 @@ export interface AppState {
 }
 
 const defaultState = (): AppState => ({
-	tjsModel: TJS_MODELS[1].id,
+	tjsModel: TJS_MODELS[0].id,
 	keys: { openai: '', anthropic: '', groq: '' },
-	preferredProvider: 'mock',
+	preferredProvider: 'anthropic',
 	presentationMode: false,
 	theme: 'dark',
 	visited: {},
@@ -78,7 +157,16 @@ function loadInitial(): AppState {
 	if (!browser) return defaultState();
 	try {
 		const raw = localStorage.getItem(STORAGE_KEY);
-		if (!raw) return defaultState();
+		if (!raw) {
+			// Migration from v1 (which had 'mock' as a provider).
+			const legacy = localStorage.getItem('langx.app.v1');
+			if (legacy) {
+				const parsed = JSON.parse(legacy) as Record<string, unknown>;
+				if (parsed.preferredProvider === 'mock') parsed.preferredProvider = 'anthropic';
+				return { ...defaultState(), ...(parsed as Partial<AppState>) };
+			}
+			return defaultState();
+		}
 		return { ...defaultState(), ...(JSON.parse(raw) as Partial<AppState>) };
 	} catch {
 		return defaultState();
@@ -128,9 +216,22 @@ export function markVisited(path: string) {
 	}
 }
 
-export function bestAvailableProvider(): ModelProvider {
+/**
+ * Returns true when the user has at least one viable runtime configured:
+ * either an API key for a hosted provider, or a downloaded TJS model + WebGPU.
+ */
+export function isConfigured(): boolean {
+	if (!browser) return false;
+	const p = app.preferredProvider;
+	if (p === 'anthropic') return !!app.keys.anthropic;
+	if (p === 'openai') return !!app.keys.openai;
+	if (p === 'groq') return !!app.keys.groq;
+	return false; // transformers-js needs cache check; treat as not-yet-configured.
+}
+
+export function bestAvailableProvider(): ModelProvider | null {
 	if (app.keys.anthropic) return 'anthropic';
 	if (app.keys.openai) return 'openai';
 	if (app.keys.groq) return 'groq';
-	return 'transformers-js';
+	return null;
 }

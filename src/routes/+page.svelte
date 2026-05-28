@@ -18,7 +18,9 @@
 		</p>
 		<div class="cta">
 			<a class="btn primary" href="/setup">
-				{app.preferredProvider === 'mock' ? 'Set up your model' : 'Models configured · review'}
+				{app.keys.anthropic || app.keys.openai || app.keys.groq
+					? 'Models configured · review'
+					: 'Set up your model'}
 			</a>
 			<a class="btn ghost" href="/1-langchain">Start the curriculum</a>
 		</div>

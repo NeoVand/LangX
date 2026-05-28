@@ -17,275 +17,262 @@
 		type Todo,
 		type VirtualFile
 	} from '$lib/deepagents';
-	import { MockChatModel, type ScriptedResponse } from '$lib/runtime/llm/mock';
+	import { getModel } from '$lib/runtime/llm';
+	import { withRunCache, loadCachedRun } from '$lib/runtime/runs';
+	import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 	import { createTracer } from '$lib/runtime/tracer';
 	import type { TraceEvent } from '$lib/runtime/tracer/types';
+
+	interface RunPayload {
+		topic: string;
+		todos: Todo[];
+		files: VirtualFile[];
+		events: TraceEvent[];
+		finalText: string;
+	}
 
 	let topic = $state('Pregel and the bulk-synchronous parallel model');
 	let busy = $state(false);
 	let todos = $state<Todo[]>([]);
 	let files = $state<VirtualFile[]>([]);
 	let events = $state<TraceEvent[]>([]);
+	let finalText = $state<string>('');
 
-	const corpus: Record<string, string[]> = {
-		pregel: [
-			'Pregel paper (Malewicz 2010): vertex-centric BSP computation with synchronous supersteps.',
-			'LangGraph runtime spec: each superstep merges concurrent updates via reducers.',
-			'BSP analysis (Valiant 1990): predictable performance via synchronization barriers.'
-		],
-		default: [
-			'A. Generic source 1 about the topic.',
-			'B. Generic source 2 with a contradicting point.',
-			'C. Generic source 3 with implementation details.'
-		]
+	const SUBAGENT_PROMPTS: Record<string, string> = {
+		researcher: `You are a research assistant. The user will give you a focused sub-question.
+Reply with a tight paragraph (≤ 70 words): two or three plausible primary sources and a single
+key claim from each. Invent reasonable sources where you do not have direct knowledge. Do not
+call tools. Do not chat — prose only.`,
+		writer: `You are a technical writer. The user will give you a topic and a packet of
+findings. Reply with a short paragraph (≤ 80 words) describing the brief you would write:
+how many sections, the angle, and rough citation count. Do not call tools.`,
+		critic: `You are an editorial critic. The user will give you a brief description.
+Reply with at most three terse bullet notes, one per line, each beginning with "- ".
+Notes should be specific (clarity, accuracy, citation discipline). Do not call tools.`
 	};
 
-	function pickCorpus(t: string) {
-		const k = Object.keys(corpus).find((k) => t.toLowerCase().includes(k));
-		return corpus[k ?? 'default'];
-	}
-
-	function makeResearcher(): SubAgentSpec {
+	function makeSubagent(name: keyof typeof SUBAGENT_PROMPTS): SubAgentSpec {
 		return {
-			name: 'researcher',
-			description: 'Find sources and extract key claims for a sub-question.',
-			prompt: '...',
+			name,
+			description: `Run the ${name} subagent for a focused task.`,
+			prompt: SUBAGENT_PROMPTS[name],
 			run: async (input) => {
-				await new Promise((r) => setTimeout(r, 500 + Math.random() * 600));
-				const sources = pickCorpus(topic).slice(0, 2);
-				return {
-					summary: `For "${input.description}", found:\n${sources.map((s) => '- ' + s).join('\n')}`
-				};
+				const model = await getModel({ temperature: 0.3, maxTokens: 260 });
+				const response = await model.invoke([
+					new SystemMessage(SUBAGENT_PROMPTS[name]),
+					new HumanMessage(input.description)
+				]);
+				const text =
+					typeof response.content === 'string'
+						? response.content
+						: JSON.stringify(response.content);
+				return { summary: text.trim() };
 			}
 		};
 	}
 
-	function makeWriter(): SubAgentSpec {
-		return {
-			name: 'writer',
-			description: 'Synthesise notes into a 1-page brief.',
-			prompt: '...',
-			run: async (input) => {
-				await new Promise((r) => setTimeout(r, 600));
-				return {
-					summary: `Drafted: "${input.description.slice(0, 60)}…" — 280 words, 3 sections, 6 citations.`
-				};
-			}
-		};
-	}
+	const instructionsFor = (t: string) => `You are a research lead capstone. You have three subagents:
+researcher, writer, critic. The user wants a brief on: "${t}".
 
-	function makeCritic(): SubAgentSpec {
-		return {
-			name: 'critic',
-			description: 'Critique the brief for clarity, accuracy, and citations.',
-			prompt: '...',
-			run: async () => {
-				await new Promise((r) => setTimeout(r, 350));
-				return {
-					summary: 'Critique: tighten paragraph 2, add an example, verify the citation in claim 3.'
-				};
-			}
-		};
-	}
+Follow this recipe exactly:
+1. write_todos with this 5-step plan, first step in_progress:
+   - Decompose the question
+   - Research sub-questions in parallel
+   - Draft the brief
+   - Critique the brief
+   - Save to /memories/
 
-	function script(): ScriptedResponse[] {
-		const subQuestions = [
-			`Origins and definition of ${topic}`,
-			`Key abstractions in ${topic}`,
-			`Limitations of ${topic}`
-		];
-		const todoState = (i: number, slot: 'in_progress' | 'completed'): Todo[] => {
-			const all = [
-				'Decompose the question',
-				'Research sub-questions in parallel',
-				'Draft the brief',
-				'Critique the brief',
-				'Save to /memories/'
-			];
-			return all.map((c, idx) => ({
-				content: c,
-				status: idx < i ? 'completed' : idx === i ? slot : 'pending'
-			}));
-		};
-		return [
-			{ content: '', toolCalls: [{ name: 'write_todos', args: { todos: todoState(0, 'in_progress') } }] },
-			{
-				content: '',
-				toolCalls: [
-					{
-						name: 'write_file',
-						args: {
-							path: '/scratch/sub_questions.md',
-							content: subQuestions.map((q, i) => `${i + 1}. ${q}`).join('\n')
-						}
-					}
-				]
-			},
-			{ content: '', toolCalls: [{ name: 'write_todos', args: { todos: todoState(1, 'in_progress') } }] },
-			{
-				content: '',
-				toolCalls: [
-					{
-						name: 'task',
-						args: { subagent: 'researcher', description: subQuestions[0] }
-					}
-				]
-			},
-			{
-				content: '',
-				toolCalls: [
-					{
-						name: 'task',
-						args: { subagent: 'researcher', description: subQuestions[1] }
-					}
-				]
-			},
-			{
-				content: '',
-				toolCalls: [
-					{
-						name: 'task',
-						args: { subagent: 'researcher', description: subQuestions[2] }
-					}
-				]
-			},
-			{ content: '', toolCalls: [{ name: 'write_todos', args: { todos: todoState(2, 'in_progress') } }] },
-			{
-				content: '',
-				toolCalls: [
-					{
-						name: 'task',
-						args: {
-							subagent: 'writer',
-							description: `Write a 1-page brief on "${topic}", referencing the researcher findings.`
-						}
-					}
-				]
-			},
-			{ content: '', toolCalls: [{ name: 'write_todos', args: { todos: todoState(3, 'in_progress') } }] },
-			{
-				content: '',
-				toolCalls: [
-					{
-						name: 'task',
-						args: { subagent: 'critic', description: 'Critique the brief.' }
-					}
-				]
-			},
-			{ content: '', toolCalls: [{ name: 'write_todos', args: { todos: todoState(4, 'in_progress') } }] },
-			{
-				content: '',
-				toolCalls: [
-					{
-						name: 'write_file',
-						args: {
-							path: `/memories/${topic.replace(/\s+/g, '-').toLowerCase()}.md`,
-							content: `# ${topic}\n\nA 1-page brief synthesised from researcher, writer, and critic subagents.\n\n*This file lives in the StoreBackend and survives reloads.*`
-						}
-					}
-				]
-			},
-			{
-				content: '',
-				toolCalls: [
-					{
-						name: 'write_todos',
-						args: {
-							todos: [
-								'Decompose the question',
-								'Research sub-questions in parallel',
-								'Draft the brief',
-								'Critique the brief',
-								'Save to /memories/'
-							].map((c) => ({ content: c, status: 'completed' as const }))
-						}
-					}
-				]
-			},
-			{
-				content: `Brief on "${topic}" saved to /memories/. The original sub-questions and intermediate notes live in /scratch/. Reload this tab — the saved brief survives.`
-			}
-		];
-	}
+2. write_file('/scratch/sub_questions.md', <3 numbered sub-questions about the topic>) — then update todos.
+3. For each of the three sub-questions, call task({ subagent: 'researcher', description: <sub-question> }). Update todos as you go.
+4. task({ subagent: 'writer',  description: 'Write a 1-page brief on "${t}" citing the researcher findings.' })
+5. task({ subagent: 'critic',  description: 'Critique the brief.' })
+6. write_file('/memories/${t
+		.replace(/\s+/g, '-')
+		.toLowerCase()
+		.replace(/[^a-z0-9-]/g, '')}.md', '# ${t}\\n\\n…') — a short markdown brief (≤ 200 words) summarising the work.
+7. Final write_todos with all 5 steps completed.
+8. Reply with one sentence confirming the brief was saved to /memories/.
+
+Do NOT do the research, writing, or critique yourself — delegate everything via task.`;
 
 	async function run() {
 		busy = true;
 		todos = [];
 		files = [];
 		events = [];
+		finalText = '';
 		try {
-			const tracer = createTracer();
-			tracer.subscribe((ev) => (events = [...events, ev]));
-			const backend = new CompositeBackend(
-				[{ prefix: '/memories/', backend: new StoreBackend('research-capstone') }],
-				new StateBackend()
+			const result = await withRunCache<RunPayload>(
+				{ demoId: `l3-capstone-research-${slugify(topic)}` },
+				async () => {
+					const localEvents: TraceEvent[] = [];
+					const tracer = createTracer();
+					tracer.subscribe((ev) => {
+						localEvents.push(ev);
+						events = [...localEvents];
+					});
+
+					const backend = new CompositeBackend(
+						[
+							{
+								prefix: '/memories/',
+								backend: new StoreBackend('research-capstone')
+							}
+						],
+						new StateBackend()
+					);
+					const model = await getModel({ temperature: 0.1, maxTokens: 800 });
+					const agent = createDeepAgent({
+						model,
+						backend,
+						subagents: [
+							makeSubagent('researcher'),
+							makeSubagent('writer'),
+							makeSubagent('critic')
+						],
+						instructions: instructionsFor(topic),
+						tracer,
+						maxIterations: 40
+					});
+					agent.subscribe((s) => {
+						todos = [...s.todos];
+						files = [...s.files];
+					});
+
+					const out = await agent.invoke({
+						input: `Brief me on ${topic}.`,
+						thread: `capstone-${Math.random().toString(36).slice(2, 6)}`
+					});
+					const last = out.messages[out.messages.length - 1];
+					const text =
+						typeof last?.content === 'string'
+							? last.content
+							: JSON.stringify(last?.content ?? '');
+					return {
+						topic,
+						todos: out.todos,
+						files: await backend.list(),
+						events: localEvents,
+						finalText: text
+					};
+				}
 			);
-			const model = new MockChatModel({ responses: script(), tokenDelayMs: 0 });
-			const agent = createDeepAgent({
-				model,
-				backend,
-				subagents: [makeResearcher(), makeWriter(), makeCritic()],
-				instructions:
-					'You are a research lead. Always plan via write_todos. Decompose, delegate to researcher subagents in parallel, draft via writer, critique via critic, and save the final brief to /memories/.',
-				tracer,
-				maxIterations: 30
-			});
-			agent.subscribe((s) => {
-				todos = [...s.todos];
-				files = [...s.files];
-			});
-			await agent.invoke({
-				input: `Brief me on ${topic}.`,
-				thread: 'capstone-' + Math.random().toString(36).slice(2, 6)
-			});
+			todos = result.todos;
+			files = result.files;
+			events = result.events;
+			finalText = result.finalText;
 		} finally {
 			busy = false;
 		}
 	}
+
+	function slugify(t: string) {
+		return t
+			.toLowerCase()
+			.replace(/\s+/g, '-')
+			.replace(/[^a-z0-9-]/g, '')
+			.slice(0, 60);
+	}
+
+	$effect(() => {
+		const t = topic;
+		(async () => {
+			const cached = await loadCachedRun<RunPayload>({
+				demoId: `l3-capstone-research-${slugify(t)}`
+			});
+			if (cached && cached.payload.topic === t) {
+				todos = cached.payload.todos;
+				files = cached.payload.files;
+				events = cached.payload.events;
+				finalText = cached.payload.finalText;
+			} else {
+				todos = [];
+				files = [];
+				events = [];
+				finalText = '';
+			}
+		})();
+	});
 </script>
 
-<Lesson title="Capstone — Deep Research" eyebrow="Phase 3 · Capstone 1">
+<Lesson
+	title="Capstone — Deep Research"
+	eyebrow="Phase 3 · Capstone 1"
+	motivation="A capstone is where the parts compose. Plan, delegate, summarise, publish — the same loop a senior researcher would run, expressed in code."
+	hero={{
+		id: 'l3-capstone-research',
+		alt: "A grand reading room with three subagents sending findings via pneumatic tubes to an editor's desk"
+	}}
+>
 	{#snippet intro()}
 		<p>
 			Everything you've seen comes together: <Term t="write_todos" /> for planning, parallel
 			researcher subagents for context isolation, a <Term t="CompositeBackend" /> that routes
-			the final report to durable memory, and a virtual filesystem so intermediate notes don't
-			pollute the conversation.
+			the final report to durable memory, and a virtual filesystem so intermediate notes
+			don't pollute the conversation.
 		</p>
 	{/snippet}
 
 	{#snippet narrative()}
+		<Slide eyebrow="Why this shape" title="A team, expressed in tools" variant="dropcap">
+			<p>
+				The first chapters built the primitives; this one shows them composed into the
+				smallest shape that earns the name "research agent". One parent agent owns the plan
+				and the publish step. Three subagents — researcher, writer, critic — each take a
+				slice of the cognitive load with their own context window, their own prompt, and
+				their own one-line report back. The parent never sees the debate.
+			</p>
+			<p>
+				This is the loop a senior researcher actually runs: scope the question, hand the
+				slices to specialists, draft, review, archive the final under a stable name. The
+				difference is that here it is declarative — the same six tools, the same backends,
+				the same planner — composed by a real model in real time.
+			</p>
+		</Slide>
+
 		<Slide title="The architecture">
 			<p>
 				One parent agent orchestrates the run. It plans, fans out to three researchers (one
 				per sub-question), waits for their summaries, hands them to a writer subagent, then
-				to a critic. Final output goes to <code>/memories/{'{topic}'}.md</code>, which lives
-				in IndexedDB and survives reloads.
+				to a critic. Final output goes to <code>/memories/{'<topic>'}.md</code>, which
+				lives in IndexedDB and survives reloads.
+			</p>
+		</Slide>
+
+		<Slide variant="pull-quote">
+			<p>
+				The interesting thing about the capstone is not what each piece does. It is that
+				the same six tools and three backends could be re-composed into a code review
+				agent, an operations agent, an analyst agent — without changing the harness.
 			</p>
 		</Slide>
 
 		<Slide title="What to watch">
 			<ul>
 				<li>The <strong>plan</strong> evolving in real time as steps complete.</li>
-				<li>The <strong>subagent timeline</strong> showing parallel research spans.</li>
+				<li>The <strong>subagent timeline</strong> showing each delegation as a span.</li>
 				<li>
 					The <strong>filesystem</strong> filling with <code>/scratch/sub_questions.md</code>,
 					then a <code>/memories/{'<topic>'}.md</code> tagged with the StoreBackend.
 				</li>
 				<li>
-					After the run, <em>reload this tab</em>. Only the file under <code>/memories/</code>
-					comes back.
+					After the run, <em>reload this tab</em>. Only the file under
+					<code>/memories/</code> comes back.
 				</li>
 			</ul>
 		</Slide>
 
 		<Slide title="Why the parent stays small">
 			<p>
-				The parent never sees the researcher's full debate, the writer's draft revisions, or
-				the critic's deliberations — only the one-line summaries each returns. This is the
-				core <Term t="Context quarantine">context quarantine</Term> idea, and it is what
-				makes 30-step runs feel as crisp as 3-step ones.
+				The parent never sees the researcher's full debate, the writer's draft revisions,
+				or the critic's deliberations — only the one-line summaries each returns. This is
+				the core context-quarantine idea, and it is what makes 30-step runs feel as crisp
+				as 3-step ones.
 			</p>
+		</Slide>
+
+		<Slide ornament>
+			<p>· plan · delegate · summarise · publish ·</p>
 		</Slide>
 	{/snippet}
 
@@ -298,19 +285,25 @@
 		</Panel>
 
 		<Panel title="Plan">
-			<TodoListView todos={todos} />
+			<TodoListView {todos} />
 		</Panel>
 
 		<Panel title="Subagent timeline">
-			<SubAgentTimeline events={events} />
+			<SubAgentTimeline {events} />
 		</Panel>
 
 		<Panel title="Workspace">
-			<FileTreeViewer files={files} />
+			<FileTreeViewer {files} />
 		</Panel>
 
+		{#if finalText}
+			<Panel title="Final response">
+				<p class="finaltext">{finalText}</p>
+			</Panel>
+		{/if}
+
 		<Panel title="Trace">
-			<TraceLog events={events} />
+			<TraceLog {events} compact />
 		</Panel>
 	{/snippet}
 </Lesson>
@@ -319,17 +312,25 @@
 	input {
 		width: 100%;
 		background: var(--color-bg);
-		border: 1px solid var(--color-border);
-		border-radius: 0.4rem;
-		padding: 0.5rem 0.6rem;
-		font-size: 0.88rem;
-		color: var(--color-fg);
+		border: 1px solid var(--color-rule);
+		border-radius: 0.45rem;
+		padding: 0.55rem 0.7rem;
+		font-family: var(--font-sans);
+		font-size: 0.92rem;
+		color: var(--color-ink-100);
 	}
 	input:focus {
 		outline: none;
-		border-color: var(--accent);
+		border-color: var(--accent-ink);
 	}
 	.actions {
-		margin-top: 0.6rem;
+		margin-top: 0.65rem;
+	}
+	.finaltext {
+		margin: 0;
+		font-family: var(--font-prose);
+		font-size: 0.98rem;
+		line-height: 1.6;
+		color: var(--color-ink-100);
 	}
 </style>

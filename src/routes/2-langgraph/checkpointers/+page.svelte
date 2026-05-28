@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Lesson from '$lib/components/Lesson.svelte';
 	import Slide from '$lib/components/Slide.svelte';
+	import Term from '$lib/components/Term.svelte';
 	import Panel from '$lib/components/Panel.svelte';
 	import CodeBlock from '$lib/components/CodeBlock.svelte';
 	import RunButton from '$lib/components/RunButton.svelte';
@@ -9,9 +10,19 @@
 		Annotation,
 		StateGraph,
 		MemorySaver,
+		MessagesAnnotation,
 		START,
 		END
 	} from '@langchain/langgraph/web';
+	import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts';
+	import { HumanMessage, AIMessage, type BaseMessage } from '@langchain/core/messages';
+	import { getModel } from '$lib/runtime/llm';
+	import { withRunCache, loadCachedRun } from '$lib/runtime/runs';
+	import { onMount } from 'svelte';
+
+	/* ------------------------------------------------------------------ */
+	/* Demo 1: counter graph + fork (synthetic — best for explaining)      */
+	/* ------------------------------------------------------------------ */
 
 	const State = Annotation.Root({
 		count: Annotation<number>({ reducer: (a, b) => a + b, default: () => 0 }),
@@ -19,7 +30,6 @@
 	});
 
 	let checkpointer = new MemorySaver();
-	let graphCompiled = $state(false);
 
 	let currentState = $state<unknown>(null);
 	let history = $state<Array<{ step: number; values: unknown; checkpoint_id?: string; next: string[] }>>([]);
@@ -49,7 +59,6 @@
 		busy = true;
 		try {
 			const graph = buildGraph();
-			graphCompiled = true;
 			const result = await graph.invoke({ count: 0 }, config);
 			currentState = result;
 			await refreshHistory();
@@ -80,11 +89,7 @@
 			const forkedConfig = {
 				configurable: { thread_id: threadId, checkpoint_id: id }
 			};
-			const updated = await graph.updateState(
-				forkedConfig,
-				{ count: 100 },
-				'add'
-			);
+			const updated = await graph.updateState(forkedConfig, { count: 100 }, 'add');
 			const result = await graph.invoke(null, updated);
 			currentState = result;
 			chosenCheckpoint = id;
@@ -106,6 +111,77 @@
 		newThread();
 	}
 
+	/* ------------------------------------------------------------------ */
+	/* Demo 2: real-LLM multi-turn chat with thread persistence           */
+	/* ------------------------------------------------------------------ */
+
+	let chatThread = $state('chat-thread');
+	let chatBusy = $state(false);
+	let userTurn = $state('I want to plan a trip to Tokyo.');
+	let chatLog = $state<{ role: 'user' | 'assistant'; text: string }[]>([]);
+
+	interface ChatPayload {
+		thread: string;
+		messages: { role: 'user' | 'assistant'; text: string }[];
+	}
+
+	const chatCheckpointer = new MemorySaver();
+
+	function buildChatGraph(model: Awaited<ReturnType<typeof getModel>>) {
+		const prompt = ChatPromptTemplate.fromMessages([
+			[
+				'system',
+				'You are a helpful, concise travel assistant. Keep replies short (≤ 35 words). Always use what the user has previously told you.'
+			],
+			new MessagesPlaceholder('messages')
+		]);
+
+		return new StateGraph(MessagesAnnotation)
+			.addNode('chat', async (s) => {
+				const ai = await prompt.pipe(model).invoke({ messages: s.messages });
+				return { messages: [ai] };
+			})
+			.addEdge(START, 'chat')
+			.addEdge('chat', END)
+			.compile({ checkpointer: chatCheckpointer });
+	}
+
+	async function sendChat() {
+		if (!userTurn.trim()) return;
+		chatBusy = true;
+		const turnText = userTurn.trim();
+		try {
+			const model = await getModel({ temperature: 0.4, maxTokens: 220 });
+			const graph = buildChatGraph(model);
+			const cfg = { configurable: { thread_id: chatThread } };
+
+			chatLog = [...chatLog, { role: 'user', text: turnText }];
+			const out = await graph.invoke({ messages: [new HumanMessage(turnText)] }, cfg);
+			const last = (out.messages as BaseMessage[]).at(-1);
+			const reply = typeof last?.content === 'string' ? last.content : '';
+			chatLog = [...chatLog, { role: 'assistant', text: reply }];
+
+			const payload: ChatPayload = { thread: chatThread, messages: chatLog };
+			await withRunCache<ChatPayload>({ demoId: 'l2-checkpointers-chat' }, async () => payload);
+			userTurn = '';
+		} finally {
+			chatBusy = false;
+		}
+	}
+
+	function newChatThread() {
+		chatThread = 'chat-' + Math.random().toString(36).slice(2, 6);
+		chatLog = [];
+	}
+
+	onMount(async () => {
+		const cached = await loadCachedRun<ChatPayload>({ demoId: 'l2-checkpointers-chat' });
+		if (cached) {
+			chatLog = cached.payload.messages;
+			chatThread = cached.payload.thread;
+		}
+	});
+
 	const code = `import { MemorySaver, StateGraph } from '@langchain/langgraph';
 
 const checkpointer = new MemorySaver();           // SQLite or Postgres in production
@@ -124,32 +200,72 @@ const forked = await graph.updateState(
   { count: 100 }
 );
 await graph.invoke(null, forked);`;
+
+	const chatCode = `// Same checkpointer turns ANY graph into a multi-turn chat.
+const graph = builder.compile({ checkpointer: new MemorySaver() });
+const cfg = { configurable: { thread_id: "user-42" } };
+
+await graph.invoke({ messages: [new HumanMessage("Hi, I'm Neo.")] }, cfg);
+// → assistant remembers Neo because the previous superstep's state lives in the saver.
+await graph.invoke({ messages: [new HumanMessage("What's my name?")] }, cfg);`;
 </script>
 
-<Lesson title="Checkpointers & time travel" eyebrow="Phase 2 · Lesson 03">
+<Lesson
+	title="Checkpointers & time travel"
+	eyebrow="Phase 2 · Lesson 03"
+	motivation="An agent without persistence is a goldfish. Checkpointers give you resumption, branching histories, and forensic time-travel — the difference between a demo and a system."
+	hero={{
+		id: 'l2-checkpointers',
+		alt: 'A grandfather clock with gears whose dots align like saved checkpoints'
+	}}
+>
 	{#snippet intro()}
 		<p>
-			Plug a checkpointer into a compiled graph and every step writes a snapshot. That single
-			fact unlocks resume-after-crash, multi-turn conversations, and time travel — replay or
-			fork from any earlier point in the run.
+			Plug a <Term t="Checkpointer" /> into a compiled graph and every step writes a snapshot.
+			That single fact unlocks resume-after-crash, multi-turn conversations, and time travel —
+			replay or fork from any earlier point in the run.
 		</p>
 	{/snippet}
 
 	{#snippet narrative()}
-		<Slide title="Compile with a checkpointer">
+		<Slide eyebrow="Why this shape" title="State you can re-enter" variant="dropcap">
 			<p>
-				<code>graph.compile(&#123; checkpointer &#125;)</code> wires the runtime to call the saver
-				after every node. <code>MemorySaver</code> is in-memory; production setups use SQLite
-				or Postgres.
+				Most "agent frameworks" treat memory as a feature you bolt on later. LangGraph treats
+				it as a property of the runtime. As long as your state is well-typed, the same saver
+				that powers a multi-turn chat also powers crash recovery, A/B branching, and
+				point-in-time debugging — three problems that look unrelated until they share an
+				implementation.
 			</p>
-			<CodeBlock code={code} caption="One Memory checkpointer, three superpowers." />
+			<p>
+				The mental shift: stop thinking of a graph run as one thing and start thinking of it
+				as <strong>a stream of supersteps with a checkpoint after each one</strong>. Every
+				snapshot is addressable. Every snapshot is forkable. Every thread is just a sequence
+				of those snapshots, scoped by an id.
+			</p>
+		</Slide>
+
+		<Slide title="Compile with a checkpointer" variant="code-first">
+			<p>
+				<code>graph.compile({'{ checkpointer }'})</code> wires the runtime to call the saver
+				after every node. <code>MemorySaver</code> is in-memory; production setups use SQLite,
+				Postgres, or any custom store you implement against the saver interface.
+			</p>
+			<CodeBlock code={code} caption="One MemorySaver, three superpowers." />
 		</Slide>
 
 		<Slide title="Threads">
 			<p>
 				Every call passes <code>thread_id</code> in <code>config.configurable</code>. The
 				checkpointer treats threads as isolated: snapshots from one don't bleed into another.
-				Two users on your app simply use two thread IDs.
+				Two users on your app simply use two thread IDs — the runtime handles the rest.
+			</p>
+		</Slide>
+
+		<Slide variant="pull-quote">
+			<p>
+				A checkpoint is more than a backup — it's an address. Once your runtime hands you
+				addresses for every superstep, "memory" and "debugging" stop being separate
+				disciplines.
 			</p>
 		</Slide>
 
@@ -157,30 +273,36 @@ await graph.invoke(null, forked);`;
 			<p>
 				<code>getStateHistory</code> walks every checkpoint for a thread. You can pick one,
 				call <code>updateState</code> to edit it, and call <code>invoke(null, newConfig)</code>
-				to run forward from that fork. The original branch stays intact.
+				to run forward from that fork. The original branch stays intact, both branches stay
+				queryable.
 			</p>
 		</Slide>
 
-		<Slide title="Try it">
+		<Slide title="Same primitive, multi-turn chat" variant="code-first">
 			<p>
-				The graph on the right adds 1 then doubles the count. Press <em>Run</em>; the history
-				below it lists every checkpoint. Use <em>Fork</em> on the <code>add</code> snapshot to
-				replay from there with <code>count: 100</code>. The new branch lives in the same
-				thread; both are queryable.
+				The same checkpointer that powers time travel also powers a multi-turn chat. State is
+				whatever you defined; LangGraph just keeps loading the latest snapshot before each
+				new <code>invoke</code> on the same <code>thread_id</code>.
+			</p>
+			<CodeBlock code={chatCode} caption="Memory is a free side-effect of persistence." />
+		</Slide>
+
+		<Slide title="Try both" ornament>
+			<p>
+				On the right: a synthetic counter graph for time-travel + fork (Demo 1), and a real
+				LLM chat that remembers across turns thanks to the saver (Demo 2).
 			</p>
 		</Slide>
 	{/snippet}
 
 	{#snippet demo()}
-		<Panel title="Thread" subtitle="Two threads = two timelines">
+		<Panel title="Demo 1 · Time travel" subtitle="Two threads = two timelines">
 			<div class="thread">
 				<input type="text" bind:value={threadId} />
 				<button class="ghost" onclick={newThread}>New thread</button>
 				<button class="ghost" onclick={freshSaver}>Reset checkpointer</button>
 			</div>
-			<div class="row">
-				<RunButton onclick={runOnce} running={busy} label="Run graph" />
-			</div>
+			<RunButton onclick={runOnce} running={busy} label="Run graph" />
 			{#if currentState}
 				<StateInspector state={currentState} title="Final state" compact />
 			{/if}
@@ -215,6 +337,30 @@ await graph.invoke(null, forked);`;
 				</ol>
 			{/if}
 		</Panel>
+
+		<Panel title="Demo 2 · Multi-turn chat" subtitle="Same thread → real memory">
+			<div class="thread">
+				<input type="text" bind:value={chatThread} />
+				<button class="ghost" onclick={newChatThread}>New chat thread</button>
+			</div>
+			<div class="chat">
+				{#if !chatLog.length}
+					<p class="empty">Start the conversation. The model only remembers when you stay on this thread.</p>
+				{:else}
+					{#each chatLog as msg, i (i)}
+						<article class="chat-msg" data-role={msg.role}>
+							<div class="chat-role">{msg.role}</div>
+							<p>{msg.text}</p>
+						</article>
+					{/each}
+				{/if}
+			</div>
+			<label class="row">
+				<span>Your turn</span>
+				<input type="text" bind:value={userTurn} disabled={chatBusy} />
+			</label>
+			<RunButton onclick={sendChat} running={chatBusy} label="Send" />
+		</Panel>
 	{/snippet}
 </Lesson>
 
@@ -227,22 +373,45 @@ await graph.invoke(null, forked);`;
 	.thread input {
 		flex: 1;
 		background: var(--color-bg);
-		border: 1px solid var(--color-border);
+		border: 1px solid var(--color-rule);
 		border-radius: 0.4rem;
 		padding: 0.4rem 0.55rem;
 		font-family: var(--font-mono);
 		font-size: 0.82rem;
-		color: var(--color-fg);
+		color: var(--color-ink-100);
 	}
 	.row {
-		margin-bottom: 0.85rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+		margin: 0.7rem 0;
+	}
+	.row span {
+		font-size: 0.66rem;
+		text-transform: uppercase;
+		letter-spacing: 0.14em;
+		color: var(--color-ink-300);
+		font-family: var(--font-mono);
+	}
+	.row input {
+		background: var(--color-bg);
+		border: 1px solid var(--color-rule);
+		border-radius: 0.4rem;
+		padding: 0.45rem 0.6rem;
+		font-size: 0.88rem;
+		color: var(--color-ink-100);
+	}
+	.row input:focus,
+	.thread input:focus {
+		outline: none;
+		border-color: var(--accent-ink);
 	}
 	.ghost {
 		font-size: 0.78rem;
 		padding: 0.35rem 0.65rem;
 		background: var(--color-bg);
-		color: var(--color-fg-muted);
-		border: 1px solid var(--color-border);
+		color: var(--color-ink-200);
+		border: 1px solid var(--color-rule);
 		border-radius: 0.35rem;
 	}
 	.ghost.small {
@@ -251,12 +420,12 @@ await graph.invoke(null, forked);`;
 		margin-top: 0.4rem;
 	}
 	.ghost:hover:not(:disabled) {
-		color: var(--color-fg);
+		color: var(--color-ink-100);
 	}
 
 	.empty {
 		font-style: italic;
-		color: var(--color-fg-faint);
+		color: var(--color-ink-300);
 		font-size: 0.85rem;
 		margin: 0;
 	}
@@ -270,30 +439,66 @@ await graph.invoke(null, forked);`;
 		gap: 0.4rem;
 	}
 	.hist li {
-		border: 1px solid var(--color-border);
+		border: 1px solid var(--color-rule);
 		border-radius: 0.4rem;
 		padding: 0.55rem 0.7rem;
 		background: var(--color-bg);
 	}
 	.hist li.current {
-		border-color: var(--accent);
+		border-color: var(--accent-ink);
 	}
 	.hist header {
 		display: flex;
 		justify-content: space-between;
 		font-family: var(--font-mono);
 		font-size: 0.72rem;
-		color: var(--color-fg-faint);
+		color: var(--color-ink-300);
 		margin-bottom: 0.3rem;
 	}
 	.hist .ckpt {
-		color: var(--accent);
+		color: var(--accent-ink);
 	}
 	.vals {
 		display: flex;
 		gap: 0.6rem;
 		font-family: var(--font-mono);
 		font-size: 0.78rem;
-		color: var(--color-fg-muted);
+		color: var(--color-ink-200);
+	}
+
+	.chat {
+		display: flex;
+		flex-direction: column;
+		gap: 0.45rem;
+		max-height: 18rem;
+		overflow-y: auto;
+		padding: 0.5rem;
+		background: var(--color-bg);
+		border: 1px solid var(--color-rule);
+		border-radius: 0.4rem;
+	}
+	.chat-msg {
+		padding: 0.45rem 0.65rem;
+		border-radius: 0.4rem;
+		background: var(--color-paper);
+		border: 1px solid var(--color-rule);
+	}
+	.chat-msg[data-role='user'] {
+		border-color: color-mix(in oklch, var(--accent-ink) 50%, var(--color-rule));
+	}
+	.chat-role {
+		font-family: var(--font-mono);
+		font-size: 0.66rem;
+		text-transform: uppercase;
+		letter-spacing: 0.14em;
+		color: var(--color-ink-300);
+		margin-bottom: 0.2rem;
+	}
+	.chat-msg p {
+		margin: 0;
+		font-family: var(--font-prose);
+		font-size: 0.92rem;
+		color: var(--color-ink-100);
+		line-height: 1.55;
 	}
 </style>

@@ -73,6 +73,36 @@
 		}
 	}
 
+	function toRoman(n: number): string {
+		if (n <= 0) return '';
+		const map: Array<[number, string]> = [
+			[1000, 'M'],
+			[900, 'CM'],
+			[500, 'D'],
+			[400, 'CD'],
+			[100, 'C'],
+			[90, 'XC'],
+			[50, 'L'],
+			[40, 'XL'],
+			[10, 'X'],
+			[9, 'IX'],
+			[5, 'V'],
+			[4, 'IV'],
+			[1, 'I']
+		];
+		let r = '';
+		for (const [v, s] of map) {
+			while (n >= v) {
+				r += s;
+				n -= v;
+			}
+		}
+		return r;
+	}
+
+	const roman = $derived(toRoman(index + 1));
+	const romanTotal = $derived(toRoman(Math.max(1, total)));
+
 	$effect(() => {
 		if (app.presentationMode) {
 			untrack(() => refreshSlides());
@@ -83,7 +113,6 @@
 		}
 	});
 
-	// Reset to first slide and re-scan when navigating between lessons.
 	$effect(() => {
 		page.url.pathname;
 		if (app.presentationMode) {
@@ -113,16 +142,26 @@
 			<button class="exit" onclick={togglePresentation} aria-label="Exit presentation (Esc)">
 				Exit · Esc
 			</button>
-			<div class="counter">
-				{index + 1} / {Math.max(1, total)}
+			<div class="dots" role="tablist" aria-label="slide navigation">
+				{#each slides as _, i (i)}
+					<button
+						type="button"
+						class="dot"
+						class:active={i === index}
+						aria-label="Go to slide {i + 1}"
+						onclick={() => {
+							index = i;
+							paint();
+						}}
+					></button>
+				{/each}
 			</div>
-			<div class="bar" aria-hidden="true">
-				<div
-					class="bar-fill"
-					style:width="{total ? ((index + 1) / total) * 100 : 0}%"
-				></div>
+			<div class="counter font-display">
+				<span class="cur">{roman}</span>
+				<span class="sep">·</span>
+				<span class="all">{romanTotal}</span>
 			</div>
-			<div class="hint">← → to navigate · P or Esc to exit</div>
+			<div class="hint font-mono">← → · P · Esc</div>
 		</div>
 	{/if}
 </div>
@@ -143,10 +182,10 @@
 
 	.presentation-root.in-presentation :global([data-slide].is-active-slide) {
 		display: block !important;
-		max-width: min(1100px, 90vw);
-		margin: 5rem auto 0;
-		padding: 0 2rem;
-		animation: slide-fade 0.25s ease;
+		max-width: min(1200px, 92vw);
+		margin: 6vh auto 0;
+		padding: 0 2.5rem;
+		animation: slide-fade 0.28s ease;
 	}
 
 	.presentation-root.in-presentation :global(.lesson-shell) {
@@ -161,20 +200,39 @@
 
 	.presentation-root.in-presentation :global([data-slide].is-active-slide h1),
 	.presentation-root.in-presentation :global([data-slide].is-active-slide h2) {
-		font-size: 2.4rem;
-		line-height: 1.15;
+		font-size: clamp(2.4rem, 5vw, 3.6rem);
+		line-height: 1.05;
+		letter-spacing: -0.025em;
 	}
 
 	.presentation-root.in-presentation :global([data-slide].is-active-slide p),
 	.presentation-root.in-presentation :global([data-slide].is-active-slide li) {
-		font-size: 1.25rem;
+		font-size: clamp(1.18rem, 1.8vw, 1.4rem);
 		line-height: 1.55;
+	}
+
+	/* code-first slides go FULL WIDTH and the code becomes the focus */
+	.presentation-root.in-presentation
+		:global([data-slide][data-variant='code-first'].is-active-slide) {
+		max-width: min(1400px, 96vw);
+	}
+
+	.presentation-root.in-presentation
+		:global([data-slide][data-variant='code-first'].is-active-slide pre) {
+		font-size: clamp(0.92rem, 1.1vw, 1.05rem);
+		line-height: 1.55;
+		max-height: 75vh;
+	}
+
+	/* Hero images become slide backdrops */
+	.presentation-root.in-presentation :global([data-slide].is-active-slide .hero-frame) {
+		max-height: 38vh;
 	}
 
 	@keyframes slide-fade {
 		from {
 			opacity: 0;
-			transform: translateY(6px);
+			transform: translateY(8px);
 		}
 		to {
 			opacity: 1;
@@ -185,46 +243,88 @@
 	.overlay {
 		position: fixed;
 		inset: auto 0 0 0;
-		padding: 1rem 1.5rem;
+		padding: 0.85rem 1.5rem 1rem;
 		display: flex;
-		gap: 1rem;
+		gap: 1.25rem;
 		align-items: center;
 		justify-content: center;
 		background: linear-gradient(transparent, var(--color-bg) 60%);
-		font-size: 0.8rem;
-		color: var(--color-fg-muted);
+		font-size: 0.78rem;
+		color: var(--color-ink-300);
 		z-index: 50;
 	}
 
 	.exit {
-		border: 1px solid var(--color-border);
-		padding: 0.4rem 0.75rem;
-		border-radius: 0.5rem;
-		background: var(--color-bg-elev);
-		color: var(--color-fg);
-	}
-
-	.bar {
-		height: 3px;
-		flex: 1;
-		max-width: 320px;
-		background: var(--color-border);
+		font-family: var(--font-display);
+		border: 1px solid var(--color-rule);
+		padding: 0.4rem 0.8rem;
 		border-radius: 999px;
-		overflow: hidden;
+		background: var(--color-paper);
+		color: var(--color-ink-100);
+		font-size: 0.78rem;
+		cursor: pointer;
 	}
 
-	.bar-fill {
-		height: 100%;
-		background: var(--accent);
-		transition: width 0.25s ease;
+	.dots {
+		display: inline-flex;
+		gap: 0.4rem;
+		align-items: center;
+	}
+
+	.dot {
+		width: 7px;
+		height: 7px;
+		border-radius: 50%;
+		background: var(--color-rule);
+		border: 0;
+		padding: 0;
+		cursor: pointer;
+		transition: all 0.18s ease;
+	}
+
+	.dot:hover {
+		background: var(--color-ink-300);
+	}
+
+	.dot.active {
+		background: var(--accent-ink);
+		width: 22px;
+		border-radius: 999px;
 	}
 
 	.counter {
 		font-variant-numeric: tabular-nums;
+		font-size: 0.85rem;
+		letter-spacing: 0.12em;
+		color: var(--color-ink-200);
+	}
+
+	.counter .cur {
+		color: var(--accent-ink);
+		font-weight: 500;
+	}
+	.counter .sep {
+		opacity: 0.4;
+		margin: 0 0.5rem;
+	}
+	.counter .all {
+		color: var(--color-ink-300);
 	}
 
 	.hint {
-		font-size: 0.72rem;
-		color: var(--color-fg-faint);
+		font-size: 0.66rem;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: var(--color-ink-300);
+	}
+
+	@media (max-width: 720px) {
+		.dots {
+			max-width: 36vw;
+			overflow: hidden;
+		}
+		.hint {
+			display: none;
+		}
 	}
 </style>

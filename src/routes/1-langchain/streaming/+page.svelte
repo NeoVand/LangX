@@ -1,14 +1,19 @@
 <script lang="ts">
 	import Lesson from '$lib/components/Lesson.svelte';
 	import Slide from '$lib/components/Slide.svelte';
+	import Term from '$lib/components/Term.svelte';
 	import Panel from '$lib/components/Panel.svelte';
 	import CodeBlock from '$lib/components/CodeBlock.svelte';
 	import RunButton from '$lib/components/RunButton.svelte';
 	import { ChatPromptTemplate } from '@langchain/core/prompts';
 	import { StringOutputParser } from '@langchain/core/output_parsers';
-	import { MockChatModel } from '$lib/runtime/llm/mock';
+	import { getModel } from '$lib/runtime/llm';
+	import { withRunCache, loadCachedRun } from '$lib/runtime/runs';
+	import { onMount } from 'svelte';
 
 	let topic = $state('checkpointers in LangGraph');
+
+	type Demo1Payload = { topic: string; final: string; tokens: string[] };
 	let demo1Run = $state(false);
 	let demo1Tokens = $state<string[]>([]);
 	let demo1Final = $state('');
@@ -18,76 +23,104 @@
 		demo1Tokens = [];
 		demo1Final = '';
 		try {
-			const prompt = ChatPromptTemplate.fromMessages([
-				['human', 'In two sentences, explain {topic}.']
-			]);
-			const model = new MockChatModel({
-				responses: [
-					{
-						content: `${topic.charAt(0).toUpperCase() + topic.slice(1)} are state snapshots written after each node runs. The graph reads them on resume so it can continue without re-running prior steps.`
+			const out = await withRunCache<Demo1Payload>(
+				{ demoId: 'l1-streaming-tokens' },
+				async () => {
+					const prompt = ChatPromptTemplate.fromMessages([
+						[
+							'system',
+							'You are a concise tutor. Reply in 2 short sentences (≤ 60 words).'
+						],
+						['human', 'Explain {topic}.']
+					]);
+					const model = await getModel({ temperature: 0.2, maxTokens: 220 });
+					const chain = prompt.pipe(model).pipe(new StringOutputParser());
+					const stream = await chain.stream({ topic });
+					const tokens: string[] = [];
+					let buf = '';
+					for await (const chunk of stream) {
+						tokens.push(chunk);
+						buf += chunk;
+						demo1Tokens = tokens.slice();
+						demo1Final = buf;
 					}
-				],
-				tokenDelayMs: 35
-			});
-			const chain = prompt.pipe(model).pipe(new StringOutputParser());
-			const stream = await chain.stream({ topic });
-			let buf = '';
-			for await (const chunk of stream) {
-				demo1Tokens.push(chunk);
-				buf += chunk;
-				demo1Final = buf;
-			}
+					return { topic, final: buf, tokens };
+				}
+			);
+			demo1Final = out.final;
+			demo1Tokens = out.tokens;
 		} finally {
 			demo1Run = false;
 		}
 	}
 
-	let demo2Run = $state(false);
 	interface Ev {
 		event: string;
 		name: string;
 		data?: string;
 	}
+	type Demo2Payload = { topic: string; events: Ev[] };
+	let demo2Run = $state(false);
 	let demo2Events = $state<Ev[]>([]);
 
 	async function runDemo2() {
 		demo2Run = true;
 		demo2Events = [];
 		try {
-			const prompt = ChatPromptTemplate.fromMessages([
-				['human', 'Reply with two short bullet points about {topic}.']
-			]).withConfig({ runName: 'prompt' });
-			const model = new MockChatModel({
-				responses: [{ content: `• A bullet about ${topic}.\n• Another bullet about ${topic}.` }],
-				tokenDelayMs: 30
-			}) as unknown as MockChatModel & { withConfig: typeof prompt.withConfig };
-			const labeledModel = (model as unknown as MockChatModel).withConfig({ runName: 'model' });
-			const parser = new StringOutputParser().withConfig({ runName: 'parser' });
-			const chain = prompt.pipe(labeledModel).pipe(parser);
-			for await (const ev of chain.streamEvents({ topic }, { version: 'v2' })) {
-				if (
-					ev.event === 'on_chain_start' ||
-					ev.event === 'on_chain_end' ||
-					ev.event === 'on_chat_model_start' ||
-					ev.event === 'on_chat_model_end' ||
-					ev.event === 'on_chat_model_stream' ||
-					ev.event === 'on_parser_end'
-				) {
-					const dataPreview =
-						ev.event === 'on_chat_model_stream'
-							? (ev.data?.chunk as { content?: unknown })?.content?.toString().slice(0, 30)
-							: undefined;
-					demo2Events.push({
-						event: ev.event.replace('on_', ''),
-						name: ev.name,
-						data: dataPreview
-					});
+			const out = await withRunCache<Demo2Payload>(
+				{ demoId: 'l1-streaming-events' },
+				async () => {
+					const prompt = ChatPromptTemplate.fromMessages([
+						['human', 'In two short bullets, list two facts about {topic}.']
+					]).withConfig({ runName: 'prompt' });
+					const baseModel = await getModel({ temperature: 0, maxTokens: 180 });
+					const model = baseModel.withConfig({ runName: 'model' });
+					const parser = new StringOutputParser().withConfig({ runName: 'parser' });
+					const chain = prompt.pipe(model).pipe(parser);
+
+					const events: Ev[] = [];
+					for await (const ev of chain.streamEvents({ topic }, { version: 'v2' })) {
+						if (
+							ev.event === 'on_chain_start' ||
+							ev.event === 'on_chain_end' ||
+							ev.event === 'on_chat_model_start' ||
+							ev.event === 'on_chat_model_end' ||
+							ev.event === 'on_chat_model_stream' ||
+							ev.event === 'on_parser_end'
+						) {
+							const dataPreview =
+								ev.event === 'on_chat_model_stream'
+									? (ev.data?.chunk as { content?: unknown })?.content
+											?.toString()
+											.slice(0, 30)
+									: undefined;
+							const row: Ev = {
+								event: ev.event.replace('on_', ''),
+								name: ev.name,
+								data: dataPreview
+							};
+							events.push(row);
+							demo2Events = events.slice();
+						}
+					}
+					return { topic, events };
 				}
-			}
+			);
+			demo2Events = out.events;
 		} finally {
 			demo2Run = false;
 		}
 	}
+
+	onMount(async () => {
+		const c1 = await loadCachedRun<Demo1Payload>({ demoId: 'l1-streaming-tokens' });
+		if (c1) {
+			demo1Final = c1.payload.final;
+			demo1Tokens = c1.payload.tokens;
+		}
+		const c2 = await loadCachedRun<Demo2Payload>({ demoId: 'l1-streaming-events' });
+		if (c2) demo2Events = c2.payload.events;
+	});
 
 	const codeA = `const chain = prompt.pipe(model).pipe(new StringOutputParser());
 
@@ -107,16 +140,40 @@ for await (const chunk of stream) {
 }`;
 </script>
 
-<Lesson title="Streaming" eyebrow="Phase 1 · Lesson 02">
+<Lesson
+	title="Streaming"
+	eyebrow="Phase 1 · Lesson 02"
+	motivation="Watching tokens arrive is more than UX polish — it changes how you debug models, how you handle long contexts, and how a user lives with the latency of intelligence."
+	hero={{
+		id: 'l1-streaming',
+		alt: 'A copper-basin water clock with cascading droplets'
+	}}
+>
 	{#snippet intro()}
 		<p>
-			Streaming is not a separate API on top of LangChain — it's part of the Runnable protocol.
-			Every chain has both a final-value mode and a token-by-token mode, and a third one that
-			emits an event for every internal step.
+			Streaming is not a separate API on top of LangChain — it's part of the <Term
+				t="Runnable"
+			/> protocol. Every chain has a final-value mode, a token-by-token mode, and a third one
+			that emits an event for every internal step.
 		</p>
 	{/snippet}
 
 	{#snippet narrative()}
+		<Slide eyebrow="Why this shape" title="Latency is part of the model" variant="dropcap">
+			<p>
+				Early LLM apps treated the model as a function: send a prompt, wait, receive a string.
+				That framing hides everything interesting that happens between the first token and the
+				last — and there can be a full second between them. Long enough for the user to
+				wonder whether anything is happening at all.
+			</p>
+			<p>
+				Streaming is the alternative framing. The model is a <em>process</em> that emits
+				chunks; your job is to render them as they appear. Once you accept that, the same
+				machinery becomes a debugger, a progress bar, and the substrate for every agent
+				visualisation downstream.
+			</p>
+		</Slide>
+
 		<Slide title="Three levels of streaming">
 			<p>Pick the one that matches what you want to render:</p>
 			<ul>
@@ -125,40 +182,51 @@ for await (const chunk of stream) {
 					until the full response is ready.
 				</li>
 				<li>
-					<code>stream</code> — yield chunks of the final output as they arrive. Best for chat
-					UIs and live text.
+					<code>stream</code> — yield chunks of the final output as they arrive. Best for
+					chat UIs and live text.
 				</li>
 				<li>
-					<code>streamEvents</code> — yield typed events for every internal step (chain, model,
-					tool, parser). Best for building inspectors like the one you're using right now.
+					<code>streamEvents</code> — yield typed events for every internal step (chain,
+					model, tool, parser). Best for inspectors and audit trails.
 				</li>
 			</ul>
 		</Slide>
 
-		<Slide title="Demo 1 — token-by-token chunks">
-			<CodeBlock code={codeA} caption="Token streaming through a chain." />
+		<Slide title="Token chunks" variant="code-first">
+			<CodeBlock code={codeA} lang="ts" caption="A chain stream — Demo 1." />
 			<p>
-				Press <em>Run</em> on the right. The model is mocked so the order is reproducible — but
-				the streaming machinery is real LangChain code; swap the model for any real provider
-				and it works identically.
+				Press <em>Run</em> on the right. The chain is a real LangChain pipeline; only the
+				model behind <code>getModel()</code> changes depending on which provider you have
+				configured.
 			</p>
 		</Slide>
 
-		<Slide title="Demo 2 — streamEvents v2">
-			<CodeBlock code={codeB} caption="streamEvents emits one event per Runnable boundary." />
+		<Slide variant="pull-quote">
 			<p>
-				Use <code>withConfig({'{ runName }'})</code> to label each Runnable so the events have
-				stable, human-readable names. The inspector on the right shows the chronological event
-				log, including each token as it streams.
+				A stream is the smallest interface that lets you tell a user the model is alive
+				before it is finished thinking.
+			</p>
+		</Slide>
+
+		<Slide title="streamEvents v2" variant="code-first">
+			<CodeBlock code={codeB} lang="ts" caption="streamEvents emits one event per Runnable boundary." />
+			<p>
+				Use <code>withConfig({'{ runName }'})</code> to label each Runnable so the events
+				have stable, human-readable names. Demo 2 prints the chronological event log,
+				including each token as it streams.
 			</p>
 		</Slide>
 
 		<Slide title="What you do with this">
 			<p>
-				Token streaming is what makes a chat UI feel alive. Event streaming is what makes an{' '}
+				Token streaming is what makes a chat UI feel alive. Event streaming is what makes an
 				agent <em>auditable</em> — every tool call, every retrieval, every parse becomes a
 				visible boundary you can replay, log, or test against.
 			</p>
+		</Slide>
+
+		<Slide ornament>
+			<p>The model is a process. Render the process.</p>
 		</Slide>
 	{/snippet}
 
@@ -205,36 +273,42 @@ for await (const chunk of stream) {
 	}
 	.row span {
 		font-size: 0.78rem;
-		color: var(--color-fg-faint);
+		color: var(--color-ink-300);
+		font-family: var(--font-mono);
 	}
 	input {
 		flex: 1;
 		background: var(--color-bg);
-		border: 1px solid var(--color-border);
+		border: 1px solid var(--color-rule);
 		border-radius: 0.4rem;
 		padding: 0.4rem 0.6rem;
 		font-size: 0.88rem;
-		color: var(--color-fg);
+		color: var(--color-ink-100);
+	}
+	input:focus {
+		outline: none;
+		border-color: var(--accent-ink);
 	}
 	.output {
 		margin-top: 0.85rem;
-		padding: 0.75rem;
+		padding: 0.85rem 0.95rem;
 		background: var(--color-bg);
-		border: 1px solid var(--color-border);
-		border-radius: 0.4rem;
-		font-size: 0.92rem;
-		line-height: 1.55;
+		border: 1px solid var(--color-rule);
+		border-radius: 0.45rem;
+		font-family: var(--font-prose);
+		font-size: 1rem;
+		line-height: 1.6;
 		white-space: pre-wrap;
 	}
 	.meta {
 		font-family: var(--font-mono);
 		font-size: 0.72rem;
-		color: var(--color-fg-faint);
+		color: var(--color-ink-300);
 		text-align: right;
 		margin-top: 0.3rem;
 	}
 	.caret {
-		color: var(--accent);
+		color: var(--accent-ink);
 		animation: blink 1s steps(1) infinite;
 	}
 	@keyframes blink {
@@ -252,9 +326,9 @@ for await (const chunk of stream) {
 		gap: 0.15rem;
 		font-family: var(--font-mono);
 		font-size: 0.78rem;
-		border: 1px solid var(--color-border);
+		border: 1px solid var(--color-rule);
 		border-radius: 0.4rem;
-		padding: 0.4rem 0.5rem;
+		padding: 0.45rem 0.55rem;
 		background: var(--color-bg);
 	}
 	.ev-row {
@@ -264,7 +338,7 @@ for await (const chunk of stream) {
 	}
 	.ev-row[data-event='chat_model_start'] .ev-name,
 	.ev-row[data-event='chat_model_end'] .ev-name {
-		color: var(--accent);
+		color: var(--accent-ink);
 	}
 	.ev-row[data-event='chat_model_stream'] .ev-name {
 		color: var(--color-accent-success);
@@ -274,12 +348,13 @@ for await (const chunk of stream) {
 	}
 	.ev-name {
 		font-weight: 600;
+		color: var(--color-ink-100);
 	}
 	.ev-target {
-		color: var(--color-fg-muted);
+		color: var(--color-ink-200);
 	}
 	.ev-data {
-		color: var(--color-fg-faint);
+		color: var(--color-ink-300);
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
