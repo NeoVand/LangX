@@ -1,5 +1,6 @@
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { app, type ModelProvider, TJS_MODELS } from '$lib/state/app.svelte';
+import { findHostedModel } from '$lib/models/catalog';
 import { TransformersJsChatModel, type TjsProgress } from './transformers-js';
 
 export type ProviderHint = ModelProvider | 'auto';
@@ -26,11 +27,11 @@ export function resolveProvider(hint: ProviderHint = 'auto'): ModelProvider {
 	const pref = app.preferredProvider;
 	if (pref === 'openai' && app.keys.openai) return 'openai';
 	if (pref === 'anthropic' && app.keys.anthropic) return 'anthropic';
-	if (pref === 'groq' && app.keys.groq) return 'groq';
+	if (pref === 'google' && app.keys.google) return 'google';
 	if (pref === 'transformers-js') return 'transformers-js';
 	if (app.keys.anthropic) return 'anthropic';
 	if (app.keys.openai) return 'openai';
-	if (app.keys.groq) return 'groq';
+	if (app.keys.google) return 'google';
 	return 'transformers-js';
 }
 
@@ -52,14 +53,21 @@ export async function getModel(opts: GetModelOptions = {}): Promise<BaseChatMode
 	if (provider === 'openai') {
 		if (!app.keys.openai) throw new NoConfiguredProviderError('openai');
 		const { ChatOpenAI } = await import('@langchain/openai');
+		const id = app.models.openai;
+		const configuration = { dangerouslyAllowBrowser: true } as never;
+		// GPT-5.x / o-series are reasoning models: they reject a custom temperature
+		// and meter output with max_completion_tokens. Send the minimal parameter
+		// surface so we never pass something the API rejects; let the SDK default
+		// the rest. Classic chat models (gpt-4o-mini) keep the deterministic path.
+		if (findHostedModel(id)?.reasoning) {
+			return new ChatOpenAI({ apiKey: app.keys.openai, model: id, configuration });
+		}
 		return new ChatOpenAI({
 			apiKey: app.keys.openai,
-			model: 'gpt-4o-mini',
+			model: id,
 			temperature: opts.temperature ?? 0,
 			maxTokens: opts.maxTokens,
-			configuration: {
-				dangerouslyAllowBrowser: true
-			} as never
+			configuration
 		});
 	}
 
@@ -68,7 +76,7 @@ export async function getModel(opts: GetModelOptions = {}): Promise<BaseChatMode
 		const { ChatAnthropic } = await import('@langchain/anthropic');
 		return new ChatAnthropic({
 			apiKey: app.keys.anthropic,
-			model: 'claude-haiku-4-5',
+			model: app.models.anthropic,
 			temperature: opts.temperature ?? 0,
 			maxTokens: opts.maxTokens ?? 1024,
 			clientOptions: {
@@ -77,13 +85,15 @@ export async function getModel(opts: GetModelOptions = {}): Promise<BaseChatMode
 		});
 	}
 
-	if (provider === 'groq') {
-		if (!app.keys.groq) throw new NoConfiguredProviderError('groq');
-		const { ChatGroq } = await import('@langchain/groq');
-		return new ChatGroq({
-			apiKey: app.keys.groq,
-			model: 'llama-3.3-70b-versatile',
-			temperature: opts.temperature ?? 0
+	if (provider === 'google') {
+		if (!app.keys.google) throw new NoConfiguredProviderError('google');
+		const { ChatGoogleGenerativeAI } = await import('@langchain/google-genai');
+		return new ChatGoogleGenerativeAI({
+			apiKey: app.keys.google,
+			model: app.models.google,
+			temperature: opts.temperature ?? 0,
+			// Google's SDK names the output cap maxOutputTokens (not maxTokens).
+			maxOutputTokens: opts.maxTokens
 		});
 	}
 

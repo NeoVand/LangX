@@ -7,7 +7,7 @@
 
 	const path = $derived(page.url.pathname);
 	const hasKey = $derived(
-		!!(app.keys.openai || app.keys.anthropic || app.keys.groq)
+		!!(app.keys.openai || app.keys.anthropic || app.keys.google)
 	);
 	// View toggles only make sense on lesson pages (two-pane layout).
 	const onLesson = $derived(/^\/[123]-/.test(path));

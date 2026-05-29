@@ -131,7 +131,7 @@ const aliases: Record<string, string> = {
 	voyageembeddings: 'VoyageEmbeddings',
 	chatanthropic: 'ChatAnthropic',
 	chatopenai: 'ChatOpenAI',
-	chatgroq: 'ChatGroq',
+	gemini: 'ChatGoogleGenerativeAI',
 	postgressaver: 'PostgresSaver',
 	'skill.md': 'SKILL.md',
 	'agents.md': 'AGENTS.md',
@@ -1018,7 +1018,7 @@ export const glossary: GlossaryEntry[] = [
 		term: 'getModel',
 		chapter: 'general',
 		short: 'LangX factory returning a configured chat model.',
-		long: 'await getModel({ temperature, maxTokens }) from $lib/runtime/llm resolves preferred provider (Anthropic, OpenAI, Groq, Transformers.js) — every lesson demo invokes through this entry point.'
+		long: 'await getModel({ temperature, maxTokens }) from $lib/runtime/llm resolves preferred provider (Anthropic, OpenAI, Google Gemini, Transformers.js) — every lesson demo invokes through this entry point.'
 	},
 	{
 		term: 'makeEmbeddings',
@@ -1029,14 +1029,14 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'provider',
 		chapter: 'general',
-		short: 'Configured LLM backend: anthropic, openai, groq, or transformers-js.',
+		short: 'Configured LLM backend: anthropic, openai, google, or transformers-js.',
 		long: 'Setup Step 2 and resolveProvider() in getModel() pick the runtime; app.preferredProvider and per-provider API keys in localStorage gate all lesson demos.'
 	},
 	{
 		term: 'API key',
 		chapter: 'general',
 		short: 'Secret credential for a hosted model or embeddings API.',
-		long: 'Setup stores anthropic/openai/groq/voyage keys in localStorage (browser-only); NoConfiguredProviderError directs learners to /setup when a hosted path is selected without a key.'
+		long: 'Setup stores anthropic/openai/google/voyage keys in localStorage (browser-only); NoConfiguredProviderError directs learners to /setup when a hosted path is selected without a key.'
 	},
 	{
 		term: 'localStorage',
@@ -1332,19 +1332,19 @@ export const glossary: GlossaryEntry[] = [
 		term: 'ChatAnthropic',
 		chapter: 'langchain',
 		short: 'LangChain wrapper for Anthropic Claude models.',
-		long: 'Recommended LangX hosted provider — claude-haiku-4-5 with dangerouslyAllowBrowser. Used in tools and runnables examples; strong tool use in browser demos.'
+		long: 'Recommended LangX hosted provider, with dangerouslyAllowBrowser. /setup lets you pick Haiku 4.5 (fast default), Sonnet 4.6, or Opus 4.8; strong tool use in browser demos.'
 	},
 	{
 		term: 'ChatOpenAI',
 		chapter: 'langchain',
 		short: 'LangChain wrapper for OpenAI chat models.',
-		long: 'createReactAgent and getModel openai path use gpt-4o-mini via browser configuration; also backs OpenAIEmbeddings when RAG provider is openai.'
+		long: "getModel's openai path uses the model you choose on /setup — gpt-4o-mini (default) or a GPT-5.x reasoning model — via browser configuration; also backs OpenAIEmbeddings when the RAG provider is openai."
 	},
 	{
-		term: 'ChatGroq',
+		term: 'ChatGoogleGenerativeAI',
 		chapter: 'langchain',
-		short: 'LangChain wrapper for Groq-hosted Llama models.',
-		long: 'getModel groq path returns ChatGroq with llama-3.3-70b-versatile — high throughput option on /setup for hosted inference without local download.'
+		short: 'LangChain wrapper for Google Gemini models.',
+		long: "getModel's google path returns ChatGoogleGenerativeAI with your chosen Gemini model (gemini-2.5-flash by default) — a 1M-token-context, multimodal option on /setup, and browser-CORS friendly."
 	},
 	{
 		term: 'synthesis',

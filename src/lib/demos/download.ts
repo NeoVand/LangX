@@ -38,7 +38,7 @@ const VERSIONS: Record<string, string> = {
 	'@langchain/core': '^1.1.48',
 	'@langchain/anthropic': '^1.4.0',
 	'@langchain/openai': '^1.4.7',
-	'@langchain/groq': '^1.2.1',
+	'@langchain/google-genai': '^2.1.31',
 	'@langchain/langgraph': '^1.3.2',
 	'@langchain/textsplitters': '^1.0.1',
 	'@observablehq/plot': '^0.6.17',

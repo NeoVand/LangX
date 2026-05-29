@@ -8,7 +8,11 @@
 	import Diagram from '$lib/components/Diagram.svelte';
 	import { ragFlow } from '$lib/diagrams';
 	import { InMemoryVectorStore } from '$lib/runtime/rag/in-memory-vector-store';
-	import { EMBEDDINGS_PROVIDERS, type EmbeddingsProviderId } from '$lib/runtime/rag/registry';
+	import {
+		EMBEDDINGS_PROVIDERS,
+		activeEmbeddingModelLabel,
+		type EmbeddingsProviderId
+	} from '$lib/runtime/rag/registry';
 	import {
 		chunkDocuments,
 		buildStore,
@@ -291,7 +295,7 @@ console.log('Answer:', answer);
 						<select bind:value={provider} onchange={() => (store = null)}>
 							{#each EMBEDDINGS_PROVIDERS as p (p.id)}
 								<option value={p.id} disabled={!providerAvailable(p.id)}>
-									{p.label}{providerAvailable(p.id) ? '' : ' (key needed)'}
+									{p.label} · {activeEmbeddingModelLabel(p.id)}{providerAvailable(p.id) ? '' : ' (key needed)'}
 								</option>
 							{/each}
 						</select>

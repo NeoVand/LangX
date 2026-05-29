@@ -3,10 +3,21 @@
 		app,
 		setApiKey,
 		setPreferredProvider,
+		setProviderModel,
+		setEmbeddingModel,
 		setTjsModel,
 		TJS_MODELS,
 		type ModelProvider
 	} from '$lib/state/app.svelte';
+	import {
+		modelsForProvider,
+		findHostedModel,
+		formatContext,
+		embeddingModelsForProvider,
+		type HostedModel,
+		type HostedProvider,
+		type EmbeddingModel
+	} from '$lib/models/catalog';
 	import ParrotMark from '$lib/components/ParrotMark.svelte';
 	import Term from '$lib/components/Term.svelte';
 	import { onMount } from 'svelte';
@@ -25,19 +36,73 @@
 	let testMessage = $state<string | null>(null);
 	let testOk = $state<boolean | null>(null);
 
-	async function pingAnthropic() {
-		if (!app.keys.anthropic) return;
+	const providerChoices = [
+		{ id: 'anthropic', title: 'Anthropic' },
+		{ id: 'openai', title: 'OpenAI' },
+		{ id: 'google', title: 'Google Gemini' },
+		{ id: 'transformers-js', title: 'Local' }
+	] as const;
+
+	/** Per-provider copy for the contextual key step. */
+	const PROVIDER_META: Record<
+		HostedProvider,
+		{ label: string; placeholder: string; keysUrl: string; blurb: string }
+	> = {
+		anthropic: {
+			label: 'Anthropic',
+			placeholder: 'sk-ant-...',
+			keysUrl: 'https://console.anthropic.com/settings/keys',
+			blurb: 'Claude — fast, strongly agentic, and browser-CORS friendly.'
+		},
+		openai: {
+			label: 'OpenAI',
+			placeholder: 'sk-proj-...',
+			keysUrl: 'https://platform.openai.com/api-keys',
+			blurb: 'GPT-4o mini plus the GPT-5.x reasoning family.'
+		},
+		google: {
+			label: 'Google Gemini',
+			placeholder: 'AIza...',
+			keysUrl: 'https://aistudio.google.com/apikey',
+			blurb: 'Gemini — 1M-token context, multimodal, with thinking models.'
+		}
+	};
+
+	const EMBED_META: Record<'openai' | 'voyage', { placeholder: string; keysUrl: string }> = {
+		openai: { placeholder: 'sk-proj-...', keysUrl: 'https://platform.openai.com/api-keys' },
+		voyage: { placeholder: 'pa-...', keysUrl: 'https://dashboard.voyageai.com/' }
+	};
+
+	/** Selected provider as a hosted provider, or null when running locally. */
+	const hostedProvider = $derived(
+		provider === 'transformers-js' ? null : (provider as HostedProvider)
+	);
+	const activeKey = $derived(hostedProvider ? app.keys[hostedProvider] : '');
+	const canPing = $derived(!!hostedProvider && !!activeKey);
+	/** Configured = local runtime (no key) or the selected hosted provider has a key. */
+	const connected = $derived(provider === 'transformers-js' || !!activeKey);
+	const selectedModelLabel = $derived(
+		hostedProvider
+			? (findHostedModel(app.models[hostedProvider])?.label ?? app.models[hostedProvider])
+			: ''
+	);
+
+	const embedGroups = $derived([
+		{ provider: 'openai' as const, title: 'OpenAI', hasKey: !!app.keys.openai },
+		{ provider: 'voyage' as const, title: 'Voyage', hasKey: !!app.keys.voyage }
+	]);
+
+	async function pingModel() {
+		if (!canPing) return;
 		testing = true;
 		testMessage = null;
+		testOk = null;
 		try {
-			const { ChatAnthropic } = await import('@langchain/anthropic');
-			const llm = new ChatAnthropic({
-				apiKey: app.keys.anthropic,
-				model: 'claude-haiku-4-5',
-				temperature: 0,
-				maxTokens: 32,
-				clientOptions: { dangerouslyAllowBrowser: true }
-			});
+			// Goes through the real getModel() path, so it tests the exact provider +
+			// model the demos will use (and exercises the reasoning-model branch).
+			const { getModel } = await import('$lib/runtime/llm');
+			// 512 (not ~32) so thinking models like Gemini 2.5 have room to emit visible text.
+			const llm = await getModel({ provider, temperature: 0, maxTokens: 512 });
 			const r = await llm.invoke([
 				{ role: 'system', content: 'Reply with the single word: ready.' },
 				{ role: 'user', content: 'ping' }
@@ -53,7 +118,13 @@
 		}
 	}
 
-	const hasAnyKey = $derived(!!(app.keys.anthropic || app.keys.openai || app.keys.groq));
+	function costLabel(m: HostedModel): string {
+		return m.price ? `$${m.price.inMtok} / $${m.price.outMtok}` : m.costTier;
+	}
+
+	function embedCost(m: EmbeddingModel): string {
+		return m.price ? `$${m.price.inMtok}/Mtok` : m.costTier;
+	}
 
 	function tierColor(tier: string) {
 		if (tier === 'XS') return 'tier-xs';
@@ -71,184 +142,264 @@
 			<div class="eyebrow font-display">Setup</div>
 			<h1>Bring your own model.</h1>
 			<p class="lead">
-				Every demo in LangX runs against a real model. Paste a hosted-API key for the fastest
-				path, or pick a <Term t="Transformers.js">Transformers.js</Term> model that downloads once and runs locally on <Term t="WebGPU">WebGPU</Term>. <Term t="API key">API keys</Term>
-				stay in <Term t="localStorage"><code>localStorage</code></Term> on this device — they never leave your browser.
+				Every demo in LangX runs against a real model you choose. Pick one below — hosted models
+				need an <Term t="API key">API key</Term>, local <Term t="Transformers.js">Transformers.js</Term>
+				models download once and run on <Term t="WebGPU">WebGPU</Term>. <Term t="API key">Keys</Term> stay
+				in <Term t="localStorage"><code>localStorage</code></Term> on this device — they never leave your
+				browser.
 			</p>
 		</div>
 	</header>
 
-	<section class="status">
-		<div class="status-row">
-			<span class="status-key">WebGPU</span>
-			<span class="status-val" class:ok={app.webgpuOk} class:bad={app.webgpuOk === false}>
-				{app.webgpuOk === null ? 'checking…' : app.webgpuOk ? 'available' : 'not available'}
-			</span>
-		</div>
-		<p class="status-note">
-			Local models run faster on <Term t="WebGPU">WebGPU</Term>. If WebGPU is missing, LangX falls back to <Term t="WebAssembly">WebAssembly</Term>
-			(~5× slower) or you can use a hosted <Term t="Model">model</Term> provider below.
+	<!-- Step 1 — choose the model first, so we only ask for the key it needs. -->
+	<section class="block">
+		<h2>Step 1 · Choose your <Term t="Model">model</Term></h2>
+		<p class="muted">
+			Pick the engine your demos run on. Hosted models need a key (next step); local models
+			download to your browser and need no key.
 		</p>
+		<div class="provider-tabs" role="tablist" aria-label="Model provider">
+			{#each providerChoices as pc (pc.id)}
+				<button
+					type="button"
+					role="tab"
+					aria-selected={provider === pc.id}
+					class="ptab"
+					class:active={provider === pc.id}
+					onclick={() => (provider = pc.id)}
+				>
+					{pc.title}
+				</button>
+			{/each}
+		</div>
+
+		{#if hostedProvider}
+			<p class="provider-blurb">{PROVIDER_META[hostedProvider].blurb}</p>
+			<div class="models hosted-models">
+				{#each modelsForProvider(hostedProvider) as model (model.id)}
+					<label class="model" class:selected={app.models[hostedProvider] === model.id}>
+						<input
+							type="radio"
+							name="hosted-model"
+							value={model.id}
+							checked={app.models[hostedProvider] === model.id}
+							onchange={() => setProviderModel(hostedProvider, model.id)}
+						/>
+						<div class="m-head">
+							<div>
+								<span class="m-name font-display">{model.label}</span>
+								<span class="m-sub">{model.tier}{model.reasoning ? ' · reasoning' : ''}</span>
+							</div>
+							{#if model.recommended}<span class="tag-rec">default</span>{/if}
+						</div>
+						<dl class="m-stats">
+							<div>
+								<dt>Context</dt>
+								<dd>{formatContext(model.contextTokens)}</dd>
+							</div>
+							<div>
+								<dt>Cost</dt>
+								<dd class="cost-{model.costTier}">{costLabel(model)}</dd>
+							</div>
+							<div>
+								<dt>Speed</dt>
+								<dd>{model.speed}</dd>
+							</div>
+							<div>
+								<dt>Agentic</dt>
+								<dd class="grade grade-{model.agenticGrade}">{model.agenticGrade}</dd>
+							</div>
+						</dl>
+						<p class="m-notes">{model.blurb}</p>
+					</label>
+				{/each}
+			</div>
+		{:else}
+			<p class="provider-blurb">
+				Runs entirely in your browser — no key, no network at runtime. Larger models need more RAM
+				and a real GPU. The <Term t="Harness">harness</Term> wants at least <strong>good</strong>
+				<Term t="Agentic grade">agentic grade</Term> for the <Term t="Deep Agent">Deep Agents</Term> chapter.
+			</p>
+			<div class="models">
+				{#each TJS_MODELS as model (model.id)}
+					<label class="model" class:selected={app.tjsModel === model.id}>
+						<input
+							type="radio"
+							name="tjs-model"
+							value={model.id}
+							checked={app.tjsModel === model.id}
+							onchange={() => setTjsModel(model.id)}
+						/>
+						<div class="m-head">
+							<div>
+								<span class="m-name font-display">{model.label}</span>
+								<span class="m-sub">{model.family} · {model.dtype}</span>
+							</div>
+							<span class="tier {tierColor(model.tier)}">{model.tier}</span>
+						</div>
+						<dl class="m-stats">
+							<div>
+								<dt>Size</dt>
+								<dd>{(model.sizeMb / 1024).toFixed(2)} GB</dd>
+							</div>
+							<div>
+								<dt>RAM</dt>
+								<dd>{model.recommendedRamGb} GB</dd>
+							</div>
+							<div>
+								<dt>TTFT</dt>
+								<dd>{model.bench.ttftMs} ms</dd>
+							</div>
+							<div>
+								<dt>Throughput</dt>
+								<dd>{model.bench.decodeTokPerSec} tok/s</dd>
+							</div>
+							<div>
+								<dt>WebGPU</dt>
+								<dd>{model.requiresWebGpu ? 'required' : 'optional'}</dd>
+							</div>
+							<div>
+								<dt>Agentic</dt>
+								<dd class="grade grade-{model.agenticGrade}">{model.agenticGrade}</dd>
+							</div>
+						</dl>
+						<p class="m-notes">{model.notes}</p>
+					</label>
+				{/each}
+			</div>
+		{/if}
 	</section>
 
-	<section class="block gate" class:ok={hasAnyKey}>
+	<!-- Step 2 — only the selected model's key, with the test tied to that model. -->
+	<section class="block gate" class:ok={connected}>
 		<div class="gate-body">
-			<h2>Step 1 · Hosted-API key</h2>
-			<p class="muted">
-				Anthropic is the recommended path — <Term t="ChatAnthropic">Claude Haiku 4.5</Term> is fast, <Term t="Agentic grade">agentic</Term>, and Browser-CORS
-				enabled. Paste any <Term t="API key">API key</Term> below and LangX will use it as the default.
-			</p>
-			<div class="keys">
-				<label>
-					<span>Anthropic</span>
-					<input
-						type="password"
-						value={app.keys.anthropic}
-						oninput={(e) => setApiKey('anthropic', (e.target as HTMLInputElement).value)}
-						placeholder="sk-ant-..."
-						autocomplete="off"
-					/>
-				</label>
-				<label>
-					<span>OpenAI</span>
-					<input
-						type="password"
-						value={app.keys.openai}
-						oninput={(e) => setApiKey('openai', (e.target as HTMLInputElement).value)}
-						placeholder="sk-..."
-						autocomplete="off"
-					/>
-				</label>
-				<label>
-					<span>Groq</span>
-					<input
-						type="password"
-						value={app.keys.groq}
-						oninput={(e) => setApiKey('groq', (e.target as HTMLInputElement).value)}
-						placeholder="gsk_..."
-						autocomplete="off"
-					/>
-				</label>
-				<label>
-					<span>Voyage <small>(embeddings, optional)</small></span>
-					<input
-						type="password"
-						value={app.keys.voyage}
-						oninput={(e) => setApiKey('voyage', (e.target as HTMLInputElement).value)}
-						placeholder="pa-..."
-						autocomplete="off"
-					/>
-				</label>
-			</div>
-			<div class="ping">
-				<button
-					class="btn ghost"
-					disabled={!app.keys.anthropic || testing}
-					onclick={pingAnthropic}
-				>
-					{testing ? 'Pinging…' : 'Ping Anthropic'}
-				</button>
-				{#if testMessage}
-					<p class="ping-msg" class:ok={testOk} class:bad={testOk === false}>{testMessage}</p>
-				{/if}
-			</div>
+			{#if hostedProvider}
+				<h2>Step 2 · Connect {PROVIDER_META[hostedProvider].label}</h2>
+				<p class="muted">
+					Paste your {PROVIDER_META[hostedProvider].label} key — it stays in
+					<Term t="localStorage"><code>localStorage</code></Term> on this device. Get one from
+					<a href={PROVIDER_META[hostedProvider].keysUrl} target="_blank" rel="noopener noreferrer"
+						>{PROVIDER_META[hostedProvider].label} ↗</a
+					>.
+				</p>
+				<div class="keys">
+					<label>
+						<span>API key</span>
+						<input
+							type="password"
+							value={app.keys[hostedProvider]}
+							oninput={(e) => setApiKey(hostedProvider, (e.target as HTMLInputElement).value)}
+							placeholder={PROVIDER_META[hostedProvider].placeholder}
+							autocomplete="off"
+						/>
+					</label>
+				</div>
+				<div class="ping">
+					<button class="btn ghost" disabled={!canPing || testing} onclick={pingModel}>
+						{testing ? 'Testing…' : `Test ${selectedModelLabel}`}
+					</button>
+					{#if testMessage}
+						<p class="ping-msg" class:ok={testOk} class:bad={testOk === false}>{testMessage}</p>
+					{/if}
+				</div>
+			{:else}
+				<h2>Step 2 · Run locally</h2>
+				<p class="muted">
+					No API key needed — your selected model downloads once into the browser cache and runs on
+					<Term t="WebGPU">WebGPU</Term>.
+				</p>
+				<div class="status">
+					<div class="status-row">
+						<span class="status-key">WebGPU</span>
+						<span class="status-val" class:ok={app.webgpuOk} class:bad={app.webgpuOk === false}>
+							{app.webgpuOk === null ? 'checking…' : app.webgpuOk ? 'available' : 'not available'}
+						</span>
+					</div>
+					<p class="status-note">
+						If WebGPU is missing, LangX falls back to <Term t="WebAssembly">WebAssembly</Term> (~5×
+						slower).
+					</p>
+				</div>
+			{/if}
 		</div>
 		<div class="gate-status">
-			{#if hasAnyKey}
+			{#if connected}
 				<span class="check">✔</span>
-				<span>Ready. Pick a default provider below.</span>
+				<span>Ready — start the curriculum below.</span>
 			{:else}
 				<span class="x">!</span>
-				<span>Add a key or switch the default to Transformers.js.</span>
+				<span>Add your {hostedProvider ? PROVIDER_META[hostedProvider].label : ''} key to continue.</span>
 			{/if}
 		</div>
 	</section>
 
+	<!-- Step 3 — embeddings are independent of the chat model; reveal each key inline. -->
 	<section class="block">
-		<h2>Step 2 · Default <Term t="Model">model</Term> provider</h2>
-		<div class="providers">
-			<label class="provider" class:selected={provider === 'anthropic'}>
-				<input type="radio" name="provider" bind:group={provider} value="anthropic" />
-				<span class="p-title">Anthropic</span>
-				<span class="p-desc"><Term t="ChatAnthropic">Claude Haiku 4.5</Term>. Strong <Term t="Tool calling">tool use</Term>, fast first token.</span>
-			</label>
-			<label class="provider" class:selected={provider === 'openai'}>
-				<input type="radio" name="provider" bind:group={provider} value="openai" />
-				<span class="p-title">OpenAI</span>
-				<span class="p-desc"><Term t="ChatOpenAI">GPT-4o mini</Term> via the browser-CORS endpoint.</span>
-			</label>
-			<label class="provider" class:selected={provider === 'groq'}>
-				<input type="radio" name="provider" bind:group={provider} value="groq" />
-				<span class="p-title">Groq</span>
-				<span class="p-desc"><Term t="ChatGroq">Hosted Llama-3.3 70B</Term> at high token throughput.</span>
-			</label>
-			<label class="provider" class:selected={provider === 'transformers-js'}>
-				<input
-					type="radio"
-					name="provider"
-					bind:group={provider}
-					value="transformers-js"
-				/>
-				<span class="p-title">Transformers.js</span>
-				<span class="p-desc">Local <Term t="Transformers.js">Transformers.js</Term> model in your browser. No key, no network at runtime.</span>
-			</label>
-		</div>
-	</section>
-
-	<section class="block">
-		<h2>Step 3 · Local model (optional)</h2>
+		<h2>Step 3 · <Term t="embedding model">Embeddings</Term> (RAG)</h2>
 		<p class="muted">
-			These models live on Hugging Face and download once into your browser cache. The <Term t="Harness">harness</Term>
-			needs at least <strong>good</strong> <Term t="Agentic grade">agentic grade</Term> for the <Term t="Deep Agent">Deep Agents</Term> chapter to behave
-			properly.
+			The <a href="/1-langchain/rag">RAG lesson</a> turns text into vectors with an embedding model.
+			Local <Term t="MiniLM">MiniLM</Term> runs in-browser with no key; to use a hosted model in the RAG
+			demo, pick it below and add that provider's key.
 		</p>
-		<div class="models">
-			{#each TJS_MODELS as model (model.id)}
-				<label class="model" class:selected={app.tjsModel === model.id}>
-					<input
-						type="radio"
-						name="tjs-model"
-						value={model.id}
-						checked={app.tjsModel === model.id}
-						onchange={() => setTjsModel(model.id)}
-					/>
-					<div class="m-head">
-						<div>
-							<span class="m-name font-display">{model.label}</span>
-							<span class="m-sub">{model.family} · {model.dtype}</span>
-						</div>
-						<span class="tier {tierColor(model.tier)}">{model.tier}</span>
+		{#each embedGroups as group (group.provider)}
+			<div class="embed-group" class:locked={!group.hasKey}>
+				<div class="embed-head">
+					<span class="embed-provider font-display">{group.title}</span>
+					<span class="embed-key" class:ok={group.hasKey}>
+						{group.hasKey ? 'key ready' : 'needs a key'}
+					</span>
+				</div>
+				{#if !group.hasKey}
+					<div class="keys">
+						<label>
+							<span>API key</span>
+							<input
+								type="password"
+								value={app.keys[group.provider]}
+								oninput={(e) => setApiKey(group.provider, (e.target as HTMLInputElement).value)}
+								placeholder={EMBED_META[group.provider].placeholder}
+								autocomplete="off"
+							/>
+						</label>
 					</div>
-					<dl class="m-stats">
-						<div>
-							<dt>Size</dt>
-							<dd>{(model.sizeMb / 1024).toFixed(2)} GB</dd>
-						</div>
-						<div>
-							<dt>RAM</dt>
-							<dd>{model.recommendedRamGb} GB</dd>
-						</div>
-						<div>
-							<dt>TTFT</dt>
-							<dd>{model.bench.ttftMs} ms</dd>
-						</div>
-						<div>
-							<dt>Throughput</dt>
-							<dd>{model.bench.decodeTokPerSec} tok/s</dd>
-						</div>
-						<div>
-							<dt>WebGPU</dt>
-							<dd>{model.requiresWebGpu ? 'required' : 'optional'}</dd>
-						</div>
-						<div>
-							<dt>Agentic</dt>
-							<dd class="grade grade-{model.agenticGrade}">{model.agenticGrade}</dd>
-						</div>
-					</dl>
-					<p class="m-notes">{model.notes}</p>
-				</label>
-			{/each}
-		</div>
+				{/if}
+				<div class="models hosted-models">
+					{#each embeddingModelsForProvider(group.provider) as model (model.id)}
+						<label class="model" class:selected={app.embeddingModels[group.provider] === model.id}>
+							<input
+								type="radio"
+								name={`embed-${group.provider}`}
+								value={model.id}
+								checked={app.embeddingModels[group.provider] === model.id}
+								onchange={() => setEmbeddingModel(group.provider, model.id)}
+							/>
+							<div class="m-head">
+								<div>
+									<span class="m-name font-display">{model.label}</span>
+									<span class="m-sub">{model.dimensions}-dim</span>
+								</div>
+								{#if model.recommended}<span class="tag-rec">default</span>{/if}
+							</div>
+							<dl class="m-stats">
+								<div>
+									<dt>Dimensions</dt>
+									<dd>{model.dimensions}</dd>
+								</div>
+								<div>
+									<dt>Cost</dt>
+									<dd class="cost-{model.costTier}">{embedCost(model)}</dd>
+								</div>
+							</dl>
+							<p class="m-notes">{model.blurb}</p>
+						</label>
+					{/each}
+				</div>
+			</div>
+		{/each}
+		<p class="muted local-note">
+			<strong>Local · MiniLM</strong> (all-MiniLM-L6-v2, 384-dim) runs fully in-browser with no key — the
+			default in the RAG lesson.
+		</p>
 	</section>
 
 	<section class="block end">
@@ -404,43 +555,47 @@
 		font-weight: 700;
 	}
 
-	.providers {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-		gap: 0.6rem;
-	}
-
-	.provider {
-		border: 1px solid var(--color-rule);
-		border-radius: 0.55rem;
-		padding: 0.95rem;
-		background: var(--color-paper);
-		cursor: pointer;
+	/* Provider selector — compact pill row above the model cards. */
+	.provider-tabs {
 		display: flex;
-		flex-direction: column;
-		gap: 0.3rem;
-		transition: border-color 0.18s ease;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+		margin-bottom: 0.75rem;
 	}
 
-	.provider input {
-		display: none;
-	}
-
-	.provider.selected {
-		border-color: var(--accent-ink);
-		box-shadow: inset 0 0 0 1px var(--accent-ink);
-	}
-
-	.p-title {
+	.ptab {
 		font-family: var(--font-display);
 		font-weight: 500;
-		font-size: 1.05rem;
+		font-size: 0.95rem;
+		padding: 0.5rem 0.95rem;
+		border-radius: 0.5rem;
+		border: 1px solid var(--color-rule);
+		background: var(--color-paper);
+		color: var(--color-ink-200);
+		cursor: pointer;
+		transition:
+			border-color 0.15s ease,
+			color 0.15s ease,
+			background 0.15s ease;
 	}
 
-	.p-desc {
-		font-size: 0.85rem;
+	.ptab:hover {
+		color: var(--color-ink-100);
+		border-color: color-mix(in oklch, var(--accent-ink) 40%, var(--color-rule));
+	}
+
+	.ptab.active {
+		border-color: var(--accent-ink);
+		color: var(--accent-ink);
+		box-shadow: inset 0 0 0 1px var(--accent-ink);
+		background: color-mix(in oklch, var(--accent-soft) 30%, var(--color-paper));
+	}
+
+	.provider-blurb {
+		font-size: 0.9rem;
 		color: var(--color-ink-200);
-		line-height: 1.45;
+		line-height: 1.5;
+		margin: 0 0 0.9rem;
 	}
 
 	.models {
@@ -568,6 +723,68 @@
 		font-weight: 600;
 	}
 
+	/* Hosted-model cards reuse the .model card styles with a tighter 2-col stat grid. */
+	.hosted-models .m-stats {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.tag-rec {
+		flex: 0 0 auto;
+		font-family: var(--font-mono);
+		font-size: 0.62rem;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		padding: 0.15rem 0.45rem;
+		border-radius: 999px;
+		background: color-mix(in oklch, var(--accent-ink) 16%, transparent);
+		color: var(--accent-ink);
+		border: 1px solid color-mix(in oklch, var(--accent-ink) 30%, var(--color-rule));
+		white-space: nowrap;
+	}
+
+	.cost-low {
+		color: var(--accent-ink);
+	}
+	.cost-medium {
+		color: var(--color-ink-100);
+	}
+	.cost-high {
+		color: var(--color-accent-warning);
+	}
+	.cost-free {
+		color: var(--accent-ink);
+	}
+
+	.embed-group {
+		margin-top: 1.1rem;
+	}
+	.embed-group.locked {
+		opacity: 0.78;
+	}
+	.embed-head {
+		display: flex;
+		align-items: baseline;
+		gap: 0.6rem;
+		margin-bottom: 0.5rem;
+	}
+	.embed-provider {
+		font-size: 1.05rem;
+		font-weight: 500;
+	}
+	.embed-key {
+		font-family: var(--font-mono);
+		font-size: 0.66rem;
+		letter-spacing: 0.09em;
+		text-transform: uppercase;
+		color: var(--color-accent-warning);
+	}
+	.embed-key.ok {
+		color: var(--accent-ink);
+	}
+	.local-note {
+		margin-top: 1.1rem;
+	}
+
 	.m-notes {
 		font-size: 0.86rem;
 		color: var(--color-ink-200);
@@ -580,13 +797,20 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.6rem;
+		margin-bottom: 0.6rem;
 	}
 
 	.keys label {
 		display: grid;
-		grid-template-columns: 7rem 1fr;
+		grid-template-columns: 6rem 1fr;
 		align-items: center;
 		gap: 0.75rem;
+	}
+
+	.keys label span {
+		font-size: 0.8rem;
+		color: var(--color-ink-200);
+		font-family: var(--font-mono);
 	}
 
 	.keys input {
@@ -610,7 +834,7 @@
 		align-items: center;
 		gap: 0.75rem;
 		flex-wrap: wrap;
-		margin-top: 0.6rem;
+		margin-top: 0.2rem;
 	}
 
 	.ping-msg {

@@ -62,9 +62,8 @@ function toPlain<T>(value: T): T {
 }
 
 function modelForProvider(provider: string): string {
-	if (provider === 'anthropic') return 'claude-haiku-4-5';
-	if (provider === 'openai') return 'gpt-4o-mini';
-	if (provider === 'groq') return 'llama-3.3-70b-versatile';
+	if (provider === 'anthropic' || provider === 'openai' || provider === 'google')
+		return app.models[provider];
 	if (provider === 'transformers-js') return app.tjsModel;
 	return 'unknown';
 }

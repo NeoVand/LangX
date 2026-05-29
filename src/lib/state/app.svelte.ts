@@ -1,13 +1,14 @@
 import { browser } from '$app/environment';
+import { defaultModelFor, defaultEmbeddingModelFor, type HostedProvider } from '$lib/models/catalog';
 
 const STORAGE_KEY = 'langx.app.v2';
 
-export type ModelProvider = 'transformers-js' | 'openai' | 'anthropic' | 'groq';
+export type ModelProvider = 'transformers-js' | 'openai' | 'anthropic' | 'google';
 
 export interface ApiKeys {
 	openai: string;
 	anthropic: string;
-	groq: string;
+	google: string;
 	voyage: string;
 }
 
@@ -143,6 +144,10 @@ export interface ViewMode {
 
 export interface AppState {
 	tjsModel: string;
+	/** Selected hosted model ID per provider (see `$lib/models/catalog`). */
+	models: Record<HostedProvider, string>;
+	/** Selected embedding model ID per hosted embeddings provider (RAG). */
+	embeddingModels: { openai: string; voyage: string };
 	keys: ApiKeys;
 	preferredProvider: ModelProvider;
 	presentationMode: boolean;
@@ -154,7 +159,16 @@ export interface AppState {
 
 const defaultState = (): AppState => ({
 	tjsModel: TJS_MODELS[0].id,
-	keys: { openai: '', anthropic: '', groq: '', voyage: '' },
+	models: {
+		anthropic: defaultModelFor('anthropic'),
+		openai: defaultModelFor('openai'),
+		google: defaultModelFor('google')
+	},
+	embeddingModels: {
+		openai: defaultEmbeddingModelFor('openai'),
+		voyage: defaultEmbeddingModelFor('voyage')
+	},
+	keys: { openai: '', anthropic: '', google: '', voyage: '' },
 	preferredProvider: 'anthropic',
 	presentationMode: false,
 	viewMode: { workshop: true, book: true },
@@ -162,6 +176,27 @@ const defaultState = (): AppState => ({
 	visited: {},
 	webgpuOk: null
 });
+
+/**
+ * Merge persisted state over defaults, deep-merging the nested objects so a save
+ * written before a field existed (e.g. `models`, or a newly added API-key slot)
+ * still ends up with every key present rather than a partial object.
+ */
+function withDefaults(parsed: Partial<AppState>): AppState {
+	const base = defaultState();
+	const merged: AppState = {
+		...base,
+		...parsed,
+		keys: { ...base.keys, ...(parsed.keys ?? {}) },
+		models: { ...base.models, ...(parsed.models ?? {}) },
+		embeddingModels: { ...base.embeddingModels, ...(parsed.embeddingModels ?? {}) },
+		viewMode: { ...base.viewMode, ...(parsed.viewMode ?? {}) }
+	};
+	// Migrate retired providers (e.g. the removed 'groq') to the default.
+	const valid: ModelProvider[] = ['transformers-js', 'openai', 'anthropic', 'google'];
+	if (!valid.includes(merged.preferredProvider)) merged.preferredProvider = 'anthropic';
+	return merged;
+}
 
 function loadInitial(): AppState {
 	if (!browser) return defaultState();
@@ -173,11 +208,11 @@ function loadInitial(): AppState {
 			if (legacy) {
 				const parsed = JSON.parse(legacy) as Record<string, unknown>;
 				if (parsed.preferredProvider === 'mock') parsed.preferredProvider = 'anthropic';
-				return { ...defaultState(), ...(parsed as Partial<AppState>) };
+				return withDefaults(parsed as Partial<AppState>);
 			}
 			return defaultState();
 		}
-		return { ...defaultState(), ...(JSON.parse(raw) as Partial<AppState>) };
+		return withDefaults(JSON.parse(raw) as Partial<AppState>);
 	} catch {
 		return defaultState();
 	}
@@ -202,6 +237,18 @@ export function detectWebGpu() {
 
 export function setTjsModel(id: string) {
 	app.tjsModel = id;
+	persist();
+}
+
+/** Choose which hosted model a given provider should use. */
+export function setProviderModel(provider: HostedProvider, id: string) {
+	app.models[provider] = id;
+	persist();
+}
+
+/** Choose which embedding model a hosted embeddings provider should use (RAG). */
+export function setEmbeddingModel(provider: 'openai' | 'voyage', id: string) {
+	app.embeddingModels[provider] = id;
 	persist();
 }
 
@@ -251,13 +298,13 @@ export function isConfigured(): boolean {
 	const p = app.preferredProvider;
 	if (p === 'anthropic') return !!app.keys.anthropic;
 	if (p === 'openai') return !!app.keys.openai;
-	if (p === 'groq') return !!app.keys.groq;
+	if (p === 'google') return !!app.keys.google;
 	return false; // transformers-js needs cache check; treat as not-yet-configured.
 }
 
 export function bestAvailableProvider(): ModelProvider | null {
 	if (app.keys.anthropic) return 'anthropic';
 	if (app.keys.openai) return 'openai';
-	if (app.keys.groq) return 'groq';
+	if (app.keys.google) return 'google';
 	return null;
 }

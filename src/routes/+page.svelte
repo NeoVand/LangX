@@ -18,7 +18,7 @@
 		</p>
 		<div class="cta">
 			<a class="btn primary" href="/setup">
-				{app.keys.anthropic || app.keys.openai || app.keys.groq
+				{app.keys.anthropic || app.keys.openai || app.keys.google
 					? 'Models configured · review'
 					: 'Set up your model'}
 			</a>
@@ -52,7 +52,7 @@
 				<h3>Pure browser</h3>
 				<p>
 					No backend. The model runs locally via Transformers.js on WebGPU, or you can paste an
-					API key for OpenAI, Anthropic, or Groq — kept only in <code>localStorage</code>.
+					API key for Anthropic, OpenAI, or Gemini — kept only in <code>localStorage</code>.
 				</p>
 			</div>
 			<div>
