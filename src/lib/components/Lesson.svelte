@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import HeroImage from './HeroImage.svelte';
+	import { app } from '$lib/state/app.svelte';
 
 	interface Props {
 		title: string;
@@ -14,11 +15,18 @@
 	}
 
 	let { title, eyebrow, motivation, hero, intro, narrative, demo, inspect }: Props = $props();
+
+	const hasDemo = $derived(!!(demo || inspect));
+	// Present mode always renders the narrative (slides); otherwise honor toggles.
+	const showBook = $derived(app.presentationMode || app.viewMode.book);
+	const showWorkshop = $derived(hasDemo && !app.presentationMode && app.viewMode.workshop);
+	const single = $derived(!(showBook && showWorkshop));
 </script>
 
-<main class="lesson-shell">
-	<section class="narrative-pane scrollbar-slim">
-		<div class="narrative-inner">
+<main class="lesson-shell" class:single>
+	{#if showBook}
+		<section class="narrative-pane scrollbar-slim">
+			<div class="narrative-inner">
 			{#if eyebrow}
 				<div class="eyebrow hide-in-presentation font-display">{eyebrow}</div>
 			{/if}
@@ -38,10 +46,11 @@
 				<hr class="ornament" aria-hidden="true" />
 			</section>
 			{@render narrative()}
-		</div>
-	</section>
+			</div>
+		</section>
+	{/if}
 
-	{#if demo || inspect}
+	{#if showWorkshop}
 		<aside class="demo-pane hide-in-presentation">
 			<div class="demo-inner scrollbar-slim">
 				{#if demo}
@@ -61,6 +70,21 @@
 		grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
 		min-height: calc(100vh - 56px);
 		gap: 0;
+	}
+
+	/* One pane hidden → the survivor takes the full width. */
+	.lesson-shell.single {
+		grid-template-columns: 1fr;
+	}
+
+	.lesson-shell.single .narrative-inner {
+		max-width: 52rem;
+	}
+
+	.lesson-shell.single .demo-inner {
+		max-width: 56rem;
+		margin: 0 auto;
+		width: 100%;
 	}
 
 	.narrative-pane {
@@ -155,6 +179,15 @@
 		display: flex;
 		flex-direction: column;
 		gap: 1.5rem;
+	}
+
+	/* Multiple <Panel>s / DemoFrames inside one snippet are direct children of
+	   these blocks; without their own gap they visually touch. */
+	.demo-block,
+	.inspect-block {
+		display: flex;
+		flex-direction: column;
+		gap: 1.25rem;
 	}
 
 	@media (max-width: 960px) {

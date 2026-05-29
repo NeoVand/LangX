@@ -3,6 +3,7 @@ import {
 	START,
 	END,
 	MemorySaver,
+	Command,
 	interrupt
 } from '@langchain/langgraph/web';
 import { ToolNode } from '@langchain/langgraph/prebuilt';
@@ -59,8 +60,22 @@ export interface DeepAgentOptions {
 	maxIterations?: number;
 }
 
+export interface HarnessInterrupt {
+	tool: string;
+	args: Record<string, unknown>;
+	id?: string;
+}
+
+export type InterruptibleResult =
+	| { status: 'interrupted'; interrupt: HarnessInterrupt; state: DeepAgentStateType }
+	| { status: 'done'; state: DeepAgentStateType };
+
 export interface CompiledDeepAgent {
 	invoke(input: { input: string; thread?: string }): Promise<DeepAgentStateType>;
+	/** Runs until completion OR the first pending interrupt (for HITL UIs). */
+	start(input: { input: string; thread?: string }): Promise<InterruptibleResult>;
+	/** Resume a paused run with a decision value, returning the next pause or completion. */
+	resume(value: unknown, thread?: string): Promise<InterruptibleResult>;
 	state: DeepAgentStateType;
 	subscribe(fn: (state: DeepAgentStateType) => void): () => void;
 }
@@ -198,6 +213,11 @@ export function createDeepAgent(opts: DeepAgentOptions): CompiledDeepAgent {
 			tracer?.emit('node_start', 'tools');
 			const last = state.messages[state.messages.length - 1] as AIMessage;
 
+			// Baseline so we can return ONLY the subagent reports produced during this
+			// tool turn — `subagentReports` uses an appending reducer, so returning the
+			// whole accumulated list would duplicate every prior report.
+			const reportsBaseline = snapshot.subagentReports.length;
+
 			for (const tc of last.tool_calls ?? []) {
 				if (interruptOn.has(tc.name)) {
 					tracer?.emit('interrupt', `pause for ${tc.name}`, { name: tc.name, args: tc.args });
@@ -205,7 +225,11 @@ export function createDeepAgent(opts: DeepAgentOptions): CompiledDeepAgent {
 						tool: tc.name,
 						args: tc.args,
 						id: tc.id
-					}) as { decision: 'approve' | 'reject'; reason?: string };
+					}) as {
+						decision: 'approve' | 'reject' | 'edit';
+						reason?: string;
+						args?: Record<string, unknown>;
+					};
 					if (decision.decision === 'reject') {
 						return {
 							messages: [
@@ -216,7 +240,13 @@ export function createDeepAgent(opts: DeepAgentOptions): CompiledDeepAgent {
 							]
 						};
 					}
-					tracer?.emit('resume', `approved ${tc.name}`);
+					if (decision.decision === 'edit' && decision.args) {
+						// Apply the human's edits in place so ToolNode runs the edited call.
+						tc.args = decision.args;
+						tracer?.emit('resume', `edited ${tc.name}`, decision.args);
+					} else {
+						tracer?.emit('resume', `approved ${tc.name}`);
+					}
 				}
 				if (tc.name === 'write_file' || tc.name === 'edit_file') {
 					const path = (tc.args as { path?: string }).path;
@@ -239,7 +269,18 @@ export function createDeepAgent(opts: DeepAgentOptions): CompiledDeepAgent {
 			}
 			snapshot.files = await backend.list();
 			tracer?.emit('node_end', 'tools');
-			return { ...result, files: snapshot.files };
+
+			// Persist the side effects of write_todos / task into the graph state, not
+			// just the local snapshot — otherwise the agent node's `state.todos` /
+			// `state.subagentReports` stay empty and the live plan never updates.
+			const newReports = snapshot.subagentReports.slice(reportsBaseline);
+			notify();
+			return {
+				...result,
+				files: snapshot.files,
+				todos: snapshot.todos,
+				subagentReports: newReports
+			};
 		})
 		.addEdge(START, 'agent')
 		.addConditionalEdges('agent', (s) => {
@@ -260,6 +301,21 @@ export function createDeepAgent(opts: DeepAgentOptions): CompiledDeepAgent {
 		for (const fn of subscribers) fn(snap);
 	}
 
+	function syncSnapshot(result: DeepAgentStateType) {
+		snapshot.messages = result.messages as BaseMessage[];
+		snapshot.todos = result.todos;
+		snapshot.files = result.files;
+		snapshot.subagentReports = result.subagentReports;
+		snapshot.summarizationEvents = result.summarizationEvents;
+		notify();
+	}
+
+	function readInterrupt(result: Record<string, unknown>): HarnessInterrupt | null {
+		const ints = result['__interrupt__'] as Array<{ value?: HarnessInterrupt }> | undefined;
+		const v = ints?.[0]?.value;
+		return v ? { tool: v.tool, args: v.args ?? {}, id: v.id } : null;
+	}
+
 	return {
 		async invoke({ input, thread = 'default' }) {
 			tracer?.emit('run_start', 'deep-agent', { input });
@@ -271,14 +327,43 @@ export function createDeepAgent(opts: DeepAgentOptions): CompiledDeepAgent {
 				{ messages: [new HumanMessage(input)] } as never,
 				config
 			)) as DeepAgentStateType;
-			snapshot.messages = result.messages as BaseMessage[];
-			snapshot.todos = result.todos;
-			snapshot.files = result.files;
-			snapshot.subagentReports = result.subagentReports;
-			snapshot.summarizationEvents = result.summarizationEvents;
-			notify();
+			syncSnapshot(result);
 			tracer?.emit('run_end', 'deep-agent');
 			return result;
+		},
+
+		async start({ input, thread = 'default' }) {
+			tracer?.emit('run_start', 'deep-agent', { input });
+			const config = {
+				configurable: { thread_id: thread },
+				recursionLimit: opts.maxIterations ?? 50
+			};
+			const result = (await graph.invoke(
+				{ messages: [new HumanMessage(input)] } as never,
+				config
+			)) as DeepAgentStateType & Record<string, unknown>;
+			syncSnapshot(result);
+			const pending = readInterrupt(result);
+			if (pending) return { status: 'interrupted', interrupt: pending, state: result };
+			tracer?.emit('run_end', 'deep-agent');
+			return { status: 'done', state: result };
+		},
+
+		async resume(value, thread = 'default') {
+			const config = {
+				configurable: { thread_id: thread },
+				recursionLimit: opts.maxIterations ?? 50
+			};
+			tracer?.emit('resume', 'host decision', value as Record<string, unknown>);
+			const result = (await graph.invoke(
+				new Command({ resume: value }) as never,
+				config
+			)) as DeepAgentStateType & Record<string, unknown>;
+			syncSnapshot(result);
+			const pending = readInterrupt(result);
+			if (pending) return { status: 'interrupted', interrupt: pending, state: result };
+			tracer?.emit('run_end', 'deep-agent');
+			return { status: 'done', state: result };
 		},
 		get state() {
 			return {

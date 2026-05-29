@@ -33,10 +33,6 @@
 </script>
 
 <figure class="code" class:dense>
-	<div class="lang-tag">{lang}</div>
-	<button class="copy" onclick={copy} aria-label="Copy code">
-		{copied ? 'copied' : 'copy'}
-	</button>
 	<div class="hl">
 		{#if html}
 			<!-- eslint-disable-next-line svelte/no-at-html-tags -->
@@ -45,14 +41,20 @@
 			<pre class="shiki"><code>{@html escape(code)}</code></pre>
 		{/if}
 	</div>
-	{#if caption}
-		<figcaption>{caption}</figcaption>
-	{/if}
+	<figcaption>
+		<span class="lang">{lang}</span>
+		{#if caption}
+			<span class="sep" aria-hidden="true">·</span>
+			<span class="cap">{caption}</span>
+		{/if}
+		<button class="copy" onclick={copy} aria-label="Copy code">
+			{copied ? 'copied' : 'copy'}
+		</button>
+	</figcaption>
 </figure>
 
 <style>
 	.code {
-		position: relative;
 		margin: 1.25rem 0;
 	}
 
@@ -62,51 +64,59 @@
 
 	.hl :global(pre.shiki) {
 		margin: 0;
-	}
-
-	.lang-tag {
-		position: absolute;
-		top: 0.55rem;
-		left: 0.85rem;
-		font-size: 0.62rem;
-		letter-spacing: 0.16em;
-		text-transform: uppercase;
-		font-family: var(--font-mono);
-		color: var(--color-fg-faint);
-		pointer-events: none;
-		z-index: 1;
-		background: color-mix(in oklch, var(--color-paper) 85%, transparent);
-		padding: 0.05rem 0.4rem;
-		border-radius: 0.25rem;
-	}
-
-	.copy {
-		position: absolute;
-		top: 0.5rem;
-		right: 0.6rem;
-		font-size: 0.7rem;
-		padding: 0.25rem 0.5rem;
-		border-radius: 0.3rem;
-		background: var(--color-bg-elev-2);
-		color: var(--color-fg-muted);
-		border: 1px solid var(--color-border);
-		font-family: var(--font-mono);
-		opacity: 0;
-		transition: opacity 0.18s ease;
-		z-index: 2;
-	}
-
-	.code:hover .copy,
-	.copy:focus-visible {
-		opacity: 1;
+		border-bottom-left-radius: 0;
+		border-bottom-right-radius: 0;
 	}
 
 	figcaption {
-		font-size: 0.78rem;
-		color: var(--color-fg-faint);
-		margin-top: 0.45rem;
-		text-align: right;
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.4rem 0.7rem;
+		border: 1px solid var(--color-border);
+		border-top: none;
+		border-bottom-left-radius: 0.55rem;
+		border-bottom-right-radius: 0.55rem;
+		background: var(--color-bg-elev-2);
 		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		color: var(--color-fg-faint);
 		letter-spacing: 0.04em;
+	}
+
+	.lang {
+		text-transform: uppercase;
+		letter-spacing: 0.12em;
+		color: var(--color-fg-muted);
+	}
+
+	.sep {
+		opacity: 0.5;
+	}
+
+	.cap {
+		flex: 1;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.copy {
+		margin-left: auto;
+		font-size: 0.7rem;
+		padding: 0.15rem 0.5rem;
+		border-radius: 0.3rem;
+		background: var(--color-bg);
+		color: var(--color-fg-muted);
+		border: 1px solid var(--color-border);
+		font-family: var(--font-mono);
+		cursor: pointer;
+		transition: color 0.18s ease;
+	}
+
+	.copy:hover,
+	.copy:focus-visible {
+		color: var(--color-fg);
 	}
 </style>

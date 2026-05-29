@@ -4,6 +4,8 @@
 	import Term from '$lib/components/Term.svelte';
 	import Panel from '$lib/components/Panel.svelte';
 	import CodeBlock from '$lib/components/CodeBlock.svelte';
+	import Diagram from '$lib/components/Diagram.svelte';
+	import { interruptResume } from '$lib/diagrams';
 	import RunButton from '$lib/components/RunButton.svelte';
 	import StateInspector from '$lib/components/StateInspector.svelte';
 	import {
@@ -55,7 +57,9 @@
 		const parser = new StringOutputParser();
 
 		return new StateGraph(State)
-			.addNode('draft', async (s) => {
+			// Node name must differ from the channel name 'draft' — LangGraph forbids
+			// a node and a state channel sharing an identifier.
+			.addNode('draft_email', async (s) => {
 				if (s.draft && s.draft.length > 0) return { draft: s.draft };
 				const text = await draftPrompt.pipe(model).pipe(parser).invoke({ topic: s.topic });
 				return { draft: text };
@@ -73,8 +77,8 @@
 				}
 				return { final: s.draft, decision: 'approved' };
 			})
-			.addEdge(START, 'draft')
-			.addEdge('draft', 'approve')
+			.addEdge(START, 'draft_email')
+			.addEdge('draft_email', 'approve')
 			.addEdge('approve', END)
 			.compile({ checkpointer });
 	}
@@ -236,6 +240,10 @@ if (decision !== 'approve') return { aborted: true };
 				runtime catches. The checkpointer saves state with <code>next: ['approve']</code>; the
 				next call with a <code>Command</code> resumes from exactly that point.
 			</p>
+		</Slide>
+
+		<Slide title="Pause and resume, drawn" variant="figure">
+			<Diagram spec={interruptResume} title="Interrupt and resume" />
 		</Slide>
 
 		<Slide variant="pull-quote">

@@ -9,6 +9,7 @@
 	import { ToolNode } from '@langchain/langgraph/prebuilt';
 	import { weatherTool } from '$lib/runtime/tools';
 	import { HumanMessage, AIMessage, type BaseMessage } from '@langchain/core/messages';
+	import { displayContent } from '$lib/runtime/messages';
 	import { getModel } from '$lib/runtime/llm';
 	import { withRunCache, loadCachedRun } from '$lib/runtime/runs';
 	import { onMount } from 'svelte';
@@ -91,7 +92,9 @@
 					})) {
 						const c = chunk as { content?: unknown };
 						const md = meta as { langgraph_node?: string };
-						const text = typeof c.content === 'string' ? c.content : '';
+						// Anthropic streams content as block arrays, not strings — extract
+						// the text so the messages panel isn't silently empty.
+						const text = displayContent(c.content as never);
 						if (text) m.push({ chunk: text, from: md.langgraph_node ?? '?' });
 					}
 					messagesEvents = m;

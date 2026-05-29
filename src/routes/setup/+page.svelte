@@ -128,6 +128,16 @@
 						autocomplete="off"
 					/>
 				</label>
+				<label>
+					<span>Voyage <small>(embeddings, optional)</small></span>
+					<input
+						type="password"
+						value={app.keys.voyage}
+						oninput={(e) => setApiKey('voyage', (e.target as HTMLInputElement).value)}
+						placeholder="pa-..."
+						autocomplete="off"
+					/>
+				</label>
 			</div>
 			<div class="ping">
 				<button

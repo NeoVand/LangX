@@ -37,13 +37,9 @@
 			></a>
 		{/each}
 	</div>
-	<a
-		class="link right"
-		class:disabled={!next}
-		href={next ? `${chapter.base}/${next.slug}` : chapter.base}
-	>
+	<a class="link right" href={next ? `${chapter.base}/${next.slug}` : `${chapter.base}/recap`}>
 		<span class="lbl">
-			<span class="role">next</span>
+			<span class="role">{next ? 'next' : 'wrap up'}</span>
 			<span class="title">{next ? next.title : 'End of chapter'}</span>
 		</span>
 		<span class="dir">→</span>

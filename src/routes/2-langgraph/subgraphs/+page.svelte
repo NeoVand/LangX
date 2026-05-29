@@ -4,6 +4,8 @@
 	import Term from '$lib/components/Term.svelte';
 	import Panel from '$lib/components/Panel.svelte';
 	import CodeBlock from '$lib/components/CodeBlock.svelte';
+	import Diagram from '$lib/components/Diagram.svelte';
+	import { subgraphs } from '$lib/diagrams';
 	import RunButton from '$lib/components/RunButton.svelte';
 	import LangGraphView from '$lib/components/LangGraphView.svelte';
 	import StateInspector from '$lib/components/StateInspector.svelte';
@@ -273,6 +275,10 @@ const chat = new StateGraph(ChatState)
 				code={code}
 				caption="No special API — call invoke from inside a node."
 			/>
+		</Slide>
+
+		<Slide title="Composition, drawn" variant="figure">
+			<Diagram spec={subgraphs} title="Subgraphs" />
 		</Slide>
 
 		<Slide variant="pull-quote">

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import Markdown from '$lib/components/Markdown.svelte';
+
 	export interface VirtualFile {
 		path: string;
 		content: string;
@@ -8,16 +10,26 @@
 	interface Props {
 		files: VirtualFile[];
 		title?: string;
+		/** When set (and the file exists), auto-select this path. */
+		focus?: string | null;
 	}
 
-	let { files, title = 'Virtual filesystem' }: Props = $props();
+	let { files, title = 'Virtual filesystem', focus = null }: Props = $props();
 
 	let selected = $state<string | null>(null);
+	let lastFocus = $state<string | null>(null);
 
 	const sorted = $derived([...files].sort((a, b) => a.path.localeCompare(b.path)));
 	const current = $derived(sorted.find((f) => f.path === selected) ?? sorted[0]);
+	const isMarkdown = $derived(!!current && /\.(md|markdown)$/i.test(current.path));
 
 	$effect(() => {
+		// Honor an external focus request once per distinct value.
+		if (focus && focus !== lastFocus && sorted.some((f) => f.path === focus)) {
+			selected = focus;
+			lastFocus = focus;
+			return;
+		}
 		if (!current && sorted.length) selected = sorted[0].path;
 		if (current && selected !== current.path) selected = current.path;
 	});
@@ -106,7 +118,11 @@
 			<div class="content scrollbar-slim">
 				{#if current}
 					<div class="path">{current.path}</div>
-					<pre>{current.content}</pre>
+					{#if isMarkdown}
+						<Markdown source={current.content} />
+					{:else}
+						<pre>{current.content}</pre>
+					{/if}
 				{/if}
 			</div>
 		</div>

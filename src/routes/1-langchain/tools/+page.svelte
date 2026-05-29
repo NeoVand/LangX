@@ -2,115 +2,55 @@
 	import Lesson from '$lib/components/Lesson.svelte';
 	import Slide from '$lib/components/Slide.svelte';
 	import Term from '$lib/components/Term.svelte';
-	import Panel from '$lib/components/Panel.svelte';
 	import CodeBlock from '$lib/components/CodeBlock.svelte';
 	import RunButton from '$lib/components/RunButton.svelte';
 	import MessageStream from '$lib/components/MessageStream.svelte';
-	import { calculatorTool, weatherTool, knownWeatherCities } from '$lib/runtime/tools';
-	import { getModel } from '$lib/runtime/llm';
+	import DemoFrame from '$lib/components/DemoFrame.svelte';
+	import { knownWeatherCities } from '$lib/runtime/tools';
 	import { withRunCache, loadCachedRun } from '$lib/runtime/runs';
+	import { type BaseMessage } from '@langchain/core/messages';
 	import {
-		AIMessage,
-		HumanMessage,
-		SystemMessage,
-		ToolMessage,
-		type BaseMessage
-	} from '@langchain/core/messages';
-	import type { Runnable } from '@langchain/core/runnables';
-	import type { BaseChatModelCallOptions } from '@langchain/core/language_models/chat_models';
+		serializeMessages,
+		deserializeMessages,
+		type SerializedMessage
+	} from '$lib/runtime/messages';
+	import { runWeatherDemo } from '$lib/demos/tools-weather';
+	import weatherSrc from '$lib/demos/tools-weather.ts?raw';
+	import { runCalcDemo } from '$lib/demos/tools-calc';
+	import calcSrc from '$lib/demos/tools-calc.ts?raw';
+	import type { DemoStep } from '$lib/demos/types';
 	import { onMount } from 'svelte';
 
-	type BoundModel = Runnable<BaseMessage[], AIMessage, BaseChatModelCallOptions>;
-
-	interface SerializedMsg {
-		role: 'human' | 'system' | 'ai' | 'tool';
-		content: string;
-		tool_call_id?: string;
-		tool_calls?: { name: string; args: Record<string, unknown>; id?: string }[];
-	}
-
-	function serializeMsg(m: BaseMessage): SerializedMsg {
-		if (m instanceof HumanMessage) return { role: 'human', content: String(m.content) };
-		if (m instanceof SystemMessage) return { role: 'system', content: String(m.content) };
-		if (m instanceof ToolMessage)
-			return { role: 'tool', content: String(m.content), tool_call_id: m.tool_call_id };
-		if (m instanceof AIMessage) {
-			return {
-				role: 'ai',
-				content: String(m.content ?? ''),
-				tool_calls: (m.tool_calls ?? []).map((tc) => ({
-					name: tc.name,
-					args: tc.args as Record<string, unknown>,
-					id: tc.id
-				}))
-			};
-		}
-		return { role: 'ai', content: String(m.content) };
-	}
-
-	function deserializeMsg(s: SerializedMsg): BaseMessage {
-		switch (s.role) {
-			case 'human':
-				return new HumanMessage(s.content);
-			case 'system':
-				return new SystemMessage(s.content);
-			case 'tool':
-				return new ToolMessage({
-					tool_call_id: s.tool_call_id ?? '',
-					content: s.content
-				});
-			case 'ai':
-			default:
-				return new AIMessage({
-					content: s.content,
-					tool_calls: s.tool_calls?.map((tc) => ({ ...tc })) ?? []
-				});
-		}
-	}
-
-	type ConvoPayload = { messages: SerializedMsg[] };
+	type ConvoPayload = { messages: SerializedMessage[]; steps: DemoStep[] };
 
 	let weatherCity = $state('Tokyo');
 	let weatherRun = $state(false);
 	let weatherMessages = $state<BaseMessage[]>([]);
+	let weatherSteps = $state<DemoStep[]>([]);
 
 	async function runWeather() {
 		weatherRun = true;
 		weatherMessages = [];
+		weatherSteps = [];
 		try {
 			const cityForRun = weatherCity;
 			const out = await withRunCache<ConvoPayload>(
 				{ demoId: 'l1-tools-weather' },
 				async () => {
-					const baseModel = await getModel({ temperature: 0, maxTokens: 256 });
-					const model = baseModel.bindTools!([weatherTool]) as unknown as BoundModel;
-					const messages: BaseMessage[] = [
-						new HumanMessage(`What's the weather in ${cityForRun}?`)
-					];
-					weatherMessages = [...messages];
-
-					let safety = 0;
-					while (safety++ < 4) {
-						const ai = (await model.invoke(messages)) as AIMessage;
-						messages.push(ai);
-						weatherMessages = [...messages];
-						if (!ai.tool_calls?.length) break;
-						for (const tc of ai.tool_calls) {
-							const result = await weatherTool.invoke(tc.args as { city: string });
-							messages.push(
-								new ToolMessage({
-									tool_call_id: tc.id ?? '',
-									content: typeof result === 'string' ? result : JSON.stringify(result)
-								})
-							);
-							weatherMessages = [...messages];
+					const steps: DemoStep[] = [];
+					const messages = await runWeatherDemo(
+						cityForRun,
+						(m) => (weatherMessages = m),
+						(s) => {
+							steps.push(s);
+							weatherSteps = [...steps];
 						}
-					}
-
-					return { messages: messages.map(serializeMsg) };
+					);
+					return { messages: serializeMessages(messages), steps };
 				}
 			);
-			weatherMessages = out.messages.map(deserializeMsg);
+			weatherMessages = deserializeMessages(out.messages);
+			weatherSteps = out.steps;
 		} finally {
 			weatherRun = false;
 		}
@@ -119,42 +59,31 @@
 	let calcExpr = $state('(7 + 3) * 12 / 4');
 	let calcRun = $state(false);
 	let calcMessages = $state<BaseMessage[]>([]);
+	let calcSteps = $state<DemoStep[]>([]);
 
 	async function runCalc() {
 		calcRun = true;
 		calcMessages = [];
+		calcSteps = [];
 		try {
 			const exprForRun = calcExpr;
 			const out = await withRunCache<ConvoPayload>(
 				{ demoId: 'l1-tools-calc' },
 				async () => {
-					const baseModel = await getModel({ temperature: 0, maxTokens: 256 });
-					const model = baseModel.bindTools!([calculatorTool]) as unknown as BoundModel;
-					const messages: BaseMessage[] = [new HumanMessage(`Compute ${exprForRun}.`)];
-					calcMessages = [...messages];
-
-					let safety = 0;
-					while (safety++ < 4) {
-						const ai = (await model.invoke(messages)) as AIMessage;
-						messages.push(ai);
-						calcMessages = [...messages];
-						if (!ai.tool_calls?.length) break;
-						for (const tc of ai.tool_calls) {
-							const result = await calculatorTool.invoke(tc.args as { expression: string });
-							messages.push(
-								new ToolMessage({
-									tool_call_id: tc.id ?? '',
-									content: typeof result === 'string' ? result : JSON.stringify(result)
-								})
-							);
-							calcMessages = [...messages];
+					const steps: DemoStep[] = [];
+					const messages = await runCalcDemo(
+						exprForRun,
+						(m) => (calcMessages = m),
+						(s) => {
+							steps.push(s);
+							calcSteps = [...steps];
 						}
-					}
-
-					return { messages: messages.map(serializeMsg) };
+					);
+					return { messages: serializeMessages(messages), steps };
 				}
 			);
-			calcMessages = out.messages.map(deserializeMsg);
+			calcMessages = deserializeMessages(out.messages);
+			calcSteps = out.steps;
 		} finally {
 			calcRun = false;
 		}
@@ -162,9 +91,15 @@
 
 	onMount(async () => {
 		const cw = await loadCachedRun<ConvoPayload>({ demoId: 'l1-tools-weather' });
-		if (cw) weatherMessages = cw.payload.messages.map(deserializeMsg);
+		if (cw) {
+			weatherMessages = deserializeMessages(cw.payload.messages);
+			weatherSteps = cw.payload.steps ?? [];
+		}
 		const cc = await loadCachedRun<ConvoPayload>({ demoId: 'l1-tools-calc' });
-		if (cc) calcMessages = cc.payload.messages.map(deserializeMsg);
+		if (cc) {
+			calcMessages = deserializeMessages(cc.payload.messages);
+			calcSteps = cc.payload.steps ?? [];
+		}
 	});
 
 	const codeTool = `import { tool } from '@langchain/core/tools';
@@ -273,27 +208,43 @@ const ai = await model.invoke('What is the weather in Tokyo?');
 	{/snippet}
 
 	{#snippet demo()}
-		<Panel title="Demo 1 · Weather tool" subtitle="model → ToolMessage → model">
-			<label class="row">
-				<span>City (try {knownWeatherCities.slice(0, 4).join(', ')}, …)</span>
-				<input type="text" bind:value={weatherCity} />
-			</label>
-			<RunButton onclick={runWeather} running={weatherRun} />
-			<div class="stream">
-				<MessageStream messages={weatherMessages} compact />
-			</div>
-		</Panel>
+		<DemoFrame
+			title="Demo 1 · Weather tool"
+			subtitle="model → ToolMessage → model"
+			code={weatherSrc}
+			codeCaption="src/lib/demos/tools-weather.ts — exactly what runs"
+			steps={weatherSteps}
+		>
+			{#snippet run()}
+				<label class="row">
+					<span>City — any city worldwide (e.g. {knownWeatherCities.slice(0, 3).join(', ')}, Irving TX)</span>
+					<input type="text" bind:value={weatherCity} />
+				</label>
+				<RunButton onclick={runWeather} running={weatherRun} />
+				<div class="stream">
+					<MessageStream messages={weatherMessages} compact />
+				</div>
+			{/snippet}
+		</DemoFrame>
 
-		<Panel title="Demo 2 · Calculator tool" subtitle="Pure arithmetic, sandboxed">
-			<label class="row">
-				<span>Expression</span>
-				<input type="text" bind:value={calcExpr} />
-			</label>
-			<RunButton onclick={runCalc} running={calcRun} />
-			<div class="stream">
-				<MessageStream messages={calcMessages} compact />
-			</div>
-		</Panel>
+		<DemoFrame
+			title="Demo 2 · Calculator tool"
+			subtitle="Pure arithmetic, sandboxed"
+			code={calcSrc}
+			codeCaption="src/lib/demos/tools-calc.ts — exactly what runs"
+			steps={calcSteps}
+		>
+			{#snippet run()}
+				<label class="row">
+					<span>Expression</span>
+					<input type="text" bind:value={calcExpr} />
+				</label>
+				<RunButton onclick={runCalc} running={calcRun} />
+				<div class="stream">
+					<MessageStream messages={calcMessages} compact />
+				</div>
+			{/snippet}
+		</DemoFrame>
 	{/snippet}
 </Lesson>
 

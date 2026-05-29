@@ -4,6 +4,8 @@
 	import Term from '$lib/components/Term.svelte';
 	import Panel from '$lib/components/Panel.svelte';
 	import CodeBlock from '$lib/components/CodeBlock.svelte';
+	import Diagram from '$lib/components/Diagram.svelte';
+	import { stateGraphTriad } from '$lib/diagrams';
 	import RunButton from '$lib/components/RunButton.svelte';
 	import LangGraphView from '$lib/components/LangGraphView.svelte';
 	import MessageStream from '$lib/components/MessageStream.svelte';
@@ -264,6 +266,10 @@ const graph = new StateGraph(MessagesAnnotation)
 					<code>addConditionalEdges('a', router)</code> when the next node depends on state.
 				</li>
 			</ul>
+		</Slide>
+
+		<Slide title="The triad, drawn" variant="figure">
+			<Diagram spec={stateGraphTriad} title="StateGraph triad" />
 		</Slide>
 
 		<Slide variant="pull-quote">

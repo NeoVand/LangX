@@ -6,6 +6,8 @@
 	import CodeBlock from '$lib/components/CodeBlock.svelte';
 	import RunButton from '$lib/components/RunButton.svelte';
 	import StateInspector from '$lib/components/StateInspector.svelte';
+	import Diagram from '$lib/components/Diagram.svelte';
+	import { lcelPipeline } from '$lib/diagrams';
 	import { ChatPromptTemplate } from '@langchain/core/prompts';
 	import { StringOutputParser } from '@langchain/core/output_parsers';
 	import {
@@ -225,6 +227,10 @@ const { short, bullets, passthrough } = await fanout.invoke({ topic });`;
 				<code>{'{ topic }'}</code> → <code>ChatPromptValue</code> → <code>AIMessage</code> →
 				<code>string</code>.
 			</p>
+		</Slide>
+
+		<Slide title="The pipe, drawn" variant="figure">
+			<Diagram spec={lcelPipeline} title="LCEL pipeline" />
 		</Slide>
 
 		<Slide variant="pull-quote">

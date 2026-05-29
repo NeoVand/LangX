@@ -4,6 +4,8 @@
 	import Term from '$lib/components/Term.svelte';
 	import Panel from '$lib/components/Panel.svelte';
 	import CodeBlock from '$lib/components/CodeBlock.svelte';
+	import Diagram from '$lib/components/Diagram.svelte';
+	import { sendFanout } from '$lib/diagrams';
 	import RunButton from '$lib/components/RunButton.svelte';
 	import StateInspector from '$lib/components/StateInspector.svelte';
 	import { Annotation, StateGraph, Send, START, END } from '@langchain/langgraph/web';
@@ -196,6 +198,10 @@
 
 		<Slide title="The shape" variant="code-first">
 			<CodeBlock code={code} caption="One plan, N research branches, one synthesis." />
+		</Slide>
+
+		<Slide title="Fan-out / fan-in, drawn" variant="figure">
+			<Diagram spec={sendFanout} title="Send fan-out" />
 		</Slide>
 
 		<Slide variant="pull-quote">

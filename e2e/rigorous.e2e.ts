@@ -328,4 +328,81 @@ test.describe('LangX rigorous live-demo assertions', () => {
 		await expect(approve.first()).toBeVisible({ timeout: 60_000 });
 		expect(errors).toEqual([]);
 	});
+
+	test('Phase 3 · hitl: approving the gate resumes and completes the run', async ({ page }) => {
+		const errors = collectErrors(page);
+		await page.goto('/3-deepagents/hitl', { waitUntil: 'networkidle' });
+		const trigger = page.getByRole('button', { name: /try|run/i }).first();
+		await expect(trigger).toBeVisible();
+		await trigger.click();
+		const approve = page.getByRole('button', { name: /approve|allow/i }).first();
+		await expect(approve).toBeVisible({ timeout: 60_000 });
+		await approve.click();
+		// After resume, no run should be left hanging and a decision/response should show.
+		await expect(page.getByRole('button', { name: /running/i })).toHaveCount(0, {
+			timeout: 60_000
+		});
+		const body = (await page.locator('body').textContent()) ?? '';
+		expect(/(approv|resume|response|done|complete)/i.test(body)).toBeTruthy();
+		expect(errors).toEqual([]);
+	});
+
+	test('Phase 3 · subagents: reports list grows by at least one card', async ({ page }) => {
+		const errors = collectErrors(page);
+		await page.goto('/3-deepagents/subagents', { waitUntil: 'networkidle' });
+		await runPrimary(page, /^plan|^run/i);
+		// SubagentCard renders one card per returned report.
+		const cards = await page.locator('.subagent-card, [class*="subagent"]').count();
+		expect(cards, 'no subagent cards rendered after run').toBeGreaterThan(0);
+		expect(errors).toEqual([]);
+	});
+
+	test('Phase 1 · rag: lists multiple substantial retrieved chunks', async ({ page }) => {
+		const errors = collectErrors(page);
+		await page.goto('/1-langchain/rag', { waitUntil: 'networkidle' });
+		await runPrimary(page);
+		// Retrieved chunks render as list items with a similarity bar in `.hits`.
+		const chunkTexts = await page.evaluate(() =>
+			[...document.querySelectorAll('.hits li p')]
+				.map((n) => (n.textContent ?? '').trim())
+				.filter((t) => t.length > 40)
+		);
+		expect(chunkTexts.length, `expected ≥3 substantial chunks, got ${chunkTexts.length}`).toBeGreaterThanOrEqual(3);
+		expect(errors).toEqual([]);
+	});
+
+	test('Phase 3 · compaction: completes without an Anthropic 400', async ({ page }) => {
+		const errors = collectErrors(page);
+		const apiErrors: string[] = [];
+		page.on('response', (res) => {
+			if (/api\.anthropic\.com/.test(res.url()) && res.status() >= 400) {
+				apiErrors.push(`${res.status()} ${res.url()}`);
+			}
+		});
+		await page.goto('/3-deepagents/compaction', { waitUntil: 'networkidle' });
+		await runPrimary(page, /^run|^compact/i);
+		expect(apiErrors, `Anthropic returned errors:\n${apiErrors.join('\n')}`).toEqual([]);
+		expect(errors).toEqual([]);
+	});
+
+	test('Phase 3 · capstone DS: plot tool writes an SVG figure', async ({ page }) => {
+		const errors = collectErrors(page);
+		await page.goto('/3-deepagents/capstone-data-science', { waitUntil: 'networkidle' });
+		await runPrimary(page, /^analyse|^run/i);
+		// The plot() tool writes /reports/figures/<n>.svg, rendered inline as <svg>.
+		const figs = await page.locator('.chart-svg svg').count();
+		const body = (await page.locator('body').textContent()) ?? '';
+		expect(figs > 0 || /\/reports\/figures\//.test(body), 'no plot figure produced').toBeTruthy();
+		expect(errors).toEqual([]);
+	});
+
+	test('Phase 3 · capstone research: publishes a rendered markdown brief', async ({ page }) => {
+		const errors = collectErrors(page);
+		await page.goto('/3-deepagents/capstone-research', { waitUntil: 'networkidle' });
+		await runPrimary(page, /^run/i);
+		const body = (await page.locator('body').textContent()) ?? '';
+		expect(/\/memories\//.test(body), 'no /memories/ artifact referenced').toBeTruthy();
+		expect(body).not.toContain('[object Object');
+		expect(errors).toEqual([]);
+	});
 });

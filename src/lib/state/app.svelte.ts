@@ -8,6 +8,7 @@ export interface ApiKeys {
 	openai: string;
 	anthropic: string;
 	groq: string;
+	voyage: string;
 }
 
 export interface TransformersJsModel {
@@ -133,11 +134,19 @@ export const TJS_MODELS: TransformersJsModel[] = [
 	}
 ];
 
+export interface ViewMode {
+	/** Demo / workshop pane visible. */
+	workshop: boolean;
+	/** Narrative / book pane visible. */
+	book: boolean;
+}
+
 export interface AppState {
 	tjsModel: string;
 	keys: ApiKeys;
 	preferredProvider: ModelProvider;
 	presentationMode: boolean;
+	viewMode: ViewMode;
 	theme: 'dark' | 'light';
 	visited: Record<string, boolean>;
 	webgpuOk: boolean | null;
@@ -145,9 +154,10 @@ export interface AppState {
 
 const defaultState = (): AppState => ({
 	tjsModel: TJS_MODELS[0].id,
-	keys: { openai: '', anthropic: '', groq: '' },
+	keys: { openai: '', anthropic: '', groq: '', voyage: '' },
 	preferredProvider: 'anthropic',
 	presentationMode: false,
+	viewMode: { workshop: true, book: true },
 	theme: 'dark',
 	visited: {},
 	webgpuOk: null
@@ -207,6 +217,22 @@ export function setPreferredProvider(p: ModelProvider) {
 
 export function togglePresentation() {
 	app.presentationMode = !app.presentationMode;
+}
+
+/** Toggle the workshop (demo) pane, never allowing both panes to be hidden. */
+export function toggleWorkshop() {
+	if (app.viewMode.workshop && !app.viewMode.book) return; // would hide both
+	app.viewMode.workshop = !app.viewMode.workshop;
+	if (!app.viewMode.workshop && !app.viewMode.book) app.viewMode.book = true;
+	persist();
+}
+
+/** Toggle the book (narrative) pane, never allowing both panes to be hidden. */
+export function toggleBook() {
+	if (app.viewMode.book && !app.viewMode.workshop) return; // would hide both
+	app.viewMode.book = !app.viewMode.book;
+	if (!app.viewMode.book && !app.viewMode.workshop) app.viewMode.workshop = true;
+	persist();
 }
 
 export function markVisited(path: string) {

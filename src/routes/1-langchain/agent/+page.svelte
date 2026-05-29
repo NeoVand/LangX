@@ -6,88 +6,36 @@
 	import CodeBlock from '$lib/components/CodeBlock.svelte';
 	import RunButton from '$lib/components/RunButton.svelte';
 	import MessageStream from '$lib/components/MessageStream.svelte';
+	import DemoFrame from '$lib/components/DemoFrame.svelte';
+	import Diagram from '$lib/components/Diagram.svelte';
+	import { reactLoop } from '$lib/diagrams';
 	import LangGraphView from '$lib/components/LangGraphView.svelte';
 	import { StateGraph, MessagesAnnotation, START, END } from '@langchain/langgraph/web';
-	import { calculatorTool, weatherTool } from '$lib/runtime/tools';
-	import { getModel } from '$lib/runtime/llm';
 	import { withRunCache, loadCachedRun } from '$lib/runtime/runs';
+	import { type BaseMessage } from '@langchain/core/messages';
 	import {
-		AIMessage,
-		HumanMessage,
-		SystemMessage,
-		ToolMessage,
-		type BaseMessage
-	} from '@langchain/core/messages';
-	import type { Runnable } from '@langchain/core/runnables';
-	import type { BaseChatModelCallOptions } from '@langchain/core/language_models/chat_models';
+		serializeMessages,
+		deserializeMessages,
+		type SerializedMessage
+	} from '$lib/runtime/messages';
+	import { runAgentScenario } from '$lib/demos/agent-react';
+	import agentSrc from '$lib/demos/agent-react.ts?raw';
+	import type { DemoStep } from '$lib/demos/types';
 	import { onMount } from 'svelte';
 
-	type BoundModel = Runnable<BaseMessage[], AIMessage, BaseChatModelCallOptions>;
-	type LooseTool = { name: string; invoke: (args: unknown) => Promise<unknown> };
-
-	const allTools = [weatherTool, calculatorTool] as unknown as LooseTool[];
-	const toolByName = Object.fromEntries(allTools.map((t) => [t.name, t])) as Record<
-		string,
-		LooseTool
-	>;
-
-	interface SerializedMsg {
-		role: 'human' | 'system' | 'ai' | 'tool';
-		content: string;
-		tool_call_id?: string;
-		tool_calls?: { name: string; args: Record<string, unknown>; id?: string }[];
-	}
-	type AgentNode = 'agent' | 'tools' | 'end';
 	type ScenarioPayload = {
 		mode: 'weather' | 'multi';
-		messages: SerializedMsg[];
-		path: AgentNode[];
+		messages: SerializedMessage[];
+		path: string[];
+		steps: DemoStep[];
 	};
-
-	function serializeMsg(m: BaseMessage): SerializedMsg {
-		if (m instanceof HumanMessage) return { role: 'human', content: String(m.content) };
-		if (m instanceof SystemMessage) return { role: 'system', content: String(m.content) };
-		if (m instanceof ToolMessage)
-			return { role: 'tool', content: String(m.content), tool_call_id: m.tool_call_id };
-		if (m instanceof AIMessage) {
-			return {
-				role: 'ai',
-				content: String(m.content ?? ''),
-				tool_calls: (m.tool_calls ?? []).map((tc) => ({
-					name: tc.name,
-					args: tc.args as Record<string, unknown>,
-					id: tc.id
-				}))
-			};
-		}
-		return { role: 'ai', content: String(m.content) };
-	}
-
-	function deserializeMsg(s: SerializedMsg): BaseMessage {
-		switch (s.role) {
-			case 'human':
-				return new HumanMessage(s.content);
-			case 'system':
-				return new SystemMessage(s.content);
-			case 'tool':
-				return new ToolMessage({
-					tool_call_id: s.tool_call_id ?? '',
-					content: s.content
-				});
-			case 'ai':
-			default:
-				return new AIMessage({
-					content: s.content,
-					tool_calls: s.tool_calls?.map((tc) => ({ ...tc })) ?? []
-				});
-		}
-	}
 
 	let mode = $state<'weather' | 'multi'>('multi');
 	let running = $state(false);
 	let messages = $state<BaseMessage[]>([]);
 	let active = $state<string | undefined>(undefined);
 	let path = $state<string[]>([]);
+	let steps = $state<DemoStep[]>([]);
 
 	// Viz-only graph: same shape as createReactAgent compiles (agent ↔ tools loop).
 	const vizGraph = new StateGraph(MessagesAnnotation)
@@ -98,91 +46,42 @@
 		.addEdge('tools', 'agent')
 		.compile();
 
-	function pushPath(node: AgentNode, log: AgentNode[]) {
-		log.push(node);
-		// Map our internal labels to the actual LangGraph node names so the
-		// viz highlights light up correctly: 'end' → '__end__'.
-		path = log.map((n) => (n === 'end' ? '__end__' : n));
-		active = node === 'end' ? '__end__' : node;
-	}
-
 	async function runScenario() {
 		running = true;
 		messages = [];
 		path = [];
+		steps = [];
 		active = 'agent';
 		const modeForRun = mode;
 		try {
 			const out = await withRunCache<ScenarioPayload>(
 				{ demoId: `l1-agent-${modeForRun}` },
 				async () => {
-					const baseModel = await getModel({ temperature: 0, maxTokens: 320 });
-					const model = baseModel.bindTools!(
-						allTools as unknown as never[]
-					) as unknown as BoundModel;
-
-					const live: BaseMessage[] = [];
-					const log: AgentNode[] = [];
-
-					if (modeForRun === 'weather') {
-						live.push(
-							new HumanMessage("What's the weather like in San Francisco today?")
-						);
-					} else {
-						live.push(
-							new HumanMessage(
-								"Compare today's weather in Tokyo and London, and tell me the temperature difference in °C."
-							)
-						);
-					}
-					messages = live.slice();
-
-					let safety = 0;
-					while (safety++ < 6) {
-						pushPath('agent', log);
-						await new Promise((res) => setTimeout(res, 200));
-						const ai = (await model.invoke(live)) as AIMessage;
-						live.push(ai);
-						messages = live.slice();
-						if (!ai.tool_calls?.length) {
-							pushPath('end', log);
-							break;
+					const collected: DemoStep[] = [];
+					const res = await runAgentScenario(
+						modeForRun,
+						(m) => (messages = m),
+						(p, a) => {
+							path = p;
+							active = a;
+						},
+						(s) => {
+							collected.push(s);
+							steps = [...collected];
 						}
-						pushPath('tools', log);
-						await new Promise((res) => setTimeout(res, 200));
-						for (const tc of ai.tool_calls) {
-							const t = toolByName[tc.name];
-							if (!t) {
-								live.push(
-									new ToolMessage({
-										tool_call_id: tc.id ?? '',
-										content: `Error: unknown tool "${tc.name}"`
-									})
-								);
-							} else {
-								const result = await t.invoke(tc.args);
-								live.push(
-									new ToolMessage({
-										tool_call_id: tc.id ?? '',
-										content:
-											typeof result === 'string' ? result : JSON.stringify(result)
-									})
-								);
-							}
-							messages = live.slice();
-						}
-					}
-
+					);
 					return {
 						mode: modeForRun,
-						messages: live.map(serializeMsg),
-						path: log
+						messages: serializeMessages(res.messages),
+						path: res.path,
+						steps: collected
 					};
 				}
 			);
-			messages = out.messages.map(deserializeMsg);
+			messages = deserializeMessages(out.messages);
 			path = out.path;
-			active = out.path[out.path.length - 1];
+			active = path[path.length - 1];
+			steps = out.steps;
 		} finally {
 			running = false;
 		}
@@ -193,9 +92,10 @@
 			demoId: `l1-agent-${mode}`
 		});
 		if (cached) {
-			messages = cached.payload.messages.map(deserializeMsg);
+			messages = deserializeMessages(cached.payload.messages);
 			path = cached.payload.path;
-			active = cached.payload.path[cached.payload.path.length - 1];
+			active = path[path.length - 1];
+			steps = cached.payload.steps ?? [];
 		}
 	});
 
@@ -263,6 +163,10 @@ const result = await agent.invoke({
 			</p>
 		</Slide>
 
+		<Slide title="The loop, drawn" variant="figure">
+			<Diagram spec={reactLoop} title="The ReAct loop" />
+		</Slide>
+
 		<Slide variant="pull-quote">
 			<p>
 				An agent is not a smarter model. It is the smallest loop that lets a model use the
@@ -293,21 +197,32 @@ const result = await agent.invoke({
 	{/snippet}
 
 	{#snippet demo()}
-		<Panel title="Pick a scenario">
-			<div class="modes">
-				<label class:selected={mode === 'weather'}>
-					<input type="radio" bind:group={mode} value="weather" />
-					<span>Single tool</span>
-					<small>One weather lookup, one final answer.</small>
-				</label>
-				<label class:selected={mode === 'multi'}>
-					<input type="radio" bind:group={mode} value="multi" />
-					<span>Parallel + follow-up</span>
-					<small>Two weather calls, then a calculator call.</small>
-				</label>
-			</div>
-			<RunButton onclick={runScenario} running={running} label="Run scenario" />
-		</Panel>
+		<DemoFrame
+			title="ReAct agent"
+			subtitle="agent ↔ tools loop"
+			code={agentSrc}
+			codeCaption="src/lib/demos/agent-react.ts — exactly what runs"
+			steps={steps}
+		>
+			{#snippet run()}
+				<div class="modes">
+					<label class:selected={mode === 'weather'}>
+						<input type="radio" bind:group={mode} value="weather" />
+						<span>Single tool</span>
+						<small>One weather lookup, one final answer.</small>
+					</label>
+					<label class:selected={mode === 'multi'}>
+						<input type="radio" bind:group={mode} value="multi" />
+						<span>Parallel + follow-up</span>
+						<small>Two weather calls, then a calculator call.</small>
+					</label>
+				</div>
+				<RunButton onclick={runScenario} running={running} label="Run scenario" />
+				<div class="stream">
+					<MessageStream messages={messages} compact />
+				</div>
+			{/snippet}
+		</DemoFrame>
 
 		<Panel title="Graph (live)" subtitle="rendered from getGraphAsync().drawMermaid()">
 			<LangGraphView
@@ -316,10 +231,6 @@ const result = await agent.invoke({
 				path={path}
 				caption="Native LangGraph diagram · agent ↔ tools loop"
 			/>
-		</Panel>
-
-		<Panel title="Messages">
-			<MessageStream messages={messages} compact />
 		</Panel>
 	{/snippet}
 </Lesson>
@@ -357,5 +268,8 @@ const result = await agent.invoke({
 		font-size: 0.78rem;
 		color: var(--color-ink-300);
 		font-family: var(--font-mono);
+	}
+	.stream {
+		margin-top: 0.85rem;
 	}
 </style>

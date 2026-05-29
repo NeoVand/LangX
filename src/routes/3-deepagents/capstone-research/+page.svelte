@@ -6,7 +6,8 @@
 	import RunButton from '$lib/components/RunButton.svelte';
 	import TodoListView from '$lib/components/TodoListView.svelte';
 	import FileTreeViewer from '$lib/components/FileTreeViewer.svelte';
-	import SubAgentTimeline from '$lib/components/SubAgentTimeline.svelte';
+	import SubagentCard from '$lib/components/SubagentCard.svelte';
+	import Markdown from '$lib/components/Markdown.svelte';
 	import TraceLog from '$lib/components/TraceLog.svelte';
 	import {
 		createDeepAgent,
@@ -14,6 +15,7 @@
 		StoreBackend,
 		CompositeBackend,
 		type SubAgentSpec,
+		type SubAgentReport,
 		type Todo,
 		type VirtualFile
 	} from '$lib/deepagents';
@@ -28,6 +30,7 @@
 		todos: Todo[];
 		files: VirtualFile[];
 		events: TraceEvent[];
+		reports: SubAgentReport[];
 		finalText: string;
 	}
 
@@ -36,7 +39,12 @@
 	let todos = $state<Todo[]>([]);
 	let files = $state<VirtualFile[]>([]);
 	let events = $state<TraceEvent[]>([]);
+	let reports = $state<SubAgentReport[]>([]);
 	let finalText = $state<string>('');
+
+	// Path the agent is told to save its brief to — used to auto-focus the file viewer.
+	const memoryPath = $derived(`/memories/${slugify(topic)}.md`);
+	const memoryFile = $derived(files.find((f) => f.path === memoryPath));
 
 	const SUBAGENT_PROMPTS: Record<string, string> = {
 		researcher: `You are a research assistant. The user will give you a focused sub-question.
@@ -100,6 +108,7 @@ Do NOT do the research, writing, or critique yourself — delegate everything vi
 		todos = [];
 		files = [];
 		events = [];
+		reports = [];
 		finalText = '';
 		try {
 			const result = await withRunCache<RunPayload>(
@@ -137,6 +146,7 @@ Do NOT do the research, writing, or critique yourself — delegate everything vi
 					agent.subscribe((s) => {
 						todos = [...s.todos];
 						files = [...s.files];
+						reports = [...s.subagentReports];
 					});
 
 					const out = await agent.invoke({
@@ -153,6 +163,7 @@ Do NOT do the research, writing, or critique yourself — delegate everything vi
 						todos: out.todos,
 						files: await backend.list(),
 						events: localEvents,
+						reports: out.subagentReports,
 						finalText: text
 					};
 				}
@@ -160,6 +171,7 @@ Do NOT do the research, writing, or critique yourself — delegate everything vi
 			todos = result.todos;
 			files = result.files;
 			events = result.events;
+			reports = result.reports;
 			finalText = result.finalText;
 		} finally {
 			busy = false;
@@ -184,11 +196,13 @@ Do NOT do the research, writing, or critique yourself — delegate everything vi
 				todos = cached.payload.todos;
 				files = cached.payload.files;
 				events = cached.payload.events;
+				reports = cached.payload.reports ?? [];
 				finalText = cached.payload.finalText;
 			} else {
 				todos = [];
 				files = [];
 				events = [];
+				reports = [];
 				finalText = '';
 			}
 		})();
@@ -288,15 +302,34 @@ Do NOT do the research, writing, or critique yourself — delegate everything vi
 			<TodoListView {todos} />
 		</Panel>
 
-		<Panel title="Subagent timeline">
-			<SubAgentTimeline {events} />
+		<Panel title="Subagents">
+			{#if reports.length === 0}
+				<p class="finaltext"><em>No subagent reports yet — run the capstone.</em></p>
+			{:else}
+				<div class="cards">
+					{#each reports as r, i (i)}
+						<SubagentCard
+							name={r.name}
+							status="done"
+							report={r.summary}
+							durationMs={r.durationMs}
+						/>
+					{/each}
+				</div>
+			{/if}
 		</Panel>
 
 		<Panel title="Workspace">
-			<FileTreeViewer {files} />
+			<FileTreeViewer {files} focus={memoryFile ? memoryPath : null} />
 		</Panel>
 
-		{#if finalText}
+		{#if memoryFile}
+			<Panel title="Published brief">
+				<div class="brief">
+					<Markdown source={memoryFile.content} />
+				</div>
+			</Panel>
+		{:else if finalText}
 			<Panel title="Final response">
 				<p class="finaltext">{finalText}</p>
 			</Panel>
@@ -325,6 +358,16 @@ Do NOT do the research, writing, or critique yourself — delegate everything vi
 	}
 	.actions {
 		margin-top: 0.65rem;
+	}
+	.cards {
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+	}
+	.brief {
+		max-height: 26rem;
+		overflow-y: auto;
+		padding-right: 0.5rem;
 	}
 	.finaltext {
 		margin: 0;

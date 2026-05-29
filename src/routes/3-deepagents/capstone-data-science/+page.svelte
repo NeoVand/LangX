@@ -6,10 +6,12 @@
 	import CodeBlock from '$lib/components/CodeBlock.svelte';
 	import RunButton from '$lib/components/RunButton.svelte';
 	import FileTreeViewer from '$lib/components/FileTreeViewer.svelte';
+	import Markdown from '$lib/components/Markdown.svelte';
 	import TraceLog from '$lib/components/TraceLog.svelte';
 	import {
 		createDeepAgent,
 		StateBackend,
+		type CompiledDeepAgent,
 		type VirtualFile
 	} from '$lib/deepagents';
 	import { JsSandbox } from '$lib/runtime/sandbox';
@@ -19,6 +21,11 @@
 	import { z } from 'zod';
 	import { createTracer } from '$lib/runtime/tracer';
 	import type { TraceEvent } from '$lib/runtime/tracer/types';
+
+	interface ComputeStep {
+		code: string;
+		result: string;
+	}
 
 	const SAMPLE_CSV = `date,product,quantity,revenue
 2025-01-01,A,12,360
@@ -35,6 +42,7 @@
 		csv: string;
 		files: VirtualFile[];
 		events: TraceEvent[];
+		steps: ComputeStep[];
 		report: string | null;
 		finalText: string;
 	}
@@ -43,89 +51,192 @@
 	let busy = $state(false);
 	let files = $state<VirtualFile[]>([]);
 	let events = $state<TraceEvent[]>([]);
+	let steps = $state<ComputeStep[]>([]);
 	let report = $state<string | null>(null);
 	let finalText = $state<string>('');
 
-	const INSTRUCTIONS = `You are a data-science agent. You have a custom tool \`compute\` that runs
-JavaScript inside a scoped Worker. The variable \`csv\` is pre-bound to the raw CSV text the
-user provided. Follow this recipe exactly:
+	// Live handles kept after a fresh run so follow-up chips can re-prompt the same thread.
+	let liveAgent = $state<CompiledDeepAgent | null>(null);
+	let liveBackend: StateBackend | null = null;
+	let liveSandbox: JsSandbox | null = null;
+	let liveThread = '';
 
+	// SVG charts the plot() tool wrote into /reports/figures/.
+	const figures = $derived(
+		files
+			.filter((f) => f.path.startsWith('/reports/figures/') && f.path.endsWith('.svg'))
+			.sort((a, b) => a.path.localeCompare(b.path))
+	);
+
+	const FOLLOWUPS = [
+		'Plot revenue over time as a line chart and add it to the report.',
+		'Rank the products by total revenue and add a table to the report.',
+		'Compute the daily revenue totals and chart them as bars.'
+	];
+
+	const INSTRUCTIONS = `You are a data-science agent. You have two custom tools:
+- \`compute({ code })\` runs JavaScript inside a scoped Worker. The variable \`csv\` is pre-bound to
+  the raw CSV text. Use \`return\` to produce a JSON-serialisable value.
+- \`plot({ mark, data, x, y, title })\` renders an Observable Plot chart to an SVG file under
+  /reports/figures/ and returns its path. \`data\` is an array of objects.
+
+Follow this recipe exactly:
 1. write_file('/data/sales.csv', <the CSV string the user provided>) — pass the CSV through verbatim.
-2. compute({ code: <JS that parses csv into rows, then aggregates quantity and revenue per product, then returns { rowCount, byProduct }> })
-3. write_file('/reports/sales.md', <a short markdown report with two sections:
+2. compute({ code: <JS that parses csv into rows, then aggregates quantity and revenue per product, then returns { rowCount, byProduct: [{ product, quantity, revenue }] }> })
+3. plot({ mark: 'bar', data: <the byProduct array>, x: 'product', y: 'revenue', title: 'Revenue by product' })
+4. write_file('/reports/sales.md', <a short markdown report with three sections:
    - "Summary" — one paragraph with rowCount and product count.
-   - "Revenue by product" — a fenced code block with ASCII bar chart rows of the form  PRODUCT  ████░░░░  1234>)
-4. Reply with one sentence noting where the report was saved and how many rows were analysed.
+   - "Revenue by product" — a markdown table of product / quantity / revenue.
+   - "Chart" — the line  ![Revenue by product](/reports/figures/1.svg)  >)
+5. Reply with one sentence noting where the report was saved and how many rows were analysed.
 
 Do not chat between tool calls. Do not skip steps.`;
+
+	async function renderPlot(spec: {
+		mark: string;
+		data: Record<string, unknown>[];
+		x: string;
+		y: string;
+		title?: string;
+	}): Promise<string> {
+		const Plot = await import('@observablehq/plot');
+		const fill = 'var(--color-accent-deepagents, #8a6cff)';
+		const marks =
+			spec.mark === 'line'
+				? [Plot.line(spec.data, { x: spec.x, y: spec.y, stroke: fill, strokeWidth: 2 }), Plot.dot(spec.data, { x: spec.x, y: spec.y, fill })]
+				: spec.mark === 'dot'
+					? [Plot.dot(spec.data, { x: spec.x, y: spec.y, fill })]
+					: [Plot.barY(spec.data, { x: spec.x, y: spec.y, fill })];
+		const chart = Plot.plot({
+			title: spec.title,
+			width: 520,
+			height: 300,
+			marginLeft: 64,
+			marginBottom: 44,
+			x: { label: spec.x },
+			y: { label: spec.y, grid: true },
+			marks
+		});
+		const svgEl =
+			chart.tagName.toLowerCase() === 'svg' ? chart : chart.querySelector('svg');
+		const out = svgEl ? new XMLSerializer().serializeToString(svgEl) : chart.outerHTML;
+		chart.remove?.();
+		return out;
+	}
+
+	function buildAgent(localEvents: TraceEvent[], collectStep: (s: ComputeStep) => void) {
+		const tracer = createTracer();
+		tracer.subscribe((ev) => {
+			localEvents.push(ev);
+			events = [...localEvents];
+		});
+
+		const sandbox = new JsSandbox();
+		const backend = new StateBackend();
+		let figureCount = 0;
+
+		const computeTool = tool(
+			async ({ code }) => {
+				const out = await sandbox.run(code, { csv });
+				const result = out.ok ? JSON.stringify(out.value, null, 2) : `Error: ${out.error}`;
+				collectStep({ code, result });
+				return result;
+			},
+			{
+				name: 'compute',
+				description:
+					'Run a self-contained JavaScript expression in a scoped Worker (no DOM, no network). Use `csv` as the variable holding the raw CSV text. Use `return` to produce a value.',
+				schema: z.object({ code: z.string() })
+			}
+		);
+
+		const plotTool = tool(
+			async ({ mark, data, x, y, title }) => {
+				try {
+					const svg = await renderPlot({ mark, data, x, y, title });
+					const path = `/reports/figures/${++figureCount}.svg`;
+					await backend.write(path, svg);
+					return `Wrote chart to ${path}`;
+				} catch (e) {
+					return `Plot error: ${e instanceof Error ? e.message : String(e)}`;
+				}
+			},
+			{
+				name: 'plot',
+				description:
+					'Render an Observable Plot chart to an SVG file under /reports/figures/. data is an array of row objects; x and y are field names; mark is "bar", "line", or "dot".',
+				schema: z.object({
+					mark: z.enum(['bar', 'line', 'dot']),
+					data: z.array(z.record(z.string(), z.unknown())),
+					x: z.string(),
+					y: z.string(),
+					title: z.string().optional()
+				})
+			}
+		);
+
+		const agentPromise = (async () => {
+			const model = await getModel({ temperature: 0, maxTokens: 1200 });
+			return createDeepAgent({
+				model,
+				backend,
+				tools: [computeTool, plotTool],
+				instructions: INSTRUCTIONS,
+				tracer,
+				maxIterations: 16
+			});
+		})();
+
+		return { agentPromise, sandbox, backend };
+	}
 
 	async function run() {
 		busy = true;
 		files = [];
 		events = [];
+		steps = [];
 		report = null;
 		finalText = '';
+		liveSandbox?.terminate();
+		liveAgent = null;
 		try {
+			const localSteps: ComputeStep[] = [];
 			const result = await withRunCache<RunPayload>(
-				{ demoId: 'l3-capstone-ds-run' },
+				{ demoId: `l3-capstone-ds-${slugify(csv)}` },
 				async () => {
 					const localEvents: TraceEvent[] = [];
-					const tracer = createTracer();
-					tracer.subscribe((ev) => {
-						localEvents.push(ev);
-						events = [...localEvents];
+					const { agentPromise, sandbox, backend } = buildAgent(localEvents, (s) => {
+						localSteps.push(s);
+						steps = [...localSteps];
 					});
-
-					const sandbox = new JsSandbox();
-					const computeTool = tool(
-						async ({ code }) => {
-							const out = await sandbox.run(code, { csv });
-							if (!out.ok) return `Error: ${out.error}`;
-							return JSON.stringify(out.value, null, 2);
-						},
-						{
-							name: 'compute',
-							description:
-								'Run a self-contained JavaScript expression in a scoped Worker (no DOM, no network). Use `csv` as the variable holding the raw CSV text. Use `return` to produce a value.',
-							schema: z.object({ code: z.string() })
-						}
-					);
-
-					const model = await getModel({ temperature: 0, maxTokens: 1000 });
-					const backend = new StateBackend();
-					const agent = createDeepAgent({
-						model,
-						backend,
-						tools: [computeTool],
-						instructions: INSTRUCTIONS,
-						tracer,
-						maxIterations: 12
-					});
+					const agent = await agentPromise;
 					agent.subscribe((s) => (files = [...s.files]));
 
+					liveThread = `ds-${Math.random().toString(36).slice(2, 6)}`;
 					const out = await agent.invoke({
 						input: `Here is the CSV. Analyse it and produce a sales report.\n\n${csv}`,
-						thread: `ds-${Math.random().toString(36).slice(2, 6)}`
+						thread: liveThread
 					});
-					const last = out.messages[out.messages.length - 1];
-					const text =
-						typeof last?.content === 'string'
-							? last.content
-							: JSON.stringify(last?.content ?? '');
-					const finalFiles = await backend.list();
-					const reportText = (await backend.read('/reports/sales.md')) ?? null;
-					sandbox.terminate();
+					const text = lastText(out.messages);
+
+					// Keep handles alive for follow-up chips (only on a fresh run, not a cache hit).
+					liveAgent = agent;
+					liveBackend = backend;
+					liveSandbox = sandbox;
+
 					return {
 						csv,
-						files: finalFiles,
+						files: await backend.list(),
 						events: localEvents,
-						report: reportText,
+						steps: localSteps,
+						report: (await backend.read('/reports/sales.md')) ?? null,
 						finalText: text
 					};
 				}
 			);
 			files = result.files;
 			events = result.events;
+			steps = result.steps ?? [];
 			report = result.report;
 			finalText = result.finalText;
 		} finally {
@@ -133,12 +244,38 @@ Do not chat between tool calls. Do not skip steps.`;
 		}
 	}
 
+	async function followUp(prompt: string) {
+		if (!liveAgent || !liveBackend || busy) return;
+		busy = true;
+		try {
+			const out = await liveAgent.invoke({ input: prompt, thread: liveThread });
+			finalText = lastText(out.messages);
+			files = await liveBackend.list();
+			report = (await liveBackend.read('/reports/sales.md')) ?? report;
+		} finally {
+			busy = false;
+		}
+	}
+
+	function lastText(messages: { content: unknown }[]): string {
+		const last = messages[messages.length - 1];
+		return typeof last?.content === 'string' ? last.content : JSON.stringify(last?.content ?? '');
+	}
+
+	function slugify(s: string) {
+		let h = 0;
+		for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
+		return `h${(h >>> 0).toString(36)}`;
+	}
+
 	$effect(() => {
+		const current = csv;
 		(async () => {
-			const cached = await loadCachedRun<RunPayload>({ demoId: 'l3-capstone-ds-run' });
-			if (cached) {
+			const cached = await loadCachedRun<RunPayload>({ demoId: `l3-capstone-ds-${slugify(current)}` });
+			if (cached && cached.payload.csv === current) {
 				files = cached.payload.files;
 				events = cached.payload.events;
+				steps = cached.payload.steps ?? [];
 				report = cached.payload.report;
 				finalText = cached.payload.finalText;
 			}
@@ -146,21 +283,33 @@ Do not chat between tool calls. Do not skip steps.`;
 	});
 
 	const code = `import { JsSandbox } from '$lib/runtime/sandbox';
+import * as Plot from '@observablehq/plot';
 
 const sandbox = new JsSandbox();
+
 const computeTool = tool(
   async ({ code }) => {
     const out = await sandbox.run(code, { csv });
     return out.ok ? JSON.stringify(out.value) : 'Error: ' + out.error;
   },
+  { name: 'compute', schema: z.object({ code: z.string() }) }
+);
+
+const plotTool = tool(
+  async ({ mark, data, x, y, title }) => {
+    const chart = Plot.plot({ title, marks: [Plot.barY(data, { x, y })] });
+    const svg = new XMLSerializer().serializeToString(chart.querySelector('svg') ?? chart);
+    const path = '/reports/figures/' + (++n) + '.svg';
+    await backend.write(path, svg);
+    return 'Wrote chart to ' + path;
+  },
   {
-    name: 'compute',
-    description: 'Run JS in a scoped Worker. csv holds the raw text.',
-    schema: z.object({ code: z.string() })
+    name: 'plot',
+    schema: z.object({ mark: z.enum(['bar','line','dot']), data: z.array(z.record(z.unknown())), x: z.string(), y: z.string(), title: z.string().optional() })
   }
 );
 
-createDeepAgent({ model, backend, tools: [computeTool] });`;
+createDeepAgent({ model, backend, tools: [computeTool, plotTool] });`;
 </script>
 
 <Lesson
@@ -255,19 +404,59 @@ createDeepAgent({ model, backend, tools: [computeTool] });`;
 			</div>
 		</Panel>
 
+		{#if steps.length}
+			<Panel title="Compute steps" subtitle="every `compute` call: the code and its result">
+				<ol class="steps">
+					{#each steps as s, i (i)}
+						<li>
+							<div class="step-h">compute · call {i + 1}</div>
+							<CodeBlock code={s.code} lang="js" />
+							<pre class="step-out">{s.result}</pre>
+						</li>
+					{/each}
+				</ol>
+			</Panel>
+		{/if}
+
 		<Panel title="Workspace">
-			<FileTreeViewer {files} />
+			<FileTreeViewer {files} focus={report ? '/reports/sales.md' : null} />
 		</Panel>
+
+		{#if figures.length}
+			<Panel title="Figures" subtitle="charts rendered by the plot() tool">
+				<div class="figures">
+					{#each figures as fig (fig.path)}
+						<figure class="chart">
+							<!-- eslint-disable-next-line svelte/no-at-html-tags -- generated by Observable Plot, no user input -->
+							<div class="chart-svg">{@html fig.content}</div>
+							<figcaption>{fig.path}</figcaption>
+						</figure>
+					{/each}
+				</div>
+			</Panel>
+		{/if}
 
 		{#if report}
 			<Panel title="/reports/sales.md">
-				<pre class="report">{report}</pre>
+				<div class="report-md">
+					<Markdown source={report} />
+				</div>
 			</Panel>
 		{/if}
 
 		{#if finalText}
 			<Panel title="Final response">
 				<p class="finaltext">{finalText}</p>
+			</Panel>
+		{/if}
+
+		{#if liveAgent}
+			<Panel title="Follow-up" subtitle="re-prompts the same agent on the same thread">
+				<div class="chips">
+					{#each FOLLOWUPS as f (f)}
+						<button class="chip" onclick={() => followUp(f)} disabled={busy}>{f}</button>
+					{/each}
+				</div>
 			</Panel>
 		{/if}
 
@@ -297,19 +486,90 @@ createDeepAgent({ model, backend, tools: [computeTool] });`;
 	.actions {
 		margin-top: 0.65rem;
 	}
-	.report {
+	.steps {
+		list-style: none;
 		margin: 0;
-		padding: 0.95rem 1.05rem;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.85rem;
+	}
+	.steps li {
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+	}
+	.step-h {
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: var(--accent-ink, var(--color-accent-deepagents));
+	}
+	.step-out {
+		margin: 0;
+		padding: 0.6rem 0.8rem;
 		background: var(--color-bg);
 		border: 1px solid var(--color-rule);
-		border-radius: 0.45rem;
+		border-radius: 0.4rem;
 		font-family: var(--font-mono);
-		font-size: 0.82rem;
-		line-height: 1.55;
-		color: var(--color-ink-100);
+		font-size: 0.76rem;
+		line-height: 1.5;
+		color: var(--color-ink-200);
 		white-space: pre-wrap;
-		max-height: 22rem;
+		word-break: break-word;
+		max-height: 14rem;
 		overflow: auto;
+	}
+	.figures {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+	}
+	.chart {
+		margin: 0;
+		border: 1px solid var(--color-rule);
+		border-radius: 0.5rem;
+		padding: 0.85rem;
+		background: var(--color-paper);
+	}
+	.chart-svg :global(svg) {
+		max-width: 100%;
+		height: auto;
+	}
+	.chart figcaption {
+		margin-top: 0.5rem;
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		color: var(--color-fg-faint);
+	}
+	.report-md {
+		max-height: 26rem;
+		overflow-y: auto;
+		padding-right: 0.5rem;
+	}
+	.chips {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+	}
+	.chip {
+		border: 1px solid var(--color-rule);
+		background: var(--color-bg);
+		color: var(--color-ink-100);
+		border-radius: 999px;
+		padding: 0.4rem 0.85rem;
+		font-size: 0.84rem;
+		cursor: pointer;
+		transition: border-color 0.15s ease, background 0.15s ease;
+	}
+	.chip:hover:not(:disabled) {
+		border-color: var(--accent-ink, var(--color-accent-deepagents));
+		background: var(--color-paper);
+	}
+	.chip:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
 	}
 	.finaltext {
 		margin: 0;

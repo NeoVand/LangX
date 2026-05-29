@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { BaseMessage } from '@langchain/core/messages';
 	import { AIMessage, HumanMessage, SystemMessage, ToolMessage } from '@langchain/core/messages';
+	import { displayContent } from '$lib/runtime/messages';
 
 	interface Props {
 		messages: BaseMessage[];
@@ -19,9 +20,7 @@
 	}
 
 	function display(m: BaseMessage) {
-		const c = m.content;
-		if (typeof c === 'string') return c;
-		return JSON.stringify(c, null, 2);
+		return displayContent(m.content);
 	}
 </script>
 

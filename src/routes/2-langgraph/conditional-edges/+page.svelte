@@ -4,6 +4,8 @@
 	import Term from '$lib/components/Term.svelte';
 	import Panel from '$lib/components/Panel.svelte';
 	import CodeBlock from '$lib/components/CodeBlock.svelte';
+	import Diagram from '$lib/components/Diagram.svelte';
+	import { conditionalEdges } from '$lib/diagrams';
 	import RunButton from '$lib/components/RunButton.svelte';
 	import LangGraphView from '$lib/components/LangGraphView.svelte';
 	import StateInspector from '$lib/components/StateInspector.svelte';
@@ -151,7 +153,12 @@
 							reducer: (a, b) => a + b,
 							default: () => 0
 						}),
-						lastWriter: Annotation<string>()
+						// research and draft both write this in the same superstep, so it
+						// needs a reducer; "last writer wins" keeps the parallel fan-in legal.
+						lastWriter: Annotation<string>({
+							reducer: (a, b) => b ?? a,
+							default: () => ''
+						})
 					});
 
 					const research = () => ({
@@ -300,6 +307,10 @@ const graph = new StateGraph(State)
 				objects (covered in lesson 06).
 			</p>
 			<CodeBlock code={codeRoute} caption="A real-LLM support-ticket triage graph." />
+		</Slide>
+
+		<Slide title="The router, drawn" variant="figure">
+			<Diagram spec={conditionalEdges} title="Conditional edges" />
 		</Slide>
 
 		<Slide variant="pull-quote">

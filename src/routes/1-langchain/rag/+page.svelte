@@ -2,122 +2,112 @@
 	import Lesson from '$lib/components/Lesson.svelte';
 	import Slide from '$lib/components/Slide.svelte';
 	import Term from '$lib/components/Term.svelte';
-	import Panel from '$lib/components/Panel.svelte';
 	import CodeBlock from '$lib/components/CodeBlock.svelte';
 	import RunButton from '$lib/components/RunButton.svelte';
-	import { Document } from '@langchain/core/documents';
+	import DemoFrame from '$lib/components/DemoFrame.svelte';
+	import Diagram from '$lib/components/Diagram.svelte';
+	import { ragFlow } from '$lib/diagrams';
 	import { InMemoryVectorStore } from '$lib/runtime/rag/in-memory-vector-store';
-	import { MiniLmEmbeddings } from '$lib/runtime/rag/embeddings';
-	import { withRunCache, loadCachedRun } from '$lib/runtime/runs';
+	import { EMBEDDINGS_PROVIDERS, type EmbeddingsProviderId } from '$lib/runtime/rag/registry';
+	import {
+		chunkDocuments,
+		buildStore,
+		answerWithRag,
+		type Chunk,
+		type RetrievedChunk
+	} from '$lib/demos/rag-pipeline';
+	import ragSrc from '$lib/demos/rag-pipeline.ts?raw';
+	import type { DemoStep } from '$lib/demos/types';
 	import { browser } from '$app/environment';
 	import { onMount } from 'svelte';
 
-	const sourceA = `LangChain Expression Language (LCEL) is a declarative way to compose Runnables. The pipe operator feeds the output of one Runnable into the next. LCEL is lazy: nothing runs until invoke or stream is called. It supports batching, streaming, retries, fallbacks, and observable callbacks for free.`;
+	const defaultDocs = [
+		{
+			source: 'LCEL',
+			text: `LangChain Expression Language (LCEL) is a declarative way to compose Runnables. The pipe operator feeds the output of one Runnable into the next. LCEL is lazy: nothing runs until invoke or stream is called. Because every step is a Runnable, LCEL chains get batching, streaming, retries, fallbacks, and observable callbacks for free, without you writing any of that plumbing yourself.`
+		},
+		{
+			source: 'LangGraph',
+			text: `LangGraph models applications as directed, stateful, cyclic graphs. Each node is a function from the current state to a partial state update, and a reducer decides how updates merge. Edges can be unconditional or conditional on the state. Checkpointers persist the graph state after every superstep, which is what enables resuming after a crash, time travel to an earlier state, and human-in-the-loop interrupts that pause the graph and wait for input.`
+		},
+		{
+			source: 'Deep Agents',
+			text: `Deep Agents bundle planning, a virtual filesystem, subagent delegation, context summarization, and human-in-the-loop review into an opinionated harness. The agent reads, writes, and edits files using ls, read_file, write_file, edit_file, glob, and grep tools. When a tool returns a very long result, the harness evicts it to a file on the virtual filesystem and replaces it inline with a short path and preview, keeping the model's context small.`
+		}
+	];
 
-	const sourceB = `LangGraph models applications as directed stateful cyclic graphs. Each node is a function from state to a partial state update. Edges can be unconditional or conditional. Checkpointers persist the graph state after every step, enabling resume, time travel, and human-in-the-loop interrupts.`;
-
-	const sourceC = `Deep Agents bundle planning, a virtual filesystem, subagent delegation, summarization, and human-in-the-loop into an opinionated harness. The agent reads, writes, and edits files using ls, read_file, write_file, edit_file, glob, and grep tools. Long tool outputs are evicted to disk and replaced with a path and short preview.`;
-
+	let docs = $state(defaultDocs.map((d) => ({ ...d })));
+	let chunks = $state<Chunk[]>([]);
 	let store: InMemoryVectorStore | null = $state(null);
+	let provider = $state<EmbeddingsProviderId>('local');
 	let warming = $state(false);
-	let warmStatus = $state<string>('Embedding model not yet downloaded.');
+	let warmStatus = $state('Not indexed yet.');
+	let expandedDoc = $state<number | null>(null);
 
-	type Hit = { source: string; pageContent: string; score: number };
-	type HitPayload = { question: string; hits: Hit[] };
+	let question = $state('How do I resume a graph after a crash?');
+	let topK = $state(3);
+	let running = $state(false);
+	let steps = $state<DemoStep[]>([]);
+	let hits = $state<RetrievedChunk[]>([]);
+	let answer = $state('');
+	let expandedHit = $state<number | null>(null);
 
-	let q1 = $state('What does the pipe operator actually do?');
-	let q1Run = $state(false);
-	let q1Hits = $state<Hit[]>([]);
+	const providerAvailable = (id: EmbeddingsProviderId) =>
+		EMBEDDINGS_PROVIDERS.find((p) => p.id === id)?.available() ?? false;
 
-	let q2 = $state('How do I resume a graph after a crash?');
-	let q2Run = $state(false);
-	let q2Hits = $state<Hit[]>([]);
-
-	async function ensureStore() {
-		if (store) return store;
+	async function buildIndex() {
 		warming = true;
-		warmStatus = 'Loading MiniLM embeddings (~25 MB the first time)…';
+		store = null;
+		warmStatus =
+			provider === 'local'
+				? 'Embedding chunks with bundled MiniLM (no network)…'
+				: 'Embedding chunks with the cloud provider…';
 		try {
-			const embeddings = new MiniLmEmbeddings();
-			const s = new InMemoryVectorStore(embeddings);
-			await s.addDocuments([
-				new Document({ pageContent: sourceA, metadata: { source: 'LCEL', chapter: 1 } }),
-				new Document({ pageContent: sourceB, metadata: { source: 'LangGraph', chapter: 2 } }),
-				new Document({
-					pageContent: sourceC,
-					metadata: { source: 'Deep Agents', chapter: 3 }
-				})
-			]);
-			store = s;
-			warmStatus = `Indexed ${s.entries.length} documents · 384-dim vectors.`;
+			chunks = await chunkDocuments(docs);
+			store = await buildStore(chunks, provider);
+			warmStatus = `Indexed ${chunks.length} chunks from ${docs.length} documents.`;
 		} catch (err) {
-			warmStatus = `Failed to load embeddings: ${(err as Error).message}`;
+			warmStatus = `Failed to index: ${(err as Error).message}`;
 		} finally {
 			warming = false;
 		}
 	}
 
-	function toHits(rows: { doc: Document; score: number }[]): Hit[] {
-		return rows.map((h) => ({
-			source: String(h.doc.metadata?.source ?? ''),
-			pageContent: h.doc.pageContent,
-			score: h.score
-		}));
+	async function onUpload(e: Event) {
+		const input = e.target as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file) return;
+		const text = await file.text();
+		docs = [...docs, { source: file.name, text }];
+		store = null;
+		warmStatus = `Added "${file.name}". Re-index to search it.`;
 	}
 
-	async function runQ1() {
-		q1Run = true;
-		q1Hits = [];
+	async function runQuery() {
+		running = true;
+		steps = [];
+		hits = [];
+		answer = '';
 		try {
-			const out = await withRunCache<HitPayload>({ demoId: 'l1-rag-single' }, async () => {
-				const s = await ensureStore();
-				if (!s) return { question: q1, hits: [] };
-				const rows = await s.similaritySearch(q1, 3);
-				return { question: q1, hits: toHits(rows) };
+			if (!store) await buildIndex();
+			if (!store) return;
+			const collected: DemoStep[] = [];
+			const out = await answerWithRag(store, question, topK, (s) => {
+				collected.push(s);
+				steps = [...collected];
 			});
-			q1Hits = out.hits;
+			hits = out.hits;
+			answer = out.answer;
 		} finally {
-			q1Run = false;
+			running = false;
 		}
 	}
 
-	async function runQ2() {
-		q2Run = true;
-		q2Hits = [];
-		try {
-			const out = await withRunCache<HitPayload>({ demoId: 'l1-rag-cross' }, async () => {
-				const s = await ensureStore();
-				if (!s) return { question: q2, hits: [] };
-				const rows = await s.similaritySearch(q2, 3);
-				return { question: q2, hits: toHits(rows) };
-			});
-			q2Hits = out.hits;
-		} finally {
-			q2Run = false;
-		}
-	}
-
-	onMount(async () => {
-		const c1 = await loadCachedRun<HitPayload>({ demoId: 'l1-rag-single' });
-		if (c1) q1Hits = c1.payload.hits;
-		const c2 = await loadCachedRun<HitPayload>({ demoId: 'l1-rag-cross' });
-		if (c2) q2Hits = c2.payload.hits;
+	onMount(() => {
+		// Index lazily on first run to avoid burning embeddings on page load.
 	});
 
-	const code = `import { Document } from '@langchain/core/documents';
-import { MiniLmEmbeddings } from '$lib/runtime/rag/embeddings';
-import { InMemoryVectorStore } from '$lib/runtime/rag/in-memory-vector-store';
-
-const store = new InMemoryVectorStore(new MiniLmEmbeddings());
-
-await store.addDocuments([
-  new Document({ pageContent: sourceA, metadata: { source: 'LCEL' } }),
-  new Document({ pageContent: sourceB, metadata: { source: 'LangGraph' } }),
-  new Document({ pageContent: sourceC, metadata: { source: 'Deep Agents' } })
-]);
-
-const hits = await store.similaritySearch('How do I resume a crashed graph?', 3);
-// hits[0].doc.pageContent → the LangGraph passage`;
+	const code = ragSrc;
 </script>
 
 <Lesson
@@ -180,6 +170,10 @@ const hits = await store.similaritySearch('How do I resume a crashed graph?', 3)
 			</p>
 		</Slide>
 
+		<Slide title="The read path, drawn" variant="figure">
+			<Diagram spec={ragFlow} title="RAG read path" />
+		</Slide>
+
 		<Slide variant="pull-quote">
 			<p>
 				RAG is a contract between retrieval and prompting. Inspect each half on its own, or
@@ -211,67 +205,96 @@ const hits = await store.similaritySearch('How do I resume a crashed graph?', 3)
 	{/snippet}
 
 	{#snippet demo()}
-		<Panel title="Embedding status">
-			<div class="status">
-				{#if warming}
-					<span class="dot pulse-soft"></span>{warmStatus}
-				{:else}
-					<span class="dot" class:on={!!store}></span>{warmStatus}
+		<section class="corpus">
+			<header class="corpus-head">
+				<h3>Corpus</h3>
+				<span class="muted">{docs.length} docs · {chunks.length || '—'} chunks</span>
+			</header>
+			<ul class="doclist">
+				{#each docs as doc, i (i)}
+					<li>
+						<button class="doc-head" onclick={() => (expandedDoc = expandedDoc === i ? null : i)}>
+							<span class="src">{doc.source}</span>
+							<span class="muted">{doc.text.length} chars</span>
+							<span class="chev" class:open={expandedDoc === i}>›</span>
+						</button>
+						{#if expandedDoc === i}
+							<p class="doc-body">{doc.text}</p>
+						{/if}
+					</li>
+				{/each}
+			</ul>
+			<label class="upload">
+				<input type="file" accept=".md,.txt,text/plain,text/markdown" onchange={onUpload} />
+				<span>+ Add your own .md / .txt</span>
+			</label>
+		</section>
+
+		<DemoFrame
+			title="RAG · retrieve then generate"
+			subtitle="embed query → cosine search → grounded answer"
+			code={code}
+			codeCaption="src/lib/demos/rag-pipeline.ts — exactly what runs"
+			steps={steps}
+		>
+			{#snippet run()}
+				<div class="controls">
+					<label class="field">
+						<span>Embeddings provider</span>
+						<select bind:value={provider} onchange={() => (store = null)}>
+							{#each EMBEDDINGS_PROVIDERS as p (p.id)}
+								<option value={p.id} disabled={!providerAvailable(p.id)}>
+									{p.label}{providerAvailable(p.id) ? '' : ' (key needed)'}
+								</option>
+							{/each}
+						</select>
+					</label>
+					<label class="field topk">
+						<span>Top-k</span>
+						<input type="number" min="1" max="6" bind:value={topK} />
+					</label>
+				</div>
+				<label class="row">
+					<span>Question</span>
+					<input type="text" bind:value={question} />
+				</label>
+				<div class="status">
+					{#if warming}<span class="dot pulse-soft"></span>{:else}<span
+							class="dot"
+							class:on={!!store}
+						></span>{/if}{warmStatus}
+				</div>
+				<RunButton onclick={runQuery} running={running} label={browser ? 'Index & answer' : 'Run'} />
+
+				{#if answer}
+					<div class="answer">
+						<div class="answer-label">Grounded answer</div>
+						<p>{answer}</p>
+					</div>
 				{/if}
-			</div>
-			{#if browser && !store}
-				<RunButton
-					onclick={async () => {
-						await ensureStore();
-					}}
-					running={warming}
-					variant="ghost"
-					label="Download model & index 3 docs"
-				/>
-			{/if}
-		</Panel>
 
-		<Panel title="Demo 1 · Single-source query">
-			<label class="row">
-				<span>Question</span>
-				<input type="text" bind:value={q1} />
-			</label>
-			<RunButton onclick={runQ1} running={q1Run} />
-			{#if q1Hits.length}
-				<ol class="hits">
-					{#each q1Hits as hit, i (i)}
-						<li>
-							<header>
-								<span class="src">{hit.source}</span>
-								<span class="score">{(hit.score * 100).toFixed(1)}%</span>
-							</header>
-							<p>{hit.pageContent}</p>
-						</li>
-					{/each}
-				</ol>
-			{/if}
-		</Panel>
-
-		<Panel title="Demo 2 · Cross-document query">
-			<label class="row">
-				<span>Question</span>
-				<input type="text" bind:value={q2} />
-			</label>
-			<RunButton onclick={runQ2} running={q2Run} />
-			{#if q2Hits.length}
-				<ol class="hits">
-					{#each q2Hits as hit, i (i)}
-						<li>
-							<header>
-								<span class="src">{hit.source}</span>
-								<span class="score">{(hit.score * 100).toFixed(1)}%</span>
-							</header>
-							<p>{hit.pageContent}</p>
-						</li>
-					{/each}
-				</ol>
-			{/if}
-		</Panel>
+				{#if hits.length}
+					<ol class="hits">
+						{#each hits as hit, i (i)}
+							{@const pct = Math.max(0, hit.score) * 100}
+							<li>
+								<header>
+									<span class="src">{hit.source} · chunk {hit.index}</span>
+									<span class="score" title={`raw cosine ${hit.score.toFixed(4)}`}>
+										{(hit.score * 100).toFixed(1)}%
+									</span>
+								</header>
+								<div class="bar"><span style={`width:${pct}%`}></span></div>
+								<p class:clamped={expandedHit !== i}>{hit.text}</p>
+								<button class="more" onclick={() => (expandedHit = expandedHit === i ? null : i)}>
+									{expandedHit === i ? 'show less' : 'show full chunk'}
+								</button>
+							</li>
+						{/each}
+					</ol>
+				{/if}
+			{/snippet}
+		</DemoFrame>
 	{/snippet}
 </Lesson>
 
@@ -357,5 +380,162 @@ const hits = await store.similaritySearch('How do I resume a crashed graph?', 3)
 		line-height: 1.55;
 		color: var(--color-ink-100);
 		font-family: var(--font-prose);
+	}
+
+	.hits p.clamped {
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		line-clamp: 2;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+	}
+
+	.bar {
+		height: 5px;
+		border-radius: 999px;
+		background: var(--color-rule);
+		overflow: hidden;
+		margin: 0 0 0.5rem;
+	}
+	.bar span {
+		display: block;
+		height: 100%;
+		background: var(--accent-ink);
+	}
+	.more {
+		margin-top: 0.4rem;
+		background: none;
+		border: none;
+		padding: 0;
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		color: var(--accent-ink);
+		cursor: pointer;
+	}
+
+	.corpus {
+		border: 1px solid var(--color-rule);
+		border-radius: 0.6rem;
+		background: var(--color-bg);
+		padding: 0.85rem 1rem;
+	}
+	.corpus-head {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		margin-bottom: 0.6rem;
+	}
+	.corpus-head h3 {
+		font-size: 0.78rem;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		margin: 0;
+		color: var(--color-ink-100);
+	}
+	.muted {
+		font-size: 0.72rem;
+		font-family: var(--font-mono);
+		color: var(--color-ink-300);
+	}
+	.doclist {
+		list-style: none;
+		margin: 0 0 0.6rem;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+	.doc-head {
+		display: flex;
+		gap: 0.5rem;
+		align-items: center;
+		width: 100%;
+		background: none;
+		border: 1px solid var(--color-rule);
+		border-radius: 0.4rem;
+		padding: 0.4rem 0.6rem;
+		cursor: pointer;
+		color: var(--color-ink-100);
+	}
+	.doc-head .src {
+		font-weight: 600;
+	}
+	.doc-head .chev {
+		margin-left: auto;
+		color: var(--color-ink-300);
+		transition: transform 0.15s ease;
+	}
+	.doc-head .chev.open {
+		transform: rotate(90deg);
+	}
+	.doc-body {
+		margin: 0.4rem 0 0;
+		padding: 0.5rem 0.6rem;
+		font-size: 0.85rem;
+		line-height: 1.55;
+		color: var(--color-ink-200);
+		font-family: var(--font-prose);
+		background: var(--color-paper);
+		border-radius: 0.4rem;
+	}
+	.upload input {
+		display: none;
+	}
+	.upload {
+		display: inline-block;
+		font-family: var(--font-mono);
+		font-size: 0.74rem;
+		color: var(--accent-ink);
+		cursor: pointer;
+	}
+
+	.controls {
+		display: flex;
+		gap: 0.6rem;
+		margin-bottom: 0.7rem;
+	}
+	.field {
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+		flex: 1;
+	}
+	.field.topk {
+		flex: 0 0 4.5rem;
+	}
+	.field span {
+		font-size: 0.72rem;
+		font-family: var(--font-mono);
+		color: var(--color-ink-300);
+	}
+	select {
+		background: var(--color-bg);
+		border: 1px solid var(--color-rule);
+		border-radius: 0.4rem;
+		padding: 0.4rem 0.5rem;
+		font-size: 0.82rem;
+		color: var(--color-ink-100);
+	}
+
+	.answer {
+		margin-top: 0.85rem;
+		border: 1px solid var(--accent-ink);
+		border-radius: 0.5rem;
+		padding: 0.7rem 0.85rem;
+		background: color-mix(in oklch, var(--color-bg) 88%, var(--accent-ink) 12%);
+	}
+	.answer-label {
+		font-size: 0.68rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--accent-ink);
+		margin-bottom: 0.35rem;
+		font-family: var(--font-mono);
+	}
+	.answer p {
+		margin: 0;
+		font-size: 0.9rem;
+		line-height: 1.6;
+		color: var(--color-ink-100);
 	}
 </style>

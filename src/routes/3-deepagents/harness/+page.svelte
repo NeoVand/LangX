@@ -4,45 +4,88 @@
 	import Term from '$lib/components/Term.svelte';
 	import Panel from '$lib/components/Panel.svelte';
 	import CodeBlock from '$lib/components/CodeBlock.svelte';
-	import { BASE_AGENT_PROMPT, assembleSystemPrompt } from '$lib/deepagents';
+	import Diagram from '$lib/components/Diagram.svelte';
+	import { harnessLayers } from '$lib/diagrams';
+	import RunButton from '$lib/components/RunButton.svelte';
+	import FileTreeViewer from '$lib/components/FileTreeViewer.svelte';
+	import TraceLog from '$lib/components/TraceLog.svelte';
+	import {
+		BASE_AGENT_PROMPT,
+		assembleSystemPrompt,
+		createDeepAgent,
+		StateBackend,
+		type VirtualFile
+	} from '$lib/deepagents';
+	import { getModel } from '$lib/runtime/llm';
+	import { displayContent } from '$lib/runtime/messages';
+	import { createTracer } from '$lib/runtime/tracer';
+	import type { TraceEvent } from '$lib/runtime/tracer/types';
 
 	let userInstructions = $state(`You are a senior researcher helping the user
 write a brief on the LangGraph runtime. Always plan before you act.`);
 
-	const todos = [
-		{ content: 'Outline scope', status: 'completed' as const },
-		{ content: 'Gather sources', status: 'in_progress' as const },
-		{ content: 'Draft brief', status: 'pending' as const }
-	];
+	// Middleware toggles the learner can flip before building the agent.
+	let useCompaction = $state(true);
+	let useHitl = $state(false);
 
-	const files = [
-		{ path: '/scratch/notes.md', content: '...', backend: 'state' },
-		{ path: '/memories/glossary.md', content: '...', backend: 'store' }
-	];
+	let busy = $state(false);
+	let files = $state<VirtualFile[]>([]);
+	let events = $state<TraceEvent[]>([]);
+	let finalText = $state('');
 
-	const skills = [
-		{ name: 'cite', description: 'Insert proper citations for any claim you write.' },
-		{ name: 'summarize-pdf', description: 'Produce a 1-page summary of a PDF buffer.' }
-	];
-
-	const subagents = [
-		{ name: 'researcher', description: 'Web-search and synthesise findings.' },
-		{ name: 'writer', description: 'Write polished prose from notes.' }
-	];
-
-	const memorySummary =
-		'You met this user yesterday. They prefer short bullet summaries and dislike emoji.';
-
-	const composed = $derived(
+	const composedPreview = $derived(
 		assembleSystemPrompt({
 			user: userInstructions,
-			todos,
-			files,
-			skills,
-			subagents,
-			memorySummary
+			todos: [],
+			files: [],
+			skills: undefined,
+			subagents: undefined
 		})
 	);
+
+	async function run() {
+		busy = true;
+		files = [];
+		events = [];
+		finalText = '';
+		try {
+			const tracer = createTracer();
+			tracer.subscribe((ev) => (events = [...events, ev]));
+			const model = await getModel({ temperature: 0, maxTokens: 400 });
+			const backend = new StateBackend();
+			const thread = `harness-${Math.random().toString(36).slice(2, 6)}`;
+			const agent = createDeepAgent({
+				model,
+				backend,
+				instructions: userInstructions,
+				tracer,
+				maxIterations: 16,
+				...(useCompaction
+					? { compaction: { maxTokens: 4000, evictThresholdPct: 45, summarizeThresholdPct: 80 } }
+					: {}),
+				...(useHitl ? { interruptOn: ['write_file'] } : {})
+			});
+			agent.subscribe((s) => (files = [...s.files]));
+
+			// Drive the run; auto-approve any HITL pause so this lesson stays focused
+			// on assembly (the HITL lesson covers approval UX in depth).
+			let res = await agent.start({
+				input: 'Plan two steps, write a one-line note to /scratch/plan.md, then summarize what you did.',
+				thread
+			});
+			while (res.status === 'interrupted') {
+				res = await agent.resume({ decision: 'approve' }, thread);
+			}
+			finalText = displayContent(
+				(res.state.messages[res.state.messages.length - 1] as { content?: unknown })
+					?.content as never
+			);
+		} catch (e) {
+			finalText = `Run failed: ${e instanceof Error ? e.message : String(e)}`;
+		} finally {
+			busy = false;
+		}
+	}
 
 	const code = `import { createDeepAgent, StateBackend, StoreBackend, CompositeBackend } from '$lib/deepagents';
 
@@ -118,6 +161,10 @@ const result = await agent.invoke({ input: 'Brief me on LangGraph.' });`;
 			</ul>
 		</Slide>
 
+		<Slide title="Prompt layers, drawn" variant="figure">
+			<Diagram spec={harnessLayers} title="Harness prompt layers" />
+		</Slide>
+
 		<Slide variant="pull-quote">
 			<p>
 				The harness is opinionated on purpose. Every decision it makes for you is one your team
@@ -165,12 +212,40 @@ const result = await agent.invoke({ input: 'Brief me on LangGraph.' });`;
 	{/snippet}
 
 	{#snippet demo()}
-		<Panel title="Live system-prompt assembly" subtitle="USER → BASE → MIDDLEWARE">
+		<Panel title="Build & run a harness" subtitle="edit instructions, toggle middleware, run">
 			<label class="field">
 				<span>User instructions</span>
 				<textarea bind:value={userInstructions} rows="3"></textarea>
 			</label>
-			<pre class="prompt scrollbar-slim">{composed}</pre>
+			<div class="toggles">
+				<label class="toggle">
+					<input type="checkbox" bind:checked={useCompaction} />
+					<span>Compaction middleware</span>
+				</label>
+				<label class="toggle">
+					<input type="checkbox" bind:checked={useHitl} />
+					<span>HITL on write_file (auto-approved here)</span>
+				</label>
+			</div>
+			<RunButton onclick={run} running={busy} label="Build & run agent" />
+		</Panel>
+
+		<Panel title="Assembled system prompt" subtitle="BASE → MIDDLEWARE → USER">
+			<pre class="prompt scrollbar-slim">{composedPreview}</pre>
+		</Panel>
+
+		<Panel title="Virtual filesystem (after run)">
+			<FileTreeViewer {files} />
+		</Panel>
+
+		{#if finalText}
+			<Panel title="Final response">
+				<p class="final">{finalText}</p>
+			</Panel>
+		{/if}
+
+		<Panel title="Live trace">
+			<TraceLog {events} compact />
 		</Panel>
 	{/snippet}
 </Lesson>
@@ -215,6 +290,27 @@ const result = await agent.invoke({ input: 'Brief me on LangGraph.' });`;
 		max-height: 28rem;
 		overflow: auto;
 		white-space: pre-wrap;
+		color: var(--color-ink-100);
+	}
+
+	.toggles {
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+		margin-bottom: 0.85rem;
+	}
+	.toggle {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		font-size: 0.84rem;
+		color: var(--color-ink-100);
+		cursor: pointer;
+	}
+	.final {
+		margin: 0;
+		font-size: 0.9rem;
+		line-height: 1.6;
 		color: var(--color-ink-100);
 	}
 </style>

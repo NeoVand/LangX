@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { app, togglePresentation } from '$lib/state/app.svelte';
+	import { app, togglePresentation, toggleWorkshop, toggleBook } from '$lib/state/app.svelte';
 	import { page } from '$app/state';
 	import { onMount, untrack } from 'svelte';
 
@@ -45,9 +45,17 @@
 
 	function onKey(e: KeyboardEvent) {
 		if (!app.presentationMode) {
-			if (e.key.toLowerCase() === 'p' && !isTyping(e.target)) {
+			if (isTyping(e.target)) return;
+			const k = e.key.toLowerCase();
+			if (k === 'p') {
 				e.preventDefault();
 				togglePresentation();
+			} else if (k === 'w') {
+				e.preventDefault();
+				toggleWorkshop();
+			} else if (k === 'b') {
+				e.preventDefault();
+				toggleBook();
 			}
 			return;
 		}

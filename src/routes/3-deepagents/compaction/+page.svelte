@@ -4,6 +4,8 @@
 	import Term from '$lib/components/Term.svelte';
 	import Panel from '$lib/components/Panel.svelte';
 	import CodeBlock from '$lib/components/CodeBlock.svelte';
+	import Diagram from '$lib/components/Diagram.svelte';
+	import { compaction as compactionDiagram } from '$lib/diagrams';
 	import RunButton from '$lib/components/RunButton.svelte';
 	import ContextMeter from '$lib/components/ContextMeter.svelte';
 	import FileTreeViewer from '$lib/components/FileTreeViewer.svelte';
@@ -93,7 +95,9 @@ Do not chat between tool calls. Do not skip steps.`;
 							evictThresholdPct: 35,
 							summarizeThresholdPct: 80,
 							largeToolResultMin: 200,
-							historyKeep: 3
+							// keep enough recent turns that the pair-aware boundary always has
+							// a complete tool_calls/tool group to preserve
+							historyKeep: 4
 						},
 						maxIterations: 16
 					});
@@ -200,6 +204,10 @@ createDeepAgent({
 
 		<Slide title="The four tiers" variant="code-first">
 			<CodeBlock code={code} lang="ts" />
+		</Slide>
+
+		<Slide title="Shrinking context, drawn" variant="figure">
+			<Diagram spec={compactionDiagram} title="Context compaction" />
 		</Slide>
 
 		<Slide variant="pull-quote">

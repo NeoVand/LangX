@@ -4,6 +4,8 @@
 	import Term from '$lib/components/Term.svelte';
 	import Panel from '$lib/components/Panel.svelte';
 	import CodeBlock from '$lib/components/CodeBlock.svelte';
+	import Diagram from '$lib/components/Diagram.svelte';
+	import { checkpointer as checkpointerDiagram } from '$lib/diagrams';
 	import RunButton from '$lib/components/RunButton.svelte';
 	import StateInspector from '$lib/components/StateInspector.svelte';
 	import {
@@ -259,6 +261,10 @@ await graph.invoke({ messages: [new HumanMessage("What's my name?")] }, cfg);`;
 				checkpointer treats threads as isolated: snapshots from one don't bleed into another.
 				Two users on your app simply use two thread IDs — the runtime handles the rest.
 			</p>
+		</Slide>
+
+		<Slide title="Threaded snapshots, drawn" variant="figure">
+			<Diagram spec={checkpointerDiagram} title="Checkpointer" />
 		</Slide>
 
 		<Slide variant="pull-quote">

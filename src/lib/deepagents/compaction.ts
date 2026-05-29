@@ -103,8 +103,12 @@ export async function summarizeOlder(
 	if (messages.length <= cfg.historyKeep + 2) return { messages, event: null };
 
 	const sys = messages[0] instanceof SystemMessage ? messages.slice(0, 1) : [];
-	const tail = messages.slice(-cfg.historyKeep);
-	const middle = messages.slice(sys.length, messages.length - cfg.historyKeep);
+	// Pick a tail-start index that never splits a tool_calls/tool pair. Splitting
+	// would leave an orphan ToolMessage in the tail (or orphan tool_calls in the
+	// summarized middle), which Anthropic rejects with a 400 invalid_request.
+	const tailStart = safeBoundary(messages, messages.length - cfg.historyKeep, sys.length);
+	const tail = messages.slice(tailStart);
+	const middle = messages.slice(sys.length, tailStart);
 	if (!middle.length) return { messages, event: null };
 
 	const middleText = middle
@@ -143,6 +147,24 @@ export async function summarizeOlder(
 function stringifyContent(m: BaseMessage) {
 	const c = m.content;
 	return typeof c === 'string' ? c : JSON.stringify(c);
+}
+
+/**
+ * Returns a split index >= floor such that messages[index] does not begin with
+ * an orphan ToolMessage and messages[index-1] is not an AIMessage whose
+ * tool_calls' results live in the tail. We only ever move the boundary EARLIER
+ * (growing the tail) so a complete request/response pair is kept together.
+ */
+function safeBoundary(messages: BaseMessage[], desired: number, floor: number): number {
+	let i = Math.max(floor, Math.min(desired, messages.length));
+	while (i > floor) {
+		const startsWithToolResult = messages[i] instanceof ToolMessage;
+		const prev = messages[i - 1];
+		const prevHasPendingToolCalls = prev instanceof AIMessage && (prev.tool_calls?.length ?? 0) > 0;
+		if (!startsWithToolResult && !prevHasPendingToolCalls) break;
+		i -= 1;
+	}
+	return i;
 }
 
 export interface CompactionResult {

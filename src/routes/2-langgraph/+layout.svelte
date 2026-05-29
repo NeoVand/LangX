@@ -6,13 +6,14 @@
 	let { children } = $props();
 	const chapter = chapterById('langgraph');
 	const isIntro = $derived(page.url.pathname === chapter.base);
+	const isRecap = $derived(page.url.pathname.endsWith('/recap'));
 </script>
 
 <div class="chapter-shell">
 	<div class="chapter-content">
 		{@render children?.()}
 	</div>
-	{#if !isIntro}
+	{#if !isIntro && !isRecap}
 		<LessonNav {chapter} />
 	{/if}
 </div>

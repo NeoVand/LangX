@@ -4,6 +4,8 @@
 	import Term from '$lib/components/Term.svelte';
 	import Panel from '$lib/components/Panel.svelte';
 	import CodeBlock from '$lib/components/CodeBlock.svelte';
+	import Diagram from '$lib/components/Diagram.svelte';
+	import { backends } from '$lib/diagrams';
 	import RunButton from '$lib/components/RunButton.svelte';
 	import FileTreeViewer from '$lib/components/FileTreeViewer.svelte';
 	import TraceLog from '$lib/components/TraceLog.svelte';
@@ -181,6 +183,10 @@ const agent = createDeepAgent({ model, backend });`;
 				files goes through the backend, so where the files live becomes pure configuration.
 			</p>
 			<CodeBlock code={code} lang="ts" caption="Routing /memories/ to a Dexie-backed store." />
+		</Slide>
+
+		<Slide title="Routing, drawn" variant="figure">
+			<Diagram spec={backends} title="Backend routing" />
 		</Slide>
 
 		<Slide variant="pull-quote">

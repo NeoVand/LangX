@@ -4,9 +4,12 @@
 	import Term from '$lib/components/Term.svelte';
 	import Panel from '$lib/components/Panel.svelte';
 	import CodeBlock from '$lib/components/CodeBlock.svelte';
+	import Diagram from '$lib/components/Diagram.svelte';
+	import { skillsDisclosure } from '$lib/diagrams';
 	import RunButton from '$lib/components/RunButton.svelte';
 	import FileTreeViewer from '$lib/components/FileTreeViewer.svelte';
 	import TraceLog from '$lib/components/TraceLog.svelte';
+	import SkillInspector from '$lib/components/SkillInspector.svelte';
 	import {
 		createDeepAgent,
 		StateBackend,
@@ -14,6 +17,7 @@
 		type VirtualFile
 	} from '$lib/deepagents';
 	import { getModel } from '$lib/runtime/llm';
+	import { displayContent } from '$lib/runtime/messages';
 	import { withRunCache, loadCachedRun } from '$lib/runtime/runs';
 	import { createTracer } from '$lib/runtime/tracer';
 	import type { TraceEvent } from '$lib/runtime/tracer/types';
@@ -95,7 +99,7 @@ Process:
 						skills,
 						instructions: INSTRUCTIONS,
 						tracer,
-						maxIterations: 10
+						maxIterations: 30
 					});
 					agent.subscribe((s) => (files = [...s.files]));
 
@@ -105,10 +109,7 @@ Process:
 						thread: `skills-${Math.random().toString(36).slice(2, 6)}`
 					});
 					const last = out.messages[out.messages.length - 1];
-					const text =
-						typeof last?.content === 'string'
-							? last.content
-							: JSON.stringify(last?.content ?? '');
+					const text = displayContent(last?.content);
 					return {
 						events: localEvents,
 						files: await backend.list(),
@@ -137,6 +138,15 @@ Process:
 
 	const skillCatalogPrompt = $derived(
 		skills.map((s) => `- ${s.name}: ${s.description}`).join('\n')
+	);
+
+	// Which skills the agent actually loaded (tracer emits `load_skill <name>`).
+	const loadedSkills = $derived(
+		new Set(
+			events
+				.filter((e) => typeof e.label === 'string' && e.label.startsWith('load_skill '))
+				.map((e) => e.label.replace('load_skill ', '').trim())
+		)
 	);
 
 	const code = `const skills = [
@@ -193,6 +203,10 @@ createDeepAgent({ model, skills, /* ... */ });
 			<CodeBlock code={code} lang="ts" caption="The skill protocol." />
 		</Slide>
 
+		<Slide title="Progressive disclosure, drawn" variant="figure">
+			<Diagram spec={skillsDisclosure} title="Skills disclosure" />
+		</Slide>
+
 		<Slide variant="pull-quote">
 			<p>
 				A skill catalog is the agent's table of contents. The bodies are the chapters. You
@@ -223,15 +237,12 @@ createDeepAgent({ model, skills, /* ... */ });
 	{/snippet}
 
 	{#snippet demo()}
-		<Panel title="Catalog (descriptions only)" subtitle="what the model sees up front">
-			<ol class="cat">
+		<Panel title="Catalog (descriptions only)" subtitle="expand to inspect the SKILL.md body">
+			<div class="cat">
 				{#each skills as s, i (i)}
-					<li>
-						<code>{s.name}</code>
-						<p>{s.description}</p>
-					</li>
+					<SkillInspector skill={s} loaded={loadedSkills.has(s.name)} />
 				{/each}
-			</ol>
+			</div>
 			<RunButton onclick={run} running={busy} label="Run agent" />
 		</Panel>
 
@@ -253,30 +264,10 @@ createDeepAgent({ model, skills, /* ... */ });
 
 <style>
 	.cat {
-		list-style: none;
-		padding: 0;
 		margin: 0 0 0.95rem;
 		display: flex;
 		flex-direction: column;
 		gap: 0.5rem;
-	}
-	.cat li {
-		border: 1px solid var(--color-rule);
-		border-radius: 0.45rem;
-		padding: 0.55rem 0.75rem;
-		background: var(--color-bg);
-	}
-	.cat code {
-		color: var(--accent-ink);
-		font-family: var(--font-mono);
-		font-size: 0.84rem;
-		font-weight: 600;
-	}
-	.cat p {
-		margin: 0.28rem 0 0;
-		font-family: var(--font-prose);
-		font-size: 0.88rem;
-		color: var(--color-ink-200);
 	}
 	.finaltext {
 		margin: 0;

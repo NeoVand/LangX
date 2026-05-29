@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { app, togglePresentation } from '$lib/state/app.svelte';
+	import { app, togglePresentation, toggleWorkshop, toggleBook } from '$lib/state/app.svelte';
 	import { chapters } from '$lib/curriculum';
 	import ParrotMark from './ParrotMark.svelte';
 
@@ -8,6 +8,8 @@
 	const hasKey = $derived(
 		!!(app.keys.openai || app.keys.anthropic || app.keys.groq)
 	);
+	// View toggles only make sense on lesson pages (two-pane layout).
+	const onLesson = $derived(/^\/[123]-/.test(path));
 </script>
 
 <nav class="topnav app-chrome">
@@ -42,14 +44,39 @@
 				<span class="dot-off" aria-label="no key set"></span>
 			{/if}
 		</a>
-		<button class="present" onclick={togglePresentation} title="Toggle presentation (P)">
-			<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-				<rect x="2" y="4" width="20" height="14" rx="2" />
-				<path d="M12 18v3" />
-				<path d="M8 21h8" />
-			</svg>
-			<span>Present</span>
-		</button>
+		<div class="view-toggle" role="group" aria-label="View mode">
+			{#if onLesson}
+				<button
+					class="vt"
+					class:on={app.viewMode.book}
+					onclick={toggleBook}
+					title="Toggle the lesson text pane (B)"
+				>
+					<span>Book</span>
+				</button>
+				<button
+					class="vt"
+					class:on={app.viewMode.workshop}
+					onclick={toggleWorkshop}
+					title="Toggle the demo pane (W)"
+				>
+					<span>Workshop</span>
+				</button>
+			{/if}
+			<button
+				class="vt present"
+				class:on={app.presentationMode}
+				onclick={togglePresentation}
+				title="Toggle presentation (P)"
+			>
+				<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+					<rect x="2" y="4" width="20" height="14" rx="2" />
+					<path d="M12 18v3" />
+					<path d="M8 21h8" />
+				</svg>
+				<span>Present</span>
+			</button>
+		</div>
 	</div>
 </nav>
 
@@ -179,22 +206,44 @@
 		background: var(--color-accent-warning);
 	}
 
-	.present {
+	.view-toggle {
 		display: inline-flex;
 		align-items: center;
-		gap: 0.45rem;
-		padding: 0.45rem 0.85rem;
-		font-size: 0.82rem;
-		background: transparent;
-		color: var(--color-cream-2);
+		gap: 0.25rem;
+		padding: 0.15rem;
 		border: 1px solid var(--color-border);
-		border-radius: 0.45rem;
+		border-radius: 0.55rem;
+		background: var(--color-bg-elev);
 	}
 
-	.present:hover {
+	.vt {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		padding: 0.35rem 0.7rem;
+		font-size: 0.8rem;
+		background: transparent;
+		color: var(--color-cream-3);
+		border: 1px solid transparent;
+		border-radius: 0.4rem;
+		cursor: pointer;
+		transition: background 0.15s ease, color 0.15s ease;
+	}
+
+	.vt:hover {
 		color: var(--color-cream-0);
-		background: var(--color-bg-elev);
+	}
+
+	.vt.on {
+		background: var(--color-bg-elev-2);
+		color: var(--color-cream-0);
 		border-color: var(--color-border-strong);
+	}
+
+	.present.on {
+		background: color-mix(in oklch, var(--accent-ink, var(--color-accent-langchain)) 22%, transparent);
+		border-color: color-mix(in oklch, var(--color-accent-langchain) 40%, transparent);
+		color: var(--color-cream-0);
 	}
 
 	@media (max-width: 720px) {
@@ -211,8 +260,9 @@
 		.present span:last-child {
 			display: none;
 		}
-		.present {
-			padding: 0.45rem 0.55rem;
+		.vt {
+			padding: 0.35rem 0.5rem;
+			font-size: 0.74rem;
 		}
 		.action {
 			padding: 0.4rem 0.55rem;

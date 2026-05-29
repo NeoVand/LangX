@@ -4,8 +4,11 @@
 	import Term from '$lib/components/Term.svelte';
 	import Panel from '$lib/components/Panel.svelte';
 	import CodeBlock from '$lib/components/CodeBlock.svelte';
+	import Diagram from '$lib/components/Diagram.svelte';
+	import { subagentIsolation } from '$lib/diagrams';
 	import RunButton from '$lib/components/RunButton.svelte';
 	import SubAgentTimeline from '$lib/components/SubAgentTimeline.svelte';
+	import SubagentCard from '$lib/components/SubagentCard.svelte';
 	import TraceLog from '$lib/components/TraceLog.svelte';
 	import {
 		createDeepAgent,
@@ -197,6 +200,10 @@ createDeepAgent({ model, subagents, /* ... */ });
 			<CodeBlock code={code} lang="ts" caption="A researcher–writer–critic team in 30 lines." />
 		</Slide>
 
+		<Slide title="Isolation, drawn" variant="figure">
+			<Diagram spec={subagentIsolation} title="Subagent isolation" />
+		</Slide>
+
 		<Slide variant="pull-quote">
 			<p>
 				The first thing a long-horizon task stops being is "a conversation". It starts being
@@ -239,17 +246,16 @@ createDeepAgent({ model, subagents, /* ... */ });
 			{#if reports.length === 0}
 				<p class="empty">No reports yet.</p>
 			{:else}
-				<ol class="reports">
+				<div class="cards">
 					{#each reports as r, i (i)}
-						<li>
-							<header>
-								<code>{r.name}</code>
-								<span>{r.durationMs}ms</span>
-							</header>
-							<p>{r.summary}</p>
-						</li>
+						<SubagentCard
+							name={r.name}
+							status="done"
+							report={r.summary}
+							durationMs={r.durationMs}
+						/>
 					{/each}
-				</ol>
+				</div>
 			{/if}
 		</Panel>
 
@@ -273,39 +279,10 @@ createDeepAgent({ model, subagents, /* ... */ });
 		margin: 0;
 		font-family: var(--font-prose);
 	}
-	.reports {
-		list-style: none;
-		padding: 0;
-		margin: 0;
+	.cards {
 		display: flex;
 		flex-direction: column;
-		gap: 0.5rem;
-	}
-	.reports li {
-		border: 1px solid var(--color-rule);
-		border-radius: 0.45rem;
-		padding: 0.6rem 0.75rem;
-		background: var(--color-bg);
-	}
-	.reports header {
-		display: flex;
-		justify-content: space-between;
-		font-family: var(--font-mono);
-		font-size: 0.75rem;
-		margin-bottom: 0.35rem;
-	}
-	.reports header code {
-		color: var(--accent-ink);
-	}
-	.reports header span {
-		color: var(--color-ink-300);
-	}
-	.reports p {
-		margin: 0;
-		font-family: var(--font-prose);
-		font-size: 0.92rem;
-		line-height: 1.55;
-		color: var(--color-ink-100);
+		gap: 0.4rem;
 	}
 	.finaltext {
 		margin: 0;

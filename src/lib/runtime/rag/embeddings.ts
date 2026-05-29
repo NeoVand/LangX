@@ -11,10 +11,15 @@ let _pipeline: FeaturePipeline | null = null;
 async function getPipeline(): Promise<FeaturePipeline> {
 	if (!browser) throw new Error('Embeddings only run in the browser.');
 	if (_pipeline) return _pipeline;
-	const { pipeline } = await import('@huggingface/transformers');
+	const { pipeline, env } = await import('@huggingface/transformers');
+	// Serve the quantized weights bundled under static/models so the demo works
+	// offline and never hits huggingface.co for the default provider.
+	env.allowLocalModels = true;
+	env.localModelPath = '/models/';
+	// q8 on wasm is the reliable small build (q8-on-WebGPU is flaky).
 	const featurePipe = (await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {
-		device: 'webgpu',
-		dtype: 'fp32'
+		device: 'wasm',
+		dtype: 'q8'
 	})) as unknown as FeaturePipeline;
 	_pipeline = featurePipe;
 	return _pipeline;
