@@ -324,9 +324,9 @@ createDeepAgent({ model, backend, tools: [computeTool, plotTool] });`;
 	{#snippet intro()}
 		<p>
 			A second capstone with a different shape: the agent ingests a CSV, runs analysis in a
-			<Term t="Scoped interpreter" /> Worker (no DOM, no network), and writes a markdown
-			report with an inline ASCII chart to <code>/reports/</code>. This is the in-browser
-			analogue of Deep Agents' QuickJS sandbox.
+			<Term t="Scoped interpreter" /> Worker (no DOM, no network), plots a real chart, and
+			writes a markdown report to <code>/reports/</code>. This is the in-browser analogue of
+			Deep Agents' QuickJS sandbox.
 		</p>
 	{/snippet}
 
@@ -373,8 +373,9 @@ createDeepAgent({ model, backend, tools: [computeTool, plotTool] });`;
 					the rows, returns aggregates.
 				</li>
 				<li>
-					Build a markdown report with an inline ASCII bar chart, and write it to
-					<code>/reports/sales.md</code>.
+					Emit a <code>plot</code> tool call to render a real SVG chart into
+					<code>/reports/figures/</code>, then write the markdown report (with a results
+					table) to <code>/reports/sales.md</code>.
 				</li>
 			</ol>
 			<p>

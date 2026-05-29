@@ -123,7 +123,7 @@ test.describe('LangX rigorous live-demo assertions', () => {
 	test('Phase 1 · rag: cites at least one retrieved snippet', async ({ page }) => {
 		const errors = collectErrors(page);
 		await page.goto('/1-langchain/rag', { waitUntil: 'networkidle' });
-		await runPrimary(page);
+		await runPrimary(page, /index|answer|run/i);
 		const body = (await page.locator('body').textContent()) ?? '';
 		// RAG answer should refer to documents/sources or have ≥ a sentence.
 		expect(body.length).toBeGreaterThan(200);
@@ -360,7 +360,7 @@ test.describe('LangX rigorous live-demo assertions', () => {
 	test('Phase 1 · rag: lists multiple substantial retrieved chunks', async ({ page }) => {
 		const errors = collectErrors(page);
 		await page.goto('/1-langchain/rag', { waitUntil: 'networkidle' });
-		await runPrimary(page);
+		await runPrimary(page, /index|answer|run/i);
 		// Retrieved chunks render as list items with a similarity bar in `.hits`.
 		const chunkTexts = await page.evaluate(() =>
 			[...document.querySelectorAll('.hits li p')]

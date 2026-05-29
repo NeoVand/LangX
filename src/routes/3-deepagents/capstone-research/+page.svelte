@@ -42,9 +42,13 @@
 	let reports = $state<SubAgentReport[]>([]);
 	let finalText = $state<string>('');
 
-	// Path the agent is told to save its brief to — used to auto-focus the file viewer.
-	const memoryPath = $derived(`/memories/${slugify(topic)}.md`);
-	const memoryFile = $derived(files.find((f) => f.path === memoryPath));
+	// The agent saves its brief somewhere under /memories/; match whatever .md it wrote
+	// (LLMs don't always reproduce the exact filename) so the rendered brief always shows.
+	const memoryFile = $derived(
+		files.find((f) => f.path.startsWith('/memories/') && /\.md$/i.test(f.path)) ??
+			files.find((f) => f.path === `/memories/${slugify(topic)}.md`)
+	);
+	const memoryPath = $derived(memoryFile?.path ?? null);
 
 	const SUBAGENT_PROMPTS: Record<string, string> = {
 		researcher: `You are a research assistant. The user will give you a focused sub-question.
@@ -320,7 +324,7 @@ Do NOT do the research, writing, or critique yourself — delegate everything vi
 		</Panel>
 
 		<Panel title="Workspace">
-			<FileTreeViewer {files} focus={memoryFile ? memoryPath : null} />
+			<FileTreeViewer {files} focus={memoryPath} />
 		</Panel>
 
 		{#if memoryFile}

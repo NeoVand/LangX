@@ -6,6 +6,7 @@
 	import CodeBlock from '$lib/components/CodeBlock.svelte';
 	import RunButton from '$lib/components/RunButton.svelte';
 	import FileTreeViewer from '$lib/components/FileTreeViewer.svelte';
+	import Diff from '$lib/components/Diff.svelte';
 	import TraceLog from '$lib/components/TraceLog.svelte';
 	import { createDeepAgent, StateBackend, type VirtualFile } from '$lib/deepagents';
 	import { getModel } from '$lib/runtime/llm';
@@ -15,11 +16,18 @@
 
 	type Scenario = 'organize' | 'edit';
 
+	interface FileEdit {
+		path: string;
+		before: string;
+		after: string;
+	}
+
 	interface RunPayload {
 		scenario: Scenario;
 		files: VirtualFile[];
 		events: TraceEvent[];
 		finalText: string;
+		edits: FileEdit[];
 	}
 
 	let scenario = $state<Scenario>('organize');
@@ -27,6 +35,7 @@
 	let files = $state<VirtualFile[]>([]);
 	let events = $state<TraceEvent[]>([]);
 	let finalText = $state<string>('');
+	let edits = $state<FileEdit[]>([]);
 
 	const PROMPT: Record<Scenario, { input: string; instructions: string }> = {
 		organize: {
@@ -62,6 +71,7 @@ Then read_file to verify.`
 		files = [];
 		events = [];
 		finalText = '';
+		edits = [];
 		try {
 			const result = await withRunCache<RunPayload>(
 				{ demoId: `l3-virtual-fs-${scenario}` },
@@ -82,8 +92,26 @@ Then read_file to verify.`
 						tracer,
 						maxIterations: 14
 					});
+
+					// Track per-file content across state updates so an edit_file (a change to an
+					// already-written file) surfaces as a real before→after diff, like git diff.
+					const prevContent = new Map<string, string>();
+					const editMap = new Map<string, FileEdit>();
 					agent.subscribe((s) => {
 						files = [...s.files];
+						for (const f of s.files) {
+							const old = prevContent.get(f.path);
+							if (old !== undefined && old !== f.content) {
+								const existing = editMap.get(f.path);
+								editMap.set(f.path, {
+									path: f.path,
+									before: existing?.before ?? old,
+									after: f.content
+								});
+								edits = [...editMap.values()];
+							}
+							prevContent.set(f.path, f.content);
+						}
 					});
 
 					const out = await agent.invoke({
@@ -101,13 +129,15 @@ Then read_file to verify.`
 						scenario,
 						files: finalFiles,
 						events: localEvents,
-						finalText: text
+						finalText: text,
+						edits: [...editMap.values()]
 					};
 				}
 			);
 			files = result.files;
 			events = result.events;
 			finalText = result.finalText;
+			edits = result.edits ?? [];
 		} finally {
 			busy = false;
 		}
@@ -123,10 +153,12 @@ Then read_file to verify.`
 				files = cached.payload.files;
 				events = cached.payload.events;
 				finalText = cached.payload.finalText;
+				edits = cached.payload.edits ?? [];
 			} else {
 				files = [];
 				events = [];
 				finalText = '';
+				edits = [];
 			}
 		})();
 	});
@@ -240,6 +272,16 @@ Then read_file to verify.`
 			<FileTreeViewer {files} />
 		</Panel>
 
+		{#if edits.length}
+			<Panel title="edit_file diff" subtitle="before → after, like git diff">
+				<div class="diffs">
+					{#each edits as edit (edit.path)}
+						<Diff path={edit.path} before={edit.before} after={edit.after} />
+					{/each}
+				</div>
+			</Panel>
+		{/if}
+
 		{#if finalText}
 			<Panel title="Final response">
 				<p class="finaltext">{finalText}</p>
@@ -286,6 +328,11 @@ Then read_file to verify.`
 		font-size: 0.78rem;
 		color: var(--color-ink-300);
 		font-family: var(--font-prose);
+	}
+	.diffs {
+		display: flex;
+		flex-direction: column;
+		gap: 0.6rem;
 	}
 	.finaltext {
 		margin: 0;

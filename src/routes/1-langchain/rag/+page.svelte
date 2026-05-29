@@ -280,8 +280,12 @@
 							<li>
 								<header>
 									<span class="src">{hit.source} · chunk {hit.index}</span>
-									<span class="score" title={`raw cosine ${hit.score.toFixed(4)}`}>
-										{(hit.score * 100).toFixed(1)}%
+									<span
+										class="score"
+										class:weak={hit.score < 0.15}
+										title="Cosine similarity ranges −1 to 1. Higher means the chunk's embedding points in the same direction as the query; values near 0 or below mean it is unrelated."
+									>
+										cos {hit.score.toFixed(3)}
 									</span>
 								</header>
 								<div class="bar"><span style={`width:${pct}%`}></span></div>
@@ -371,6 +375,10 @@
 	}
 
 	.score {
+		color: var(--accent-ink);
+		cursor: help;
+	}
+	.score.weak {
 		color: var(--color-ink-300);
 	}
 
