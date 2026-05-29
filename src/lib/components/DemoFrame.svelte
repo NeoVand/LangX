@@ -132,7 +132,6 @@
 		flex-direction: column;
 		gap: 0.55rem;
 		padding: 0.75rem 1rem 0;
-		border-bottom: 1px solid color-mix(in oklch, var(--color-border) 55%, transparent);
 		background: transparent;
 	}
 
@@ -188,6 +187,9 @@
 	.frame-body {
 		padding: 0.85rem 1rem 1rem;
 		font-size: 0.88rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.85rem;
 	}
 
 	.empty {

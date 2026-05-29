@@ -101,27 +101,26 @@
 	}
 </script>
 
-<figure class="lgv">
+<figure class="lgv code-surface">
 	<div bind:this={host} class="host" aria-label="LangGraph visualization"></div>
 	{#if error}
 		<p class="err" role="alert">Could not render graph: {error}</p>
 	{/if}
 	{#if caption}
-		<figcaption>{caption}</figcaption>
+		<figcaption class="code-surface-footer">{caption}</figcaption>
 	{/if}
 </figure>
 
 <style>
 	.lgv {
 		margin: 0;
-		background: var(--color-bg);
-		border: 1px solid var(--color-rule);
-		border-radius: 0.5rem;
 		padding: 0.85rem 0.85rem 0.6rem;
 		overflow: hidden;
 	}
 
 	.host {
+		position: relative;
+		z-index: 1;
 		width: 100%;
 		min-height: 4rem;
 		display: flex;
@@ -205,16 +204,17 @@
 		stroke-dasharray: 3 3;
 	}
 
-	figcaption {
+	.lgv :global(.code-surface-footer) {
+		justify-content: flex-end;
+		margin-top: 0.15rem;
 		font-size: 0.7rem;
 		color: var(--color-ink-300);
-		margin-top: 0.45rem;
-		text-align: right;
-		font-family: var(--font-mono);
 		letter-spacing: 0.04em;
 	}
 
 	.err {
+		position: relative;
+		z-index: 1;
 		font-family: var(--font-mono);
 		font-size: 0.78rem;
 		color: var(--color-accent-warning, #c66);

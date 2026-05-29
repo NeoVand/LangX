@@ -27,24 +27,33 @@
 	}
 </script>
 
-<button class="run" data-variant={variant} {disabled} onclick={handle} aria-busy={running}>
-	{#if running}
-		<span class="spinner" aria-hidden="true"></span>
-		<span>Running…</span>
-	{:else}
-		<span>{label}</span>
-	{/if}
-</button>
+<div class="run-control">
+	<button class="run" data-variant={variant} {disabled} onclick={handle} aria-busy={running}>
+		{#if running}
+			<span class="spinner" aria-hidden="true"></span>
+			<span>Running…</span>
+		{:else}
+			<span>{label}</span>
+		{/if}
+	</button>
 
-{#if error}
-	<div class="err" role="alert">
-		<strong>Run failed.</strong>
-		<span>{error}</span>
-		<button class="dismiss" type="button" onclick={() => (error = null)} aria-label="Dismiss">×</button>
-	</div>
-{/if}
+	{#if error}
+		<div class="err" role="alert">
+			<strong>Run failed.</strong>
+			<span>{error}</span>
+			<button class="dismiss" type="button" onclick={() => (error = null)} aria-label="Dismiss">×</button>
+		</div>
+	{/if}
+</div>
 
 <style>
+	.run-control {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 0.5rem;
+	}
+
 	.run {
 		display: inline-flex;
 		align-items: center;
@@ -95,7 +104,6 @@
 		display: flex;
 		align-items: flex-start;
 		gap: 0.5rem;
-		margin-top: 0.5rem;
 		padding: 0.55rem 0.7rem;
 		border-radius: 0.4rem;
 		background: color-mix(in oklch, var(--color-accent-danger) 14%, transparent);

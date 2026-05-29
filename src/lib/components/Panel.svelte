@@ -44,7 +44,6 @@
 		justify-content: space-between;
 		gap: 0.75rem;
 		padding: 0.75rem 1rem 0.55rem;
-		border-bottom: 1px solid color-mix(in oklch, var(--color-border) 55%, transparent);
 		background: transparent;
 	}
 
@@ -78,5 +77,8 @@
 	.panel-body {
 		padding: 0.85rem 1rem 1rem;
 		font-size: 0.88rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.85rem;
 	}
 </style>

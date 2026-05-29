@@ -36,8 +36,6 @@
 		<p class="tagline font-prose">{chapter.tagline}</p>
 	</section>
 
-	<hr class="ornament chapter-ornament" aria-hidden="true" />
-
 	<section class="lessons">
 		<h2 class="font-display lessons-head">Lessons</h2>
 		<ol class="lesson-list">
@@ -95,7 +93,7 @@
 
 	.intro-body {
 		max-width: 42rem;
-		margin: 0 auto 3rem;
+		margin: 0 auto 2.25rem;
 		text-align: center;
 	}
 
@@ -124,11 +122,6 @@
 		color: var(--color-ink-300);
 		font-size: 1rem;
 		line-height: 1.55;
-	}
-
-	.chapter-ornament {
-		margin: 3.5rem auto;
-		max-width: 32rem;
 	}
 
 	.lessons-head {
