@@ -19,7 +19,32 @@
 	import { runCalcDemo } from '$lib/demos/tools-calc';
 	import calcSrc from '$lib/demos/tools-calc.ts?raw';
 	import type { DemoStep } from '$lib/demos/types';
+	import type { DemoManifest } from '$lib/demos/download';
 	import { onMount } from 'svelte';
+
+	const demoSource: DemoManifest = {
+		id: 'tools',
+		title: 'Tool calling',
+		summary: 'Bind typed tools to a chat model and run the tool-calling loop until it answers.',
+		entries: [
+			{ path: 'lib/demos/tools-weather.ts', code: weatherSrc },
+			{ path: 'lib/demos/tools-calc.ts', code: calcSrc }
+		],
+		runner: `import { runWeatherDemo } from './lib/demos/tools-weather';
+import { runCalcDemo } from './lib/demos/tools-calc';
+
+const log = (s: { label: string; detail?: string }) =>
+	console.log('  ·', s.label, s.detail ? '— ' + s.detail : '');
+
+console.log('=== Weather tool ===');
+const weather = await runWeatherDemo('Irving, Texas', () => {}, log);
+console.log('Final:', weather.at(-1)?.content, '\\n');
+
+console.log('=== Calculator tool ===');
+const calc = await runCalcDemo('(3 + 4) * 12', () => {}, log);
+console.log('Final:', calc.at(-1)?.content);
+`
+	};
 
 	type ConvoPayload = { messages: SerializedMessage[]; steps: DemoStep[] };
 
@@ -131,6 +156,7 @@ const ai = await model.invoke('What is the weather in Tokyo?');
 		id: 'l1-tools',
 		alt: 'A scholar reaches for a wall of pegboard tools'
 	}}
+	source={demoSource}
 >
 	{#snippet intro()}
 		<p>

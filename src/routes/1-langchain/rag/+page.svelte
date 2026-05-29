@@ -18,8 +18,33 @@
 	} from '$lib/demos/rag-pipeline';
 	import ragSrc from '$lib/demos/rag-pipeline.ts?raw';
 	import type { DemoStep } from '$lib/demos/types';
+	import type { DemoManifest } from '$lib/demos/download';
 	import { browser } from '$app/environment';
 	import { onMount } from 'svelte';
+
+	const demoSource: DemoManifest = {
+		id: 'rag',
+		title: 'RAG pipeline',
+		summary: 'Chunk → embed → retrieve → answer with citations over your own documents.',
+		entries: [{ path: 'lib/demos/rag-pipeline.ts', code: ragSrc }],
+		env: ['OPENAI_API_KEY'],
+		note: 'The in-browser demo can embed with a bundled local MiniLM model; standalone uses OpenAI embeddings (set OPENAI_API_KEY).',
+		runner: `import { chunkDocuments, buildStore, answerWithRag } from './lib/demos/rag-pipeline';
+
+const docs = [
+	{ source: 'lcel.md', text: 'LangChain Expression Language (LCEL) composes Runnables with the pipe operator. It is lazy: nothing runs until invoke or stream is called.' },
+	{ source: 'rag.md', text: 'Retrieval-augmented generation embeds a query, retrieves the nearest chunks from a vector store, and asks the model to answer using only those chunks.' }
+];
+
+const chunks = await chunkDocuments(docs);
+const store = await buildStore(chunks, 'openai');
+const { hits, answer } = await answerWithRag(store, 'What is LCEL?', 3, (s) =>
+	console.log('  ·', s.label, s.detail ? '— ' + s.detail : '')
+);
+console.log('\\nTop chunk:', hits[0]?.source, '(cos', hits[0]?.score.toFixed(3) + ')');
+console.log('Answer:', answer);
+`
+	};
 
 	const defaultDocs = [
 		{
@@ -118,6 +143,7 @@
 		id: 'l1-rag',
 		alt: 'A library reading room with index cards floating between books'
 	}}
+	source={demoSource}
 >
 	{#snippet intro()}
 		<p>

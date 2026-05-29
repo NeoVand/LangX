@@ -20,6 +20,28 @@
 	} from '$lib/runtime/messages';
 	import { runAgentScenario } from '$lib/demos/agent-react';
 	import agentSrc from '$lib/demos/agent-react.ts?raw';
+	import type { DemoManifest } from '$lib/demos/download';
+
+	const demoSource: DemoManifest = {
+		id: 'agent',
+		title: 'create_agent (ReAct loop)',
+		summary: 'The model ↔ tools loop that powers create_agent, with two scenarios.',
+		entries: [{ path: 'lib/demos/agent-react.ts', code: agentSrc }],
+		runner: `import { runAgentScenario } from './lib/demos/agent-react';
+
+const log = (s: { label: string; detail?: string }) =>
+	console.log('  ·', s.label, s.detail ? '— ' + s.detail : '');
+
+const { messages, path } = await runAgentScenario(
+	'multi',
+	() => {},
+	(p, active) => console.log('  → path:', p.join(' → '), '(active:', active + ')'),
+	log
+);
+console.log('\\nNode path:', path.join(' → '));
+console.log('Final:', messages.at(-1)?.content);
+`
+	};
 	import type { DemoStep } from '$lib/demos/types';
 	import { onMount } from 'svelte';
 
@@ -120,6 +142,7 @@ const result = await agent.invoke({
 		id: 'l1-agent',
 		alt: 'A mechanical homunculus deciding among a row of tools at a desk'
 	}}
+	source={demoSource}
 >
 	{#snippet intro()}
 		<p>

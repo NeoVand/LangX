@@ -1,7 +1,9 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import HeroImage from './HeroImage.svelte';
+	import DemoSourceView from './DemoSourceView.svelte';
 	import { app } from '$lib/state/app.svelte';
+	import { downloadDemo, type DemoManifest } from '$lib/demos/download';
 
 	interface Props {
 		title: string;
@@ -12,15 +14,25 @@
 		narrative: Snippet;
 		demo?: Snippet;
 		inspect?: Snippet;
+		/** When provided, the demo pane gains a flip-to-source view + standalone download. */
+		source?: DemoManifest;
 	}
 
-	let { title, eyebrow, motivation, hero, intro, narrative, demo, inspect }: Props = $props();
+	let { title, eyebrow, motivation, hero, intro, narrative, demo, inspect, source }: Props =
+		$props();
+
+	let flipped = $state(false);
 
 	const hasDemo = $derived(!!(demo || inspect));
 	// Present mode always renders the narrative (slides); otherwise honor toggles.
 	const showBook = $derived(app.presentationMode || app.viewMode.book);
 	const showWorkshop = $derived(hasDemo && !app.presentationMode && app.viewMode.workshop);
 	const single = $derived(!(showBook && showWorkshop));
+
+	$effect(() => {
+		// Snap back to the live side whenever the demo pane is hidden.
+		if (!showWorkshop) flipped = false;
+	});
 </script>
 
 <main class="lesson-shell" class:single>
@@ -52,12 +64,44 @@
 
 	{#if showWorkshop}
 		<aside class="demo-pane hide-in-presentation">
-			<div class="demo-inner scrollbar-slim">
-				{#if demo}
-					<div class="demo-block">{@render demo()}</div>
-				{/if}
-				{#if inspect}
-					<div class="inspect-block">{@render inspect()}</div>
+			{#if source}
+				<div class="demo-toolbar">
+					<span class="dt-label">{flipped ? 'Source · what the demo runs' : 'Live demo'}</span>
+					<div class="dt-actions">
+						<button
+							class="dt-btn"
+							class:active={flipped}
+							onclick={() => (flipped = !flipped)}
+							title="Flip between the live demo and its source code"
+						>
+							<span class="dt-icon" aria-hidden="true">⟲</span>
+							{flipped ? 'Back to demo' : 'View source'}
+						</button>
+						<button
+							class="dt-btn"
+							onclick={() => source && downloadDemo(source)}
+							title="Download this demo as a standalone, runnable project"
+						>
+							<span class="dt-icon" aria-hidden="true">↓</span>
+							Download
+						</button>
+					</div>
+				</div>
+			{/if}
+			<div class="demo-inner scrollbar-slim" class:flipped>
+				{#if source && flipped}
+					<div class="face source-face">
+						<DemoSourceView manifest={source} />
+					</div>
+				{:else}
+					<div class="face">
+						{#if demo}
+							<div class="demo-block">{@render demo()}</div>
+						{/if}
+						{#if inspect}
+							<div class="inspect-block">{@render inspect()}</div>
+						{/if}
+					</div>
 				{/if}
 			</div>
 		</aside>
@@ -171,6 +215,78 @@
 		overflow: hidden;
 		display: flex;
 		flex-direction: column;
+	}
+
+	.demo-toolbar {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
+		padding: 0.6rem 1.85rem;
+		border-bottom: 1px solid var(--color-rule);
+		background: color-mix(in oklch, var(--color-paper) 80%, var(--color-bg) 20%);
+		flex-shrink: 0;
+	}
+	.dt-label {
+		font-size: 0.72rem;
+		font-family: var(--font-mono);
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		color: var(--color-fg-faint);
+	}
+	.dt-actions {
+		display: flex;
+		gap: 0.4rem;
+	}
+	.dt-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		font-size: 0.74rem;
+		font-family: var(--font-mono);
+		padding: 0.32rem 0.6rem;
+		border-radius: 0.4rem;
+		border: 1px solid var(--color-rule);
+		background: var(--color-bg);
+		color: var(--color-fg-muted);
+		transition:
+			color 0.15s ease,
+			border-color 0.15s ease,
+			background 0.15s ease;
+	}
+	.dt-btn:hover {
+		color: var(--color-fg);
+		border-color: var(--accent-rule);
+	}
+	.dt-btn.active {
+		color: var(--accent-ink);
+		border-color: var(--accent-rule);
+		background: var(--accent-soft);
+	}
+	.dt-icon {
+		font-size: 0.85rem;
+		line-height: 1;
+	}
+
+	/* Flip transition between the live demo and its source. */
+	.face {
+		animation: face-in 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+		transform-origin: top center;
+	}
+	@keyframes face-in {
+		from {
+			opacity: 0;
+			transform: rotateX(8deg) translateY(6px);
+		}
+		to {
+			opacity: 1;
+			transform: none;
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.face {
+			animation: none;
+		}
 	}
 
 	.demo-inner {
