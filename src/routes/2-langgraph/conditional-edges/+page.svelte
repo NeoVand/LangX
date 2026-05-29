@@ -10,123 +10,52 @@
 	import LangGraphView from '$lib/components/LangGraphView.svelte';
 	import StateInspector from '$lib/components/StateInspector.svelte';
 	import { Annotation, StateGraph, START, END } from '@langchain/langgraph/web';
-	import { ChatPromptTemplate } from '@langchain/core/prompts';
-	import { StringOutputParser } from '@langchain/core/output_parsers';
-	import { getModel } from '$lib/runtime/llm';
 	import { withRunCache, loadCachedRun } from '$lib/runtime/runs';
+	import {
+		runRouterDemo,
+		runMergeDemo,
+		type Category,
+		type RoutePayload,
+		type MergePayload
+	} from '$lib/demos/lg-conditional-edges';
+	import lgConditionalSrc from '$lib/demos/lg-conditional-edges.ts?raw';
+	import type { DemoManifest } from '$lib/demos/download';
 	import { onMount } from 'svelte';
 
-	type Category = 'billing' | 'tech' | 'general';
+	const demoSource: DemoManifest = {
+		id: 'conditional-edges',
+		title: 'Conditional edges & reducers',
+		summary:
+			'Route with addConditionalEdges and merge concurrent writes with field reducers.',
+		entries: [{ path: 'lib/demos/lg-conditional-edges.ts', code: lgConditionalSrc }],
+		runner: `import { runRouterDemo, runMergeDemo } from './lib/demos/lg-conditional-edges';
 
-	interface RoutePayload {
-		query: string;
-		category: Category;
-		answer: string;
-	}
+console.log('=== LLM-routed triage ===');
+const route = await runRouterDemo('How do I refund order #12345?', (p) =>
+	console.log('  path:', p.join(' -> '))
+);
+console.log('category:', route.category);
+console.log('answer:', route.answer, '\\n');
 
-	interface MergePayload {
-		notes: string[];
-		score: number;
-		lastWriter: string;
-	}
+console.log('=== Concurrent writes + reducers ===');
+const merged = await runMergeDemo();
+console.log(merged);
+`
+	};
 
 	let userQuery = $state('How do I refund order #12345?');
 	let routeRun = $state(false);
 	let routeResult = $state<RoutePayload | null>(null);
 	let routePath = $state<string[]>([]);
 
-	function isCategory(s: string): s is Category {
-		return s === 'billing' || s === 'tech' || s === 'general';
-	}
-
 	async function runRouter() {
 		routeRun = true;
 		routePath = [];
 		routeResult = null;
 		try {
-			const model = await getModel({ temperature: 0, maxTokens: 60 });
-			const replyModel = await getModel({ temperature: 0.2, maxTokens: 220 });
-
-			const State = Annotation.Root({
-				query: Annotation<string>(),
-				category: Annotation<Category>(),
-				answer: Annotation<string>()
-			});
-
-			const classifyPrompt = ChatPromptTemplate.fromMessages([
-				[
-					'system',
-					'Classify a customer message into exactly one of: billing, tech, general. Respond with only the lowercase label.'
-				],
-				['human', '{query}']
-			]);
-			const replyPromptFor = (kind: Category) =>
-				ChatPromptTemplate.fromMessages([
-					[
-						'system',
-						`You are a ${kind} support agent. Reply concisely (≤ 50 words). Be helpful and warm; no greetings.`
-					],
-					['human', '{query}']
-				]);
-			const parser = new StringOutputParser();
-
 			const out = await withRunCache<RoutePayload>(
 				{ demoId: `l2-conditional-route` },
-				async () => {
-					const graph = new StateGraph(State)
-						.addNode('classify', async (s) => {
-							routePath = [...routePath, 'classify'];
-							const raw = await classifyPrompt
-								.pipe(model)
-								.pipe(parser)
-								.invoke({ query: s.query });
-							const guess = raw.trim().toLowerCase().split(/\s+/)[0];
-							const category = isCategory(guess) ? guess : 'general';
-							return { category };
-						})
-						.addNode('billing', async (s) => {
-							routePath = [...routePath, 'billing'];
-							const a = await replyPromptFor('billing')
-								.pipe(replyModel)
-								.pipe(parser)
-								.invoke({ query: s.query });
-							return { answer: `[Billing] ${a}` };
-						})
-						.addNode('tech', async (s) => {
-							routePath = [...routePath, 'tech'];
-							const a = await replyPromptFor('tech')
-								.pipe(replyModel)
-								.pipe(parser)
-								.invoke({ query: s.query });
-							return { answer: `[Tech] ${a}` };
-						})
-						.addNode('general', async (s) => {
-							routePath = [...routePath, 'general'];
-							const a = await replyPromptFor('general')
-								.pipe(replyModel)
-								.pipe(parser)
-								.invoke({ query: s.query });
-							return { answer: `[General] ${a}` };
-						})
-						.addEdge(START, 'classify')
-						.addConditionalEdges('classify', (s) => s.category, {
-							billing: 'billing',
-							tech: 'tech',
-							general: 'general'
-						})
-						.addEdge('billing', END)
-						.addEdge('tech', END)
-						.addEdge('general', END)
-						.compile();
-
-					const final = (await graph.invoke({
-						query: userQuery,
-						category: 'general',
-						answer: ''
-					})) as RoutePayload;
-					routePath = [...routePath, '__end__'];
-					return final;
-				}
+				async () => await runRouterDemo(userQuery, (p) => (routePath = p))
 			);
 			routeResult = out;
 		} finally {
@@ -143,52 +72,7 @@
 		try {
 			const out = await withRunCache<MergePayload>(
 				{ demoId: 'l2-conditional-merge' },
-				async () => {
-					const State = Annotation.Root({
-						notes: Annotation<string[]>({
-							reducer: (a, b) => [...a, ...b],
-							default: () => []
-						}),
-						score: Annotation<number>({
-							reducer: (a, b) => a + b,
-							default: () => 0
-						}),
-						// research and draft both write this in the same superstep, so it
-						// needs a reducer; "last writer wins" keeps the parallel fan-in legal.
-						lastWriter: Annotation<string>({
-							reducer: (a, b) => b ?? a,
-							default: () => ''
-						})
-					});
-
-					const research = () => ({
-						notes: ['research: found 3 sources'],
-						score: 1,
-						lastWriter: 'research'
-					});
-					const draft = () => ({
-						notes: ['draft: 250 words'],
-						score: 2,
-						lastWriter: 'draft'
-					});
-					const review = () => ({
-						notes: ['review: 4 nits found'],
-						score: -1,
-						lastWriter: 'review'
-					});
-
-					const graph = new StateGraph(State)
-						.addNode('research', research)
-						.addNode('draft', draft)
-						.addNode('review', review)
-						.addEdge(START, 'research')
-						.addEdge(START, 'draft')
-						.addEdge('research', 'review')
-						.addEdge('draft', 'review')
-						.addEdge('review', END)
-						.compile();
-					return (await graph.invoke({})) as MergePayload;
-				}
+				async () => await runMergeDemo()
 			);
 			mergeResult = out;
 		} finally {
@@ -274,6 +158,7 @@ const graph = new StateGraph(State)
 		id: 'l2-conditional-edges',
 		alt: 'A railway switch viewed from above with two tracks merging into one'
 	}}
+	source={demoSource}
 >
 	{#snippet intro()}
 		<p>

@@ -6,27 +6,35 @@
 	import CodeBlock from '$lib/components/CodeBlock.svelte';
 	import RunButton from '$lib/components/RunButton.svelte';
 	import StateInspector from '$lib/components/StateInspector.svelte';
-	import { z } from 'zod';
-	import { getModel } from '$lib/runtime/llm';
 	import { withRunCache, loadCachedRun } from '$lib/runtime/runs';
+	import {
+		extractBugReport,
+		classifySentiment,
+		type BugReport,
+		type Sentiment
+	} from '$lib/demos/structured-output';
+	import structuredSrc from '$lib/demos/structured-output.ts?raw';
+	import type { DemoManifest } from '$lib/demos/download';
 	import { onMount } from 'svelte';
 
-	const bugReportSchema = z.object({
-		title: z.string().describe('Short, action-oriented summary.'),
-		severity: z.enum(['low', 'medium', 'high', 'critical']),
-		component: z.string().describe('Page, module, or component that misbehaves.'),
-		stepsToReproduce: z.array(z.string()).max(5).describe('Up to five short reproduction steps.'),
-		expected: z.string(),
-		actual: z.string()
-	});
-	type BugReport = z.infer<typeof bugReportSchema>;
+	const demoSource: DemoManifest = {
+		id: 'structured-output',
+		title: 'Structured output',
+		summary: 'Force a chat model to return JSON that matches a Zod schema with withStructuredOutput.',
+		entries: [{ path: 'lib/demos/structured-output.ts', code: structuredSrc }],
+		runner: `import { extractBugReport, classifySentiment } from './lib/demos/structured-output';
 
-	const sentimentSchema = z.object({
-		sentiment: z.enum(['positive', 'neutral', 'negative']),
-		confidence: z.number().min(0).max(1).describe('Confidence in the chosen label.'),
-		summary: z.string().describe('One short sentence justifying the label.')
-	});
-	type Sentiment = z.infer<typeof sentimentSchema>;
+console.log('=== Bug report extraction ===');
+const bug = await extractBugReport(
+	"The export button on /reports does nothing the first click but works the second."
+);
+console.log(bug, '\\n');
+
+console.log('=== Sentiment classifier ===');
+const sentiment = await classifySentiment("I've been using LangChain for two days and I'm blown away.");
+console.log(sentiment);
+`
+	};
 
 	let bugInput = $state(
 		"Customers say the export button on /reports does nothing the first time they click it but works on the second click. Happened after Friday's deploy."
@@ -38,22 +46,11 @@
 		bugRun = true;
 		bugResult = null;
 		try {
-			const out = await withRunCache<BugReport>(
+			const inputForRun = bugInput;
+			bugResult = await withRunCache<BugReport>(
 				{ demoId: 'l1-structured-bug' },
-				async () => {
-					const model = await getModel({ temperature: 0, maxTokens: 400 });
-					const extractor = model.withStructuredOutput(bugReportSchema, { name: 'extract' });
-					return (await extractor.invoke([
-						{
-							role: 'system',
-							content:
-								'Extract a bug report from the user message. Be concise. Fill every field. Use at most five reproduction steps.'
-						},
-						{ role: 'user', content: bugInput }
-					])) as BugReport;
-				}
+				async () => await extractBugReport(inputForRun)
 			);
-			bugResult = out;
 		} finally {
 			bugRun = false;
 		}
@@ -67,24 +64,11 @@
 		sentRun = true;
 		sentResult = null;
 		try {
-			const out = await withRunCache<Sentiment>(
+			const inputForRun = sentInput;
+			sentResult = await withRunCache<Sentiment>(
 				{ demoId: 'l1-structured-sentiment' },
-				async () => {
-					const model = await getModel({ temperature: 0, maxTokens: 200 });
-					const classifier = model.withStructuredOutput(sentimentSchema, {
-						name: 'classify'
-					});
-					return (await classifier.invoke([
-						{
-							role: 'system',
-							content:
-								'Classify the sentiment of the user comment. Confidence is a number between 0 and 1. Summary is one short sentence.'
-						},
-						{ role: 'user', content: sentInput }
-					])) as Sentiment;
-				}
+				async () => await classifySentiment(inputForRun)
 			);
-			sentResult = out;
 		} finally {
 			sentRun = false;
 		}
@@ -128,6 +112,7 @@ const report = await extractor.invoke([
 		id: 'l1-structured-output',
 		alt: "A printer's typecase with hand-set metal type"
 	}}
+	source={demoSource}
 >
 	{#snippet intro()}
 		<p>

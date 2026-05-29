@@ -8,27 +8,36 @@
 	import { interruptResume } from '$lib/diagrams';
 	import RunButton from '$lib/components/RunButton.svelte';
 	import StateInspector from '$lib/components/StateInspector.svelte';
-	import {
-		Annotation,
-		StateGraph,
-		MemorySaver,
-		START,
-		END,
-		interrupt,
-		Command
-	} from '@langchain/langgraph/web';
-	import { ChatPromptTemplate } from '@langchain/core/prompts';
-	import { StringOutputParser } from '@langchain/core/output_parsers';
-	import { getModel } from '$lib/runtime/llm';
+	import { MemorySaver, Command } from '@langchain/langgraph/web';
 	import { withRunCache, loadCachedRun } from '$lib/runtime/runs';
+	import { buildInterruptGraph } from '$lib/demos/lg-interrupts';
+	import lgInterruptsSrc from '$lib/demos/lg-interrupts.ts?raw';
+	import type { DemoManifest } from '$lib/demos/download';
 	import { onMount } from 'svelte';
 
-	const State = Annotation.Root({
-		topic: Annotation<string>(),
-		draft: Annotation<string>(),
-		final: Annotation<string>(),
-		decision: Annotation<string>()
-	});
+	const demoSource: DemoManifest = {
+		id: 'interrupts',
+		title: 'Interrupts & HITL',
+		summary: 'Pause a graph mid-run with interrupt(), then resume with Command({ resume }).',
+		entries: [{ path: 'lib/demos/lg-interrupts.ts', code: lgInterruptsSrc }],
+		runner: `import { MemorySaver, Command } from '@langchain/langgraph/web';
+import { buildInterruptGraph } from './lib/demos/lg-interrupts';
+
+const config = { configurable: { thread_id: 'email-1' } };
+const graph = await buildInterruptGraph(new MemorySaver());
+
+let out = await graph.invoke({ topic: 'Q3 release notes', draft: '', final: '', decision: '' }, config);
+const interrupts = out.__interrupt__;
+if (interrupts?.length) {
+	console.log('Paused for human approval. Proposed draft:\\n');
+	console.log(interrupts[0].value.draft, '\\n');
+
+	// Resume with the human's decision (try 'reject' or { decision: 'edit', text } too):
+	out = await graph.invoke(new Command({ resume: { decision: 'approve' } }), config);
+}
+console.log('Final state:', out);
+`
+	};
 
 	let checkpointer = new MemorySaver();
 	const config = { configurable: { thread_id: 'email-1' } };
@@ -45,44 +54,6 @@
 		draft: string;
 	}
 
-	async function buildGraph() {
-		const model = await getModel({ temperature: 0.3, maxTokens: 280 });
-		const draftPrompt = ChatPromptTemplate.fromMessages([
-			[
-				'system',
-				'You are an internal-comms editor. Draft a short, professional team email (≤ 90 words). Return ONLY the email body, including a "Subject:" line.'
-			],
-			['human', 'Topic: {topic}']
-		]);
-		const parser = new StringOutputParser();
-
-		return new StateGraph(State)
-			// Node name must differ from the channel name 'draft' — LangGraph forbids
-			// a node and a state channel sharing an identifier.
-			.addNode('draft_email', async (s) => {
-				if (s.draft && s.draft.length > 0) return { draft: s.draft };
-				const text = await draftPrompt.pipe(model).pipe(parser).invoke({ topic: s.topic });
-				return { draft: text };
-			})
-			.addNode('approve', async (s) => {
-				const decision = interrupt({
-					type: 'approve_draft',
-					draft: s.draft
-				}) as { decision: 'approve' | 'edit' | 'reject'; text?: string };
-				if (decision.decision === 'reject') {
-					return { final: '', decision: 'rejected' };
-				}
-				if (decision.decision === 'edit') {
-					return { final: decision.text ?? s.draft, decision: 'edited' };
-				}
-				return { final: s.draft, decision: 'approved' };
-			})
-			.addEdge(START, 'draft_email')
-			.addEdge('draft_email', 'approve')
-			.addEdge('approve', END)
-			.compile({ checkpointer });
-	}
-
 	async function start() {
 		busy = true;
 		result = null;
@@ -92,7 +63,7 @@
 			const draftPayload = await withRunCache<DraftPayload>(
 				{ demoId: `l2-interrupts-draft-${topic.slice(0, 32)}` },
 				async () => {
-					const graph = await buildGraph();
+					const graph = await buildInterruptGraph(checkpointer);
 					const out = (await graph.invoke(
 						{ topic, draft: '', final: '', decision: '' },
 						config
@@ -105,7 +76,7 @@
 				}
 			);
 
-			const graph = await buildGraph();
+			const graph = await buildInterruptGraph(checkpointer);
 			const out = (await graph.invoke(
 				{ topic, draft: draftPayload.draft, final: '', decision: '' },
 				config
@@ -134,7 +105,7 @@
 	async function resume(decision: 'approve' | 'edit' | 'reject') {
 		busy = true;
 		try {
-			const graph = await buildGraph();
+			const graph = await buildInterruptGraph(checkpointer);
 			const cmd = new Command({
 				resume: { decision, text: decision === 'edit' ? edited : undefined }
 			});
@@ -205,6 +176,7 @@ if (decision !== 'approve') return { aborted: true };
 		id: 'l2-interrupts',
 		alt: 'A scholar pauses mid-stride as a human steps out with a sealed envelope'
 	}}
+	source={demoSource}
 >
 	{#snippet intro()}
 		<p>

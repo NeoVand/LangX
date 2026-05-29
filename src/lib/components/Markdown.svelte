@@ -109,16 +109,23 @@
 	}
 	.markdown :global(pre.shiki) {
 		margin: 0.9em 0;
-		padding: 0.85rem 1rem;
-		border-radius: 0.5rem;
-		overflow-x: auto;
+		padding: 1.15rem 1.3rem;
+		overflow-x: hidden;
+		max-width: 100%;
 		font-size: 0.82rem;
-		line-height: 1.55;
+		line-height: 1.5;
 	}
 	.markdown :global(pre.shiki code) {
 		background: none;
 		padding: 0;
 		font-size: inherit;
+		white-space: normal;
+		max-width: 100%;
+	}
+	.markdown :global(pre.shiki .line) {
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
+		word-break: break-word;
 	}
 	.markdown :global(table) {
 		border-collapse: collapse;

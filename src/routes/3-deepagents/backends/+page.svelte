@@ -9,25 +9,32 @@
 	import RunButton from '$lib/components/RunButton.svelte';
 	import FileTreeViewer from '$lib/components/FileTreeViewer.svelte';
 	import TraceLog from '$lib/components/TraceLog.svelte';
-	import {
-		createDeepAgent,
-		StateBackend,
-		StoreBackend,
-		CompositeBackend,
-		type VirtualFile
-	} from '$lib/deepagents';
-	import { getModel } from '$lib/runtime/llm';
+	import { type VirtualFile } from '$lib/deepagents';
 	import { withRunCache, loadCachedRun } from '$lib/runtime/runs';
-	import { createTracer } from '$lib/runtime/tracer';
 	import type { TraceEvent } from '$lib/runtime/tracer/types';
 	import { browser } from '$app/environment';
 	import { listFiles, clearScope } from '$lib/storage/dexie';
+	import { runBackendsDemo, BACKENDS_SCOPE, type BackendsRunResult } from '$lib/demos/da-backends';
+	import backendsSrc from '$lib/demos/da-backends.ts?raw';
+	import type { DemoManifest } from '$lib/demos/download';
 
-	interface RunPayload {
-		files: VirtualFile[];
-		events: TraceEvent[];
-		finalText: string;
-	}
+	const demoSource: DemoManifest = {
+		id: 'da-backends',
+		title: 'Backends',
+		summary:
+			'A memory steward writing through a CompositeBackend that routes /memories/ to durable storage.',
+		entries: [{ path: 'lib/demos/da-backends.ts', code: backendsSrc }],
+		runner: `import { runBackendsDemo } from './lib/demos/da-backends';
+
+const { files, finalText } = await runBackendsDemo({
+	onFiles: (live) => console.log('  · files:', live.map((f) => f.path).join(', '))
+});
+
+console.log('\\nFiles written this run:');
+for (const f of files) console.log('  [' + (f.backend ?? 'state') + ']', f.path);
+console.log('\\nSummary:', finalText);
+`
+	};
 
 	let busy = $state(false);
 	let files = $state<VirtualFile[]>([]);
@@ -35,18 +42,7 @@
 	let finalText = $state<string>('');
 	let storedAfterReload = $state<VirtualFile[]>([]);
 
-	const SCOPE = 'lesson-backends';
-
-	const INSTRUCTIONS = `You are a memory steward. Use the virtual filesystem with this routing rule:
-- /scratch/ — ephemeral notes for this run only.
-- /memories/ — durable notes the user will want available next session.
-
-For the user's request, you must:
-1. Write a SHORT scratch note at /scratch/draft.md describing the rough idea.
-2. Write a focused memory at /memories/preferences.md capturing the user's stated preferences
-   as a small bulleted markdown document.
-
-Use only write_file. End with one summary sentence. Do not chat between tool calls.`;
+	const SCOPE = BACKENDS_SCOPE;
 
 	async function run() {
 		busy = true;
@@ -54,44 +50,13 @@ Use only write_file. End with one summary sentence. Do not chat between tool cal
 		events = [];
 		finalText = '';
 		try {
-			const result = await withRunCache<RunPayload>(
+			const result = await withRunCache<BackendsRunResult>(
 				{ demoId: 'l3-backends-run' },
-				async () => {
-					const localEvents: TraceEvent[] = [];
-					const tracer = createTracer();
-					tracer.subscribe((ev) => {
-						localEvents.push(ev);
-						events = [...localEvents];
-					});
-
-					const composite = new CompositeBackend(
-						[{ prefix: '/memories/', backend: new StoreBackend(SCOPE) }],
-						new StateBackend()
-					);
-					const model = await getModel({ temperature: 0, maxTokens: 600 });
-					const agent = createDeepAgent({
-						model,
-						backend: composite,
-						instructions: INSTRUCTIONS,
-						tracer,
-						maxIterations: 10
-					});
-					agent.subscribe((s) => (files = [...s.files]));
-
-					const out = await agent.invoke({
-						input: `I prefer short, terse bullets. I dislike emoji. I want responses to be
-direct. Save a scratch note about today's planning and capture my preferences in /memories/.`,
-						thread: `backends-${Math.random().toString(36).slice(2, 6)}`
-					});
-
-					const last = out.messages[out.messages.length - 1];
-					const text =
-						typeof last?.content === 'string'
-							? last.content
-							: JSON.stringify(last?.content ?? '');
-					const finalFiles = await composite.list();
-					return { files: finalFiles, events: localEvents, finalText: text };
-				}
+				async () =>
+					runBackendsDemo({
+						onFiles: (f) => (files = f),
+						onTrace: (e) => (events = e)
+					})
 			);
 			files = result.files;
 			events = result.events;
@@ -120,7 +85,7 @@ direct. Save a scratch note about today's planning and capture my preferences in
 
 	$effect(() => {
 		(async () => {
-			const cached = await loadCachedRun<RunPayload>({ demoId: 'l3-backends-run' });
+			const cached = await loadCachedRun<BackendsRunResult>({ demoId: 'l3-backends-run' });
 			if (cached) {
 				files = cached.payload.files;
 				events = cached.payload.events;
@@ -150,6 +115,7 @@ const agent = createDeepAgent({ model, backend });`;
 		id: 'l3-backends',
 		alt: "Two-room cutaway: a chalkboard 'State' and a stone vault 'Store'"
 	}}
+	source={demoSource}
 >
 	{#snippet intro()}
 		<p>

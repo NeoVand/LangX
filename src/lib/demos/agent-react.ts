@@ -6,6 +6,7 @@ import type { OnStep } from './types';
 
 type LooseTool = { name: string; invoke: (args: unknown) => Promise<unknown> };
 
+// Registry so the tools node can dispatch by name without a switch per tool.
 const allTools = [weatherTool, calculatorTool] as unknown as LooseTool[];
 const toolByName = Object.fromEntries(allTools.map((t) => [t.name, t]));
 
@@ -21,16 +22,19 @@ export async function runAgentScenario(
 	onPath: (path: string[], active: string) => void,
 	onStep: OnStep
 ): Promise<{ messages: BaseMessage[]; path: string[] }> {
+	// ── Model + multi-tool binding ──────────────────────────────────────────
 	const baseModel = await getModel({ temperature: 0, maxTokens: 320 });
 	const model = baseModel.bindTools!(allTools as unknown as never[]);
 
 	const live: BaseMessage[] = [];
 	const log: string[] = [];
+	// Mirrors LangGraph node names so the UI can highlight agent → tools → end.
 	const push = (node: 'agent' | 'tools' | 'end') => {
 		log.push(node === 'end' ? '__end__' : node);
 		onPath([...log], node === 'end' ? '__end__' : node);
 	};
 
+	// ── Conversation seed ───────────────────────────────────────────────────
 	live.push(
 		new HumanMessage(
 			mode === 'weather'
@@ -40,6 +44,7 @@ export async function runAgentScenario(
 	);
 	onMessages([...live]);
 
+	// ── ReAct loop (agent ↔ tools) ──────────────────────────────────────────
 	let safety = 0;
 	while (safety++ < 6) {
 		push('agent');

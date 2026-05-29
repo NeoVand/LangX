@@ -8,28 +8,49 @@
 	import { checkpointer as checkpointerDiagram } from '$lib/diagrams';
 	import RunButton from '$lib/components/RunButton.svelte';
 	import StateInspector from '$lib/components/StateInspector.svelte';
-	import {
-		Annotation,
-		StateGraph,
-		MemorySaver,
-		MessagesAnnotation,
-		START,
-		END
-	} from '@langchain/langgraph/web';
-	import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts';
-	import { HumanMessage, AIMessage, type BaseMessage } from '@langchain/core/messages';
+	import { MemorySaver } from '@langchain/langgraph/web';
+	import { HumanMessage, type BaseMessage } from '@langchain/core/messages';
 	import { getModel } from '$lib/runtime/llm';
 	import { withRunCache, loadCachedRun } from '$lib/runtime/runs';
+	import { buildCounterGraph, buildChatGraph } from '$lib/demos/lg-checkpointers';
+	import lgCheckpointersSrc from '$lib/demos/lg-checkpointers.ts?raw';
+	import type { DemoManifest } from '$lib/demos/download';
 	import { onMount } from 'svelte';
+
+	const demoSource: DemoManifest = {
+		id: 'checkpointers',
+		title: 'Checkpointers & time travel',
+		summary:
+			'Compile with a MemorySaver for resume, multi-turn chat memory, and forkable history.',
+		entries: [{ path: 'lib/demos/lg-checkpointers.ts', code: lgCheckpointersSrc }],
+		runner: `import { MemorySaver } from '@langchain/langgraph/web';
+import { HumanMessage } from '@langchain/core/messages';
+import { getModel } from './lib/runtime/llm';
+import { buildCounterGraph, buildChatGraph } from './lib/demos/lg-checkpointers';
+
+console.log('=== Time travel ===');
+const saver = new MemorySaver();
+const cfg = { configurable: { thread_id: 'thread-1' } };
+const final = await buildCounterGraph(saver).invoke({ count: 0 }, cfg);
+console.log('final state:', final);
+for await (const snap of buildCounterGraph(saver).getStateHistory(cfg)) {
+	console.log('  checkpoint', JSON.stringify(snap.values), 'next', snap.next);
+}
+
+console.log('\\n=== Multi-turn chat (shared thread = memory) ===');
+const model = await getModel({ temperature: 0.4, maxTokens: 220 });
+const chat = buildChatGraph(model, new MemorySaver());
+const chatCfg = { configurable: { thread_id: 'chat-1' } };
+let out = await chat.invoke({ messages: [new HumanMessage("Hi, I'm planning a trip to Tokyo.")] }, chatCfg);
+console.log('assistant:', out.messages.at(-1)?.content);
+out = await chat.invoke({ messages: [new HumanMessage('Where did I say I was going?')] }, chatCfg);
+console.log('assistant:', out.messages.at(-1)?.content);
+`
+	};
 
 	/* ------------------------------------------------------------------ */
 	/* Demo 1: counter graph + fork (synthetic — best for explaining)      */
 	/* ------------------------------------------------------------------ */
-
-	const State = Annotation.Root({
-		count: Annotation<number>({ reducer: (a, b) => a + b, default: () => 0 }),
-		log: Annotation<string[]>({ reducer: (a, b) => [...a, ...b], default: () => [] })
-	});
 
 	let checkpointer = new MemorySaver();
 
@@ -41,26 +62,10 @@
 
 	const config = $derived({ configurable: { thread_id: threadId } });
 
-	function buildGraph() {
-		return new StateGraph(State)
-			.addNode('add', async (s) => ({
-				count: 1,
-				log: [`add → count is now ${s.count + 1}`]
-			}))
-			.addNode('double', async (s) => ({
-				count: s.count,
-				log: [`double → count is now ${s.count * 2}`]
-			}))
-			.addEdge(START, 'add')
-			.addEdge('add', 'double')
-			.addEdge('double', END)
-			.compile({ checkpointer });
-	}
-
 	async function runOnce() {
 		busy = true;
 		try {
-			const graph = buildGraph();
+			const graph = buildCounterGraph(checkpointer);
 			const result = await graph.invoke({ count: 0 }, config);
 			currentState = result;
 			await refreshHistory();
@@ -70,7 +75,7 @@
 	}
 
 	async function refreshHistory() {
-		const graph = buildGraph();
+		const graph = buildCounterGraph(checkpointer);
 		const items: typeof history = [];
 		let i = 0;
 		for await (const snap of graph.getStateHistory(config)) {
@@ -87,7 +92,7 @@
 	async function forkFrom(id: string) {
 		busy = true;
 		try {
-			const graph = buildGraph();
+			const graph = buildCounterGraph(checkpointer);
 			const forkedConfig = {
 				configurable: { thread_id: threadId, checkpoint_id: id }
 			};
@@ -129,32 +134,13 @@
 
 	const chatCheckpointer = new MemorySaver();
 
-	function buildChatGraph(model: Awaited<ReturnType<typeof getModel>>) {
-		const prompt = ChatPromptTemplate.fromMessages([
-			[
-				'system',
-				'You are a helpful, concise travel assistant. Keep replies short (≤ 35 words). Always use what the user has previously told you.'
-			],
-			new MessagesPlaceholder('messages')
-		]);
-
-		return new StateGraph(MessagesAnnotation)
-			.addNode('chat', async (s) => {
-				const ai = await prompt.pipe(model).invoke({ messages: s.messages });
-				return { messages: [ai] };
-			})
-			.addEdge(START, 'chat')
-			.addEdge('chat', END)
-			.compile({ checkpointer: chatCheckpointer });
-	}
-
 	async function sendChat() {
 		if (!userTurn.trim()) return;
 		chatBusy = true;
 		const turnText = userTurn.trim();
 		try {
 			const model = await getModel({ temperature: 0.4, maxTokens: 220 });
-			const graph = buildChatGraph(model);
+			const graph = buildChatGraph(model, chatCheckpointer);
 			const cfg = { configurable: { thread_id: chatThread } };
 
 			chatLog = [...chatLog, { role: 'user', text: turnText }];
@@ -220,6 +206,7 @@ await graph.invoke({ messages: [new HumanMessage("What's my name?")] }, cfg);`;
 		id: 'l2-checkpointers',
 		alt: 'A grandfather clock with gears whose dots align like saved checkpoints'
 	}}
+	source={demoSource}
 >
 	{#snippet intro()}
 		<p>

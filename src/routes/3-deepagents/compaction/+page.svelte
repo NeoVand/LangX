@@ -10,25 +10,41 @@
 	import ContextMeter from '$lib/components/ContextMeter.svelte';
 	import FileTreeViewer from '$lib/components/FileTreeViewer.svelte';
 	import TraceLog from '$lib/components/TraceLog.svelte';
-	import {
-		createDeepAgent,
-		StateBackend,
-		type VirtualFile
-	} from '$lib/deepagents';
-	import { totalMessageTokens } from '$lib/deepagents/tokens';
-	import { getModel } from '$lib/runtime/llm';
+	import type { VirtualFile } from '$lib/deepagents';
 	import { withRunCache, loadCachedRun } from '$lib/runtime/runs';
-	import { tool } from '@langchain/core/tools';
-	import { z } from 'zod';
-	import { createTracer } from '$lib/runtime/tracer';
 	import type { TraceEvent } from '$lib/runtime/tracer/types';
+	import {
+		runCompactionDemo,
+		MAX_TOKENS,
+		EVICT_THRESHOLD_PCT,
+		SUMMARIZE_THRESHOLD_PCT,
+		type CompactionRunResult
+	} from '$lib/demos/da-compaction';
+	import daCompactionSrc from '$lib/demos/da-compaction.ts?raw';
+	import type { DemoManifest } from '$lib/demos/download';
 
-	interface RunPayload {
-		events: TraceEvent[];
-		files: VirtualFile[];
-		liveTokens: number;
-		finalText: string;
+	const demoSource: DemoManifest = {
+		id: 'da-compaction',
+		title: 'Context compaction',
+		summary:
+			'Run the four-tier compaction pipeline at low thresholds so eviction and summarization visibly fire.',
+		entries: [{ path: 'lib/demos/da-compaction.ts', code: daCompactionSrc }],
+		runner: `import { runCompactionDemo } from './lib/demos/da-compaction';
+
+const out = await runCompactionDemo({
+	onTrace: (events) => {
+		const last = events[events.length - 1];
+		if (last) console.log('  ·', last.kind, '—', last.label);
 	}
+});
+
+console.log('\\nLive tokens:', out.liveTokens);
+console.log('Files:', out.files.map((f) => f.path).join(', '));
+console.log('Final:', out.finalText);
+`
+	};
+
+	type RunPayload = CompactionRunResult;
 
 	let busy = $state(false);
 	let events = $state<TraceEvent[]>([]);
@@ -36,20 +52,7 @@
 	let liveTokens = $state(0);
 	let finalText = $state<string>('');
 
-	const MAX = 600;
-
-	const INSTRUCTIONS = `You are testing the harness's compaction pipeline. You have a custom tool
-called \`fetch_chunk\` that returns a large block of text. To produce visible compaction
-events, follow this exact recipe in order:
-
-1. write_file('/needle.md', 'Secret access code: PURPLE-99')
-2. fetch_chunk({ label: 'PAGE 1' })  — large output
-3. fetch_chunk({ label: 'PAGE 2' })  — large output
-4. fetch_chunk({ label: 'PAGE 3' })  — large output
-5. read_file({ path: '/needle.md' })
-6. Reply with one short sentence confirming the needle is still readable after compaction.
-
-Do not chat between tool calls. Do not skip steps.`;
+	const MAX = MAX_TOKENS;
 
 	async function run() {
 		busy = true;
@@ -60,69 +63,14 @@ Do not chat between tool calls. Do not skip steps.`;
 		try {
 			const result = await withRunCache<RunPayload>(
 				{ demoId: 'l3-compaction-run' },
-				async () => {
-					const localEvents: TraceEvent[] = [];
-					const tracer = createTracer();
-					tracer.subscribe((ev) => {
-						localEvents.push(ev);
-						events = [...localEvents];
-					});
-
-					const fetchChunk = tool(
-						async ({ label }) => {
-							const lorem =
-								'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ';
-							return `[${label}]\n` + lorem.repeat(15);
-						},
-						{
-							name: 'fetch_chunk',
-							description:
-								'Return a synthetic large text block tagged with the given label. Use only as instructed.',
-							schema: z.object({ label: z.string() })
+				async () =>
+					await runCompactionDemo({
+						onTrace: (ev) => (events = ev),
+						onProgress: (s) => {
+							files = s.files;
+							liveTokens = s.liveTokens;
 						}
-					);
-
-					const model = await getModel({ temperature: 0, maxTokens: 600 });
-					const backend = new StateBackend();
-					const agent = createDeepAgent({
-						model,
-						backend,
-						tools: [fetchChunk],
-						instructions: INSTRUCTIONS,
-						tracer,
-						compaction: {
-							maxTokens: MAX,
-							evictThresholdPct: 35,
-							summarizeThresholdPct: 80,
-							largeToolResultMin: 200,
-							// keep enough recent turns that the pair-aware boundary always has
-							// a complete tool_calls/tool group to preserve
-							historyKeep: 4
-						},
-						maxIterations: 16
-					});
-					agent.subscribe((s) => {
-						files = [...s.files];
-						liveTokens = totalMessageTokens(s.messages);
-					});
-
-					const out = await agent.invoke({
-						input:
-							'Save the secret, then fetch three large chunks, then verify the secret is still readable.',
-						thread: `compact-${Math.random().toString(36).slice(2, 6)}`
-					});
-					const last = out.messages[out.messages.length - 1];
-					const text =
-						typeof last?.content === 'string'
-							? last.content
-							: JSON.stringify(last?.content ?? '');
-					return {
-						events: localEvents,
-						files: await backend.list(),
-						liveTokens: totalMessageTokens(out.messages),
-						finalText: text
-					};
-				}
+					})
 			);
 			events = result.events;
 			files = result.files;
@@ -175,6 +123,7 @@ createDeepAgent({
 		id: 'l3-compaction',
 		alt: 'Long pages distilled in a printing press into a single summary card'
 	}}
+	source={demoSource}
 >
 	{#snippet intro()}
 		<p>
@@ -246,8 +195,8 @@ createDeepAgent({
 			<ContextMeter
 				segments={[{ label: 'history', tokens: liveTokens, kind: 'history' }]}
 				max={MAX}
-				evictThresholdPct={35}
-				summarizeThresholdPct={80}
+				evictThresholdPct={EVICT_THRESHOLD_PCT}
+				summarizeThresholdPct={SUMMARIZE_THRESHOLD_PCT}
 			/>
 		</Panel>
 

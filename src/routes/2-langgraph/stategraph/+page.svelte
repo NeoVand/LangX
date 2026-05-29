@@ -11,9 +11,6 @@
 	import MessageStream from '$lib/components/MessageStream.svelte';
 	import StateInspector from '$lib/components/StateInspector.svelte';
 	import { StateGraph, MessagesAnnotation, START, END } from '@langchain/langgraph/web';
-	import { ToolNode } from '@langchain/langgraph/prebuilt';
-	import { calculatorTool, weatherTool } from '$lib/runtime/tools';
-	import { getModel } from '$lib/runtime/llm';
 	import { withRunCache, loadCachedRun } from '$lib/runtime/runs';
 	import {
 		HumanMessage,
@@ -22,7 +19,27 @@
 		SystemMessage,
 		type BaseMessage
 	} from '@langchain/core/messages';
+	import { runStateGraphDemo } from '$lib/demos/lg-stategraph';
+	import lgStateGraphSrc from '$lib/demos/lg-stategraph.ts?raw';
+	import type { DemoManifest } from '$lib/demos/download';
 	import { onMount } from 'svelte';
+
+	const demoSource: DemoManifest = {
+		id: 'stategraph',
+		title: 'StateGraph',
+		summary: 'Hand-build the ReAct loop: an agent node, a tools node, and a conditional edge.',
+		entries: [{ path: 'lib/demos/lg-stategraph.ts', code: lgStateGraphSrc }],
+		runner: `import { runStateGraphDemo } from './lib/demos/lg-stategraph';
+
+const userInput = "What's the weather in Tokyo right now? Reply in one sentence.";
+const { messages, path } = await runStateGraphDemo(userInput, 'simple', {
+	onPath: (p) => console.log('  path:', p.join(' -> '))
+});
+
+console.log('\\nFinal path:', path.join(' -> '));
+console.log('Final answer:', messages.at(-1)?.content);
+`
+	};
 
 	type SerializedMsg =
 		| { kind: 'human'; content: string }
@@ -93,54 +110,25 @@
 		activeNode = undefined;
 		finalAnswer = '';
 		try {
-			const tools = mode === 'simple' ? [weatherTool] : [weatherTool, calculatorTool];
 			const out = await withRunCache<DemoPayload>(
 				{ demoId: `l2-stategraph-${mode}` },
 				async () => {
-					const model = await getModel({ temperature: 0, maxTokens: 320 });
-					const bound = model.bindTools!(tools);
-					const toolNode = new ToolNode(tools);
-
-					const graph = new StateGraph(MessagesAnnotation)
-						.addNode('agent', async (state) => {
-							path = [...path, 'agent'];
-							activeNode = 'agent';
-							const ai = await bound.invoke(state.messages);
-							return { messages: [ai] };
-						})
-						.addNode('tools', async (state) => {
-							path = [...path, 'tools'];
-							activeNode = 'tools';
-							return await toolNode.invoke(state);
-						})
-						.addEdge(START, 'agent')
-						.addConditionalEdges('agent', (state) => {
-							const last = state.messages[state.messages.length - 1] as AIMessage;
-							if (last.tool_calls?.length) return 'tools';
-							return END;
-						})
-						.addEdge('tools', 'agent')
-						.compile();
-
-					const seedMessages: BaseMessage[] = [new HumanMessage(userInput)];
-					let collected: BaseMessage[] = seedMessages;
-					for await (const update of await graph.stream(
-						{ messages: seedMessages },
-						{ streamMode: 'values' }
-					)) {
-						collected = update.messages as BaseMessage[];
-						messages = collected;
-					}
-					activeNode = '__end__';
-					path = [...path, '__end__'];
-
+					const { messages: collected, path: finalPath } = await runStateGraphDemo(
+						userInput,
+						mode,
+						{
+							onPath: (p) => (path = p),
+							onActive: (n) => (activeNode = n),
+							onMessages: (m) => (messages = m)
+						}
+					);
 					const last = collected[collected.length - 1];
 					const final = typeof last?.content === 'string' ? last.content : '';
 					return {
 						question: userInput,
 						mode,
 						messages: serialize(collected),
-						path: [...path],
+						path: finalPath,
 						final
 					};
 				}
@@ -225,6 +213,7 @@ const graph = new StateGraph(MessagesAnnotation)
 		id: 'l2-stategraph',
 		alt: 'A garden-maze with gazebos as nodes and a glass jar of state at the center'
 	}}
+	source={demoSource}
 >
 	{#snippet intro()}
 		<p>

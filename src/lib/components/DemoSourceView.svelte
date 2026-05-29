@@ -45,6 +45,8 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.9rem;
+		min-width: 0;
+		max-width: 100%;
 	}
 	.lede {
 		margin: 0;

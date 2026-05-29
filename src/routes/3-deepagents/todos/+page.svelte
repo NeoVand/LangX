@@ -7,20 +7,34 @@
 	import RunButton from '$lib/components/RunButton.svelte';
 	import TodoListView from '$lib/components/TodoListView.svelte';
 	import TraceLog from '$lib/components/TraceLog.svelte';
-	import { createDeepAgent, StateBackend, type Todo } from '$lib/deepagents';
-	import { getModel } from '$lib/runtime/llm';
+	import { type Todo } from '$lib/deepagents';
 	import { withRunCache, loadCachedRun } from '$lib/runtime/runs';
-	import { createTracer } from '$lib/runtime/tracer';
 	import type { TraceEvent } from '$lib/runtime/tracer/types';
+	import {
+		runTodosDemo,
+		type TodosRunResult,
+		type TodoScenario as Scenario
+	} from '$lib/demos/da-todos';
+	import todosSrc from '$lib/demos/da-todos.ts?raw';
+	import type { DemoManifest } from '$lib/demos/download';
 
-	type Scenario = 'research' | 'refactor';
+	const demoSource: DemoManifest = {
+		id: 'da-todos',
+		title: 'Planning with write_todos',
+		summary:
+			'A planning agent that maintains its entire plan through repeated write_todos calls.',
+		entries: [{ path: 'lib/demos/da-todos.ts', code: todosSrc }],
+		runner: `import { runTodosDemo } from './lib/demos/da-todos';
 
-	interface RunPayload {
-		scenario: Scenario;
-		todos: Todo[];
-		events: TraceEvent[];
-		finalText: string;
-	}
+const { todos, finalText } = await runTodosDemo('research', {
+	onTodos: (live) => console.log('  · plan:', live.map((t) => t.status + ' ' + t.content).join(' | '))
+});
+
+console.log('\\nFinal plan:');
+for (const t of todos) console.log('  [' + t.status + ']', t.content);
+console.log('\\nSummary:', finalText);
+`
+	};
 
 	let scenario = $state<Scenario>('research');
 	let busy = $state(false);
@@ -28,85 +42,20 @@
 	let events = $state<TraceEvent[]>([]);
 	let finalText = $state<string>('');
 
-	const PROMPT: Record<Scenario, { input: string; instructions: string }> = {
-		research: {
-			instructions: `You are a planning agent. Before doing anything else, call write_todos to
-record a 3-step plan. As you progress, call write_todos again to mark each step's status. The
-list must use only the statuses "pending", "in_progress", "completed". Do not invent file or
-tool calls beyond write_todos for this exercise. Finish by replying with one short summary line.`,
-			input: `I want a short research brief on stateful agent runtimes. Plan it.
-
-Use roughly these three steps:
-1. Identify 3 reputable sources
-2. Read each and extract claims
-3. Synthesise into a 1-page brief
-
-Walk through each step in order. Mark in_progress before "doing" it (you do not actually
-need to do the research — just simulate progressing through the plan) and completed once
-the step is "done". End with one short summary sentence.`
-		},
-		refactor: {
-			instructions: `You are a planning agent. Use write_todos to maintain a 4-step refactor plan
-and update it as each step progresses. Do not call any other tools — this exercise is about
-the plan, not the edits. Statuses must be "pending", "in_progress", or "completed". End with
-one short summary line.`,
-			input: `Plan a small refactor of util.ts. Use exactly these four steps:
-1. Audit util.ts for string concat usages
-2. Replace with template literals
-3. Add JSDoc
-4. Add a smoke test
-
-Move through them in order, marking each in_progress then completed, and finish with one
-short summary sentence.`
-		}
-	};
-
 	async function run() {
 		busy = true;
 		todos = [];
 		events = [];
 		finalText = '';
 		try {
-			const result = await withRunCache<RunPayload>(
-				{ demoId: `l3-todos-${scenario}` },
-				async () => {
-					const localEvents: TraceEvent[] = [];
-					const tracer = createTracer();
-					tracer.subscribe((ev) => {
-						localEvents.push(ev);
-						events = [...localEvents];
-					});
-
-					const model = await getModel({ temperature: 0, maxTokens: 600 });
-					const agent = createDeepAgent({
-						model,
-						backend: new StateBackend(),
-						instructions: PROMPT[scenario].instructions,
-						tracer,
-						maxIterations: 16
-					});
-					agent.subscribe((s) => {
-						todos = [...s.todos];
-					});
-
-					const out = await agent.invoke({
-						input: PROMPT[scenario].input,
-						thread: `todo-${scenario}-${Math.random().toString(36).slice(2, 6)}`
-					});
-
-					const last = out.messages[out.messages.length - 1];
-					const text =
-						typeof last?.content === 'string'
-							? last.content
-							: JSON.stringify(last?.content ?? '');
-
-					return {
-						scenario,
-						todos: out.todos,
-						events: localEvents,
-						finalText: text
-					};
-				}
+			const which = scenario;
+			const result = await withRunCache<TodosRunResult>(
+				{ demoId: `l3-todos-${which}` },
+				async () =>
+					runTodosDemo(which, {
+						onTodos: (t) => (todos = t),
+						onTrace: (e) => (events = e)
+					})
 			);
 			todos = result.todos;
 			events = result.events;
@@ -119,7 +68,7 @@ short summary sentence.`
 	$effect(() => {
 		const which = scenario;
 		(async () => {
-			const cached = await loadCachedRun<RunPayload>({
+			const cached = await loadCachedRun<TodosRunResult>({
 				demoId: `l3-todos-${which}`
 			});
 			if (cached && cached.payload.scenario === which) {
@@ -152,6 +101,7 @@ short summary sentence.`
 		id: 'l3-todos',
 		alt: 'A clipboard checklist of pictographs with one item checked, two pending'
 	}}
+	source={demoSource}
 >
 	{#snippet intro()}
 		<p>

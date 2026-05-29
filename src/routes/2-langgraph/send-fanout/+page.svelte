@@ -8,33 +8,29 @@
 	import { sendFanout } from '$lib/diagrams';
 	import RunButton from '$lib/components/RunButton.svelte';
 	import StateInspector from '$lib/components/StateInspector.svelte';
-	import { Annotation, StateGraph, Send, START, END } from '@langchain/langgraph/web';
-	import { ChatPromptTemplate } from '@langchain/core/prompts';
-	import { StringOutputParser } from '@langchain/core/output_parsers';
-	import { getModel } from '$lib/runtime/llm';
 	import { withRunCache, loadCachedRun } from '$lib/runtime/runs';
+	import { runSendFanoutDemo, type FanoutPayload } from '$lib/demos/lg-send-fanout';
+	import lgSendFanoutSrc from '$lib/demos/lg-send-fanout.ts?raw';
+	import type { DemoManifest } from '$lib/demos/download';
 	import { onMount } from 'svelte';
 
-	const State = Annotation.Root({
-		topic: Annotation<string>(),
-		subQuestions: Annotation<string[]>({
-			reducer: (a, b) => [...a, ...b],
-			default: () => []
-		}),
-		answers: Annotation<{ q: string; a: string }[]>({
-			reducer: (a, b) => [...a, ...b],
-			default: () => []
-		}),
-		report: Annotation<string>()
-	});
+	const demoSource: DemoManifest = {
+		id: 'send-fanout',
+		title: 'Send & fan-out',
+		summary: 'Use Send to spawn N parallel branches from one node and merge their writes back.',
+		entries: [{ path: 'lib/demos/lg-send-fanout.ts', code: lgSendFanoutSrc }],
+		runner: `import { runSendFanoutDemo } from './lib/demos/lg-send-fanout';
 
-	interface FanoutPayload {
-		topic: string;
-		subQuestions: string[];
-		answers: { q: string; a: string }[];
-		report: string;
-		stages: string[];
-	}
+const out = await runSendFanoutDemo('the LangGraph runtime', (stages) =>
+	console.log('  stages:', stages.join(', '))
+);
+
+console.log('\\nSub-questions:');
+out.subQuestions.forEach((q, i) => console.log(\`  \${i + 1}. \${q}\`));
+console.log('\\nSynthesized brief:\\n');
+console.log(out.report);
+`
+	};
 
 	let topic = $state('the LangGraph runtime');
 	let busy = $state(false);
@@ -48,89 +44,7 @@
 		try {
 			const out = await withRunCache<FanoutPayload>(
 				{ demoId: `l2-send-fanout-${topic.slice(0, 32)}` },
-				async () => {
-					const planModel = await getModel({ temperature: 0.3, maxTokens: 280 });
-					const researchModel = await getModel({ temperature: 0.4, maxTokens: 220 });
-					const synthModel = await getModel({ temperature: 0.3, maxTokens: 380 });
-					const parser = new StringOutputParser();
-
-					const planPrompt = ChatPromptTemplate.fromMessages([
-						[
-							'system',
-							'You decompose a topic into exactly 5 distinct sub-questions a researcher can answer independently. Return ONLY 5 lines, each one a single question, no numbering.'
-						],
-						['human', 'Topic: {topic}']
-					]);
-					const researchPrompt = ChatPromptTemplate.fromMessages([
-						[
-							'system',
-							'You are a careful researcher. Answer the question in 1–2 short sentences (≤ 45 words). No preamble.'
-						],
-						['human', '{question}']
-					]);
-					const synthPrompt = ChatPromptTemplate.fromMessages([
-						[
-							'system',
-							'You synthesize a brief from research notes. Return Markdown with a "# Topic" heading, then bold each question as a sub-section followed by the answer. Be concise.'
-						],
-						[
-							'human',
-							'Topic: {topic}\n\nNotes:\n{notes}'
-						]
-					]);
-
-					const graph = new StateGraph(State)
-						.addNode('plan', async (s) => {
-							stages = [...stages, 'plan'];
-							const text = await planPrompt
-								.pipe(planModel)
-								.pipe(parser)
-								.invoke({ topic: s.topic });
-							const subQuestions = text
-								.split('\n')
-								.map((line) => line.replace(/^[-•\d.\s]+/, '').trim())
-								.filter((line) => line.length > 0)
-								.slice(0, 5);
-							return { subQuestions };
-						})
-						.addNode('research', async (s: { question: string }) => {
-							stages = [...stages, `research:${s.question.slice(0, 24)}…`];
-							const a = await researchPrompt
-								.pipe(researchModel)
-								.pipe(parser)
-								.invoke({ question: s.question });
-							return { answers: [{ q: s.question, a: a.trim() }] };
-						})
-						.addNode('synthesize', async (s) => {
-							stages = [...stages, 'synthesize'];
-							const notes = s.answers
-								.map((p) => `Q: ${p.q}\nA: ${p.a}`)
-								.join('\n\n');
-							const md = await synthPrompt
-								.pipe(synthModel)
-								.pipe(parser)
-								.invoke({ topic: s.topic, notes });
-							return { report: md };
-						})
-						.addEdge(START, 'plan')
-						.addConditionalEdges(
-							'plan',
-							(s) => s.subQuestions.map((q) => new Send('research', { question: q })),
-							['research']
-						)
-						.addEdge('research', 'synthesize')
-						.addEdge('synthesize', END)
-						.compile();
-
-					const final = (await graph.invoke({
-						topic,
-						subQuestions: [],
-						answers: [],
-						report: ''
-					})) as FanoutPayload;
-
-					return { ...final, stages: [...stages] };
-				}
+				async () => await runSendFanoutDemo(topic, (s) => (stages = s))
 			);
 			result = out;
 			stages = out.stages;
@@ -170,6 +84,7 @@
 		id: 'l2-send-fanout',
 		alt: "A postmaster's desk fans out envelopes to several waiting messengers"
 	}}
+	source={demoSource}
 >
 	{#snippet intro()}
 		<p>

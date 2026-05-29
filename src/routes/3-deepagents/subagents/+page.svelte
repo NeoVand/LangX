@@ -10,69 +10,35 @@
 	import SubAgentTimeline from '$lib/components/SubAgentTimeline.svelte';
 	import SubagentCard from '$lib/components/SubagentCard.svelte';
 	import TraceLog from '$lib/components/TraceLog.svelte';
-	import {
-		createDeepAgent,
-		StateBackend,
-		type SubAgentSpec,
-		type SubAgentReport
-	} from '$lib/deepagents';
-	import { getModel } from '$lib/runtime/llm';
+	import { type SubAgentReport } from '$lib/deepagents';
 	import { withRunCache, loadCachedRun } from '$lib/runtime/runs';
-	import { HumanMessage, SystemMessage } from '@langchain/core/messages';
-	import { createTracer } from '$lib/runtime/tracer';
 	import type { TraceEvent } from '$lib/runtime/tracer/types';
+	import { runSubagentsDemo, type SubagentsRunResult } from '$lib/demos/da-subagents';
+	import subagentsSrc from '$lib/demos/da-subagents.ts?raw';
+	import type { DemoManifest } from '$lib/demos/download';
 
-	interface RunPayload {
-		events: TraceEvent[];
-		reports: SubAgentReport[];
-		finalText: string;
-	}
+	const demoSource: DemoManifest = {
+		id: 'da-subagents',
+		title: 'Subagents',
+		summary:
+			'A research lead delegating to three isolated subagents (researcher → writer → critic) via the task tool.',
+		entries: [{ path: 'lib/demos/da-subagents.ts', code: subagentsSrc }],
+		runner: `import { runSubagentsDemo } from './lib/demos/da-subagents';
+
+const { reports, finalText } = await runSubagentsDemo({
+	onReports: (live) => console.log('  · reports so far:', live.length)
+});
+
+console.log('\\nReturned reports:');
+for (const r of reports) console.log('\\n[' + r.name + ']\\n' + r.summary);
+console.log('\\nSummary:', finalText);
+`
+	};
 
 	let busy = $state(false);
 	let events = $state<TraceEvent[]>([]);
 	let reports = $state<SubAgentReport[]>([]);
 	let finalText = $state<string>('');
-
-	const SUBAGENT_PROMPTS: Record<string, string> = {
-		researcher: `You are a research assistant. The user will give you a sub-question.
-Reply with a single short paragraph (≤ 60 words) summarising what you would find — invent
-plausible primary sources and one-line takeaways. Do not call tools. Do not chat. Reply
-with prose only.`,
-		writer: `You are a technical writer. The user will give you a topic and findings.
-Reply with a single short paragraph (≤ 60 words) describing the brief you would write,
-including how many sections and rough citation count. Do not call tools.`,
-		critic: `You are an editorial critic. The user will give you a brief. Reply with at
-most three terse bullet notes, one per line, each beginning with "- ". Do not call tools.`
-	};
-
-	function makeSubagent(name: keyof typeof SUBAGENT_PROMPTS): SubAgentSpec {
-		return {
-			name,
-			description: `Run the ${name} subagent for a focused task.`,
-			prompt: SUBAGENT_PROMPTS[name],
-			run: async (input) => {
-				const model = await getModel({ temperature: 0.3, maxTokens: 220 });
-				const response = await model.invoke([
-					new SystemMessage(SUBAGENT_PROMPTS[name]),
-					new HumanMessage(input.description)
-				]);
-				const text =
-					typeof response.content === 'string'
-						? response.content
-						: JSON.stringify(response.content);
-				return { summary: text.trim() };
-			}
-		};
-	}
-
-	const INSTRUCTIONS = `You are a research lead. You have three subagents: researcher, writer, critic.
-To brief the user, you must call task three times in this exact order:
-1. task({ subagent: 'researcher', description: 'Find 3 reputable sources on stateful agent runtimes and extract claims.' })
-2. task({ subagent: 'writer', description: 'Draft a 1-page brief on stateful agent runtimes citing the researcher findings.' })
-3. task({ subagent: 'critic', description: 'Critique the brief for clarity, accuracy, and citation discipline.' })
-
-You may NOT do the research yourself. You may NOT write the brief yourself. Delegate.
-After the third task returns, reply with one short summary sentence mentioning the three handoffs.`;
 
 	async function run() {
 		busy = true;
@@ -80,47 +46,13 @@ After the third task returns, reply with one short summary sentence mentioning t
 		reports = [];
 		finalText = '';
 		try {
-			const result = await withRunCache<RunPayload>(
+			const result = await withRunCache<SubagentsRunResult>(
 				{ demoId: 'l3-subagents-run' },
-				async () => {
-					const localEvents: TraceEvent[] = [];
-					const tracer = createTracer();
-					tracer.subscribe((ev) => {
-						localEvents.push(ev);
-						events = [...localEvents];
-					});
-
-					const subagents = [
-						makeSubagent('researcher'),
-						makeSubagent('writer'),
-						makeSubagent('critic')
-					];
-					const model = await getModel({ temperature: 0, maxTokens: 600 });
-					const agent = createDeepAgent({
-						model,
-						backend: new StateBackend(),
-						subagents,
-						instructions: INSTRUCTIONS,
-						tracer,
-						maxIterations: 14
-					});
-					agent.subscribe((s) => (reports = [...s.subagentReports]));
-
-					const out = await agent.invoke({
-						input: 'Brief me on stateful agent runtimes.',
-						thread: `sub-${Math.random().toString(36).slice(2, 6)}`
-					});
-					const last = out.messages[out.messages.length - 1];
-					const text =
-						typeof last?.content === 'string'
-							? last.content
-							: JSON.stringify(last?.content ?? '');
-					return {
-						events: localEvents,
-						reports: out.subagentReports,
-						finalText: text
-					};
-				}
+				async () =>
+					runSubagentsDemo({
+						onReports: (r) => (reports = r),
+						onTrace: (e) => (events = e)
+					})
 			);
 			events = result.events;
 			reports = result.reports;
@@ -132,7 +64,7 @@ After the third task returns, reply with one short summary sentence mentioning t
 
 	$effect(() => {
 		(async () => {
-			const cached = await loadCachedRun<RunPayload>({ demoId: 'l3-subagents-run' });
+			const cached = await loadCachedRun<SubagentsRunResult>({ demoId: 'l3-subagents-run' });
 			if (cached) {
 				events = cached.payload.events;
 				reports = cached.payload.reports;
@@ -170,6 +102,7 @@ createDeepAgent({ model, subagents, /* ... */ });
 		id: 'l3-subagents',
 		alt: 'A central scholar gestures to three smaller assistants at flanking desks'
 	}}
+	source={demoSource}
 >
 	{#snippet intro()}
 		<p>

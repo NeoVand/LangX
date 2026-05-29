@@ -40,9 +40,9 @@
 	}
 </script>
 
-<div class="inspector" class:compact>
+<div class="inspector code-surface" class:compact>
 	{#if title}
-		<div class="title">{title}</div>
+		<div class="title code-surface-footer">{title}</div>
 	{/if}
 	<div class="hl scrollbar-slim">
 		{#if html}
@@ -56,24 +56,30 @@
 
 <style>
 	.inspector {
-		border-radius: 0.45rem;
-		overflow: hidden;
-		background: var(--color-paper);
+		min-width: 0;
+		max-width: 100%;
 	}
 
 	.title {
+		position: relative;
+		z-index: 1;
 		font-size: 0.7rem;
 		text-transform: uppercase;
 		letter-spacing: 0.08em;
 		color: var(--color-fg-faint);
-		padding: 0.45rem 0.7rem;
-		border-bottom: 1px solid color-mix(in oklch, var(--color-border) 55%, transparent);
+		padding: 0.55rem 1.3rem 0;
 		background: transparent;
+		box-shadow: none;
+		border: none;
 	}
 
 	.hl {
+		position: relative;
+		z-index: 1;
 		max-height: 22rem;
 		overflow: auto;
+		min-width: 0;
+		max-width: 100%;
 	}
 
 	.hl :global(pre.shiki) {
@@ -81,13 +87,15 @@
 		font-size: 0.78rem;
 		line-height: 1.5;
 		margin: 0;
-		padding: 0.7rem 0.85rem;
-		/* rely on the inspector's own border, not Shiki's */
+		padding: 0.65rem 1.3rem 1.15rem;
 		border: none;
 		border-radius: 0;
-		/* wrap wide objects instead of forcing a horizontal scrollbar */
-		white-space: pre-wrap;
-		word-break: break-word;
+		overflow-x: hidden;
+		max-width: 100%;
+	}
+
+	.inspector:has(.title) .hl :global(pre.shiki) {
+		padding-top: 0.45rem;
 	}
 
 	.compact .hl {

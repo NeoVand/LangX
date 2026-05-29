@@ -27,6 +27,7 @@ export async function chunkDocuments(
 	chunkSize = 280,
 	chunkOverlap = 40
 ): Promise<Chunk[]> {
+	// RecursiveCharacterTextSplitter tries paragraph → sentence → word boundaries.
 	const splitter = new RecursiveCharacterTextSplitter({ chunkSize, chunkOverlap });
 	const chunks: Chunk[] = [];
 	for (const d of docs) {
@@ -40,6 +41,7 @@ export async function buildStore(
 	chunks: Chunk[],
 	provider: EmbeddingsProviderId
 ): Promise<InMemoryVectorStore> {
+	// ── Indexing: embed chunks and store as Documents ───────────────────────
 	const embeddings = await makeEmbeddings(provider);
 	const store = new InMemoryVectorStore(embeddings);
 	await store.addDocuments(
@@ -61,6 +63,7 @@ export async function answerWithRag(
 	k: number,
 	onStep: OnStep
 ): Promise<{ hits: RetrievedChunk[]; answer: string }> {
+	// ── Retrieval: similarity search over embedded chunks ───────────────────
 	onStep({ label: 'Embed query', kind: 'state', detail: question });
 
 	const rows = await store.similaritySearch(question, k);
@@ -77,10 +80,12 @@ export async function answerWithRag(
 		payload: hits
 	});
 
+	// Pack retrieved passages into a numbered context block for grounded generation.
 	const context = hits
 		.map((h, i) => `[${i + 1}] (${h.source}) ${h.text}`)
 		.join('\n\n');
 
+	// ── Generation: answer constrained to retrieved context ─────────────────
 	const model = await getModel({ temperature: 0, maxTokens: 320 });
 	const ai = await model.invoke([
 		new SystemMessage(

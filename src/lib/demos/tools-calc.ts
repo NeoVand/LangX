@@ -14,13 +14,17 @@ export async function runCalcDemo(
 	onMessages: (messages: BaseMessage[]) => void,
 	onStep: OnStep
 ): Promise<BaseMessage[]> {
+	// ── Model + tool binding ────────────────────────────────────────────────
+	// Swap the tool — the loop structure stays identical to runWeatherDemo.
 	const baseModel = await getModel({ temperature: 0, maxTokens: 256 });
 	const model = baseModel.bindTools!([calculatorTool]);
 
+	// ── Conversation seed ───────────────────────────────────────────────────
 	const messages: BaseMessage[] = [new HumanMessage(`Compute ${expression}.`)];
 	onMessages([...messages]);
 	onStep({ label: 'User prompt', kind: 'note', detail: `compute ${expression}` });
 
+	// ── Tool-calling loop ───────────────────────────────────────────────────
 	let safety = 0;
 	while (safety++ < 4) {
 		const ai = (await model.invoke(messages)) as AIMessage;

@@ -6,46 +6,44 @@
 	import RunButton from '$lib/components/RunButton.svelte';
 	import FileTreeViewer from '$lib/components/FileTreeViewer.svelte';
 	import TraceLog from '$lib/components/TraceLog.svelte';
-	import {
-		createDeepAgent,
-		StateBackend,
-		type FilesystemPermission,
-		type VirtualFile
-	} from '$lib/deepagents';
-	import { getModel } from '$lib/runtime/llm';
+	import type { VirtualFile } from '$lib/deepagents';
 	import { withRunCache, loadCachedRun } from '$lib/runtime/runs';
-	import { createTracer } from '$lib/runtime/tracer';
 	import type { TraceEvent } from '$lib/runtime/tracer/types';
+	import {
+		runPermissionsDemo,
+		permissions,
+		type PermissionsRunResult
+	} from '$lib/demos/da-permissions';
+	import daPermissionsSrc from '$lib/demos/da-permissions.ts?raw';
+	import type { DemoManifest } from '$lib/demos/download';
 
-	const permissions: FilesystemPermission[] = [
-		{ operations: ['write'], paths: ['**/.env', 'secrets/**'], mode: 'deny' },
-		{ operations: ['read', 'write'], paths: ['src/**', 'docs/**'], mode: 'allow' },
-		{ operations: ['read', 'write'], paths: ['**'], mode: 'deny' }
-	];
+	const demoSource: DemoManifest = {
+		id: 'da-permissions',
+		title: 'Filesystem permissions',
+		summary:
+			'First-match-wins permission rules: the agent attempts five writes; two land, three are denied.',
+		entries: [{ path: 'lib/demos/da-permissions.ts', code: daPermissionsSrc }],
+		runner: `import { runPermissionsDemo } from './lib/demos/da-permissions';
 
-	interface RunPayload {
-		files: VirtualFile[];
-		events: TraceEvent[];
-		finalText: string;
+const out = await runPermissionsDemo({
+	onTrace: (events) => {
+		const last = events[events.length - 1];
+		if (last && (last.kind === 'fs_op' || last.kind === 'error'))
+			console.log('  ·', last.kind, '—', last.label);
 	}
+});
+
+console.log('\\nFiles that survived:', out.files.map((f) => f.path).join(', '));
+console.log('Final:', out.finalText);
+`
+	};
+
+	type RunPayload = PermissionsRunResult;
 
 	let busy = $state(false);
 	let files = $state<VirtualFile[]>([]);
 	let events = $state<TraceEvent[]>([]);
 	let finalText = $state<string>('');
-
-	const INSTRUCTIONS = `You are auditing the harness's permission system. Your task is to attempt
-five file writes in this exact order, all via write_file, then call ls() once. You MUST attempt
-all five even if some are denied — the point is to see which are denied. Do not skip any.
-
-After ls(), reply with one sentence summarising which writes succeeded and which were denied.
-
-The five writes to attempt (in order):
-1. write_file('src/util.ts',     '// utility')
-2. write_file('docs/intro.md',   '# Intro')
-3. write_file('secrets/keys.txt','should be denied')
-4. write_file('.env',            'API_KEY=foo')
-5. write_file('random.md',       'catch-all denied')`;
 
 	async function run() {
 		busy = true;
@@ -55,38 +53,11 @@ The five writes to attempt (in order):
 		try {
 			const result = await withRunCache<RunPayload>(
 				{ demoId: 'l3-permissions-run' },
-				async () => {
-					const localEvents: TraceEvent[] = [];
-					const tracer = createTracer();
-					tracer.subscribe((ev) => {
-						localEvents.push(ev);
-						events = [...localEvents];
-					});
-
-					const model = await getModel({ temperature: 0, maxTokens: 800 });
-					const backend = new StateBackend();
-					const agent = createDeepAgent({
-						model,
-						backend,
-						permissions,
-						instructions: INSTRUCTIONS,
-						tracer,
-						maxIterations: 16
-					});
-					agent.subscribe((s) => (files = [...s.files]));
-					const out = await agent.invoke({
-						input:
-							'Run the five-write audit described in your instructions and report what was blocked.',
-						thread: `perms-${Math.random().toString(36).slice(2, 6)}`
-					});
-					const last = out.messages[out.messages.length - 1];
-					const text =
-						typeof last?.content === 'string'
-							? last.content
-							: JSON.stringify(last?.content ?? '');
-					const finalFiles = await backend.list();
-					return { files: finalFiles, events: localEvents, finalText: text };
-				}
+				async () =>
+					await runPermissionsDemo({
+						onTrace: (ev) => (events = ev),
+						onFiles: (f) => (files = f)
+					})
 			);
 			files = result.files;
 			events = result.events;
@@ -124,6 +95,7 @@ The five writes to attempt (in order):
 		id: 'l3-permissions',
 		alt: 'Ornate doors with unique glyphs and tiny padlocks set into a stone wall'
 	}}
+	source={demoSource}
 >
 	{#snippet intro()}
 		<p>

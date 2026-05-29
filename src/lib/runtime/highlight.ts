@@ -31,7 +31,7 @@ const langxTheme = {
 		'editor.foreground': '#f4ece0'
 	},
 	tokenColors: [
-		{ scope: ['comment', 'punctuation.definition.comment'], settings: { foreground: '#7a7268', fontStyle: 'italic' } },
+		{ scope: ['comment', 'punctuation.definition.comment'], settings: { foreground: '#9a9288', fontStyle: 'italic' } },
 		{ scope: ['string', 'string.quoted'], settings: { foreground: '#e8c66f' } },
 		{ scope: ['constant.numeric', 'constant.language'], settings: { foreground: '#e8a45e' } },
 		{ scope: ['constant.character.escape'], settings: { foreground: '#d8a876' } },

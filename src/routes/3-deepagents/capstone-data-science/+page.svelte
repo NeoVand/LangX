@@ -8,24 +8,17 @@
 	import FileTreeViewer from '$lib/components/FileTreeViewer.svelte';
 	import Markdown from '$lib/components/Markdown.svelte';
 	import TraceLog from '$lib/components/TraceLog.svelte';
-	import {
-		createDeepAgent,
-		StateBackend,
-		type CompiledDeepAgent,
-		type VirtualFile
-	} from '$lib/deepagents';
-	import { JsSandbox } from '$lib/runtime/sandbox';
-	import { getModel } from '$lib/runtime/llm';
+	import type { CompiledDeepAgent, StateBackend, VirtualFile } from '$lib/deepagents';
+	import type { JsSandbox } from '$lib/runtime/sandbox';
 	import { withRunCache, loadCachedRun } from '$lib/runtime/runs';
-	import { tool } from '@langchain/core/tools';
-	import { z } from 'zod';
-	import { createTracer } from '$lib/runtime/tracer';
 	import type { TraceEvent } from '$lib/runtime/tracer/types';
-
-	interface ComputeStep {
-		code: string;
-		result: string;
-	}
+	import {
+		runDataScienceCapstone,
+		type ComputeStep,
+		type DsRunResult
+	} from '$lib/demos/da-capstone-data-science';
+	import daCapstoneDsSrc from '$lib/demos/da-capstone-data-science.ts?raw';
+	import type { DemoManifest } from '$lib/demos/download';
 
 	const SAMPLE_CSV = `date,product,quantity,revenue
 2025-01-01,A,12,360
@@ -38,14 +31,33 @@
 2025-01-05,B,11,550
 2025-01-05,A,8,240`;
 
-	interface RunPayload {
-		csv: string;
-		files: VirtualFile[];
-		events: TraceEvent[];
-		steps: ComputeStep[];
-		report: string | null;
-		finalText: string;
-	}
+	// Cached payload: the serializable subset of DsRunResult (no live handles).
+	type RunPayload = Omit<DsRunResult, 'live'>;
+
+	const demoSource: DemoManifest = {
+		id: 'da-capstone-data-science',
+		title: 'Capstone — Data Science',
+		summary:
+			'Agent ingests a CSV, computes aggregates in a scoped Worker, plots a chart, and writes a markdown report.',
+		entries: [{ path: 'lib/demos/da-capstone-data-science.ts', code: daCapstoneDsSrc }],
+		runner: `import { runDataScienceCapstone } from './lib/demos/da-capstone-data-science';
+
+const csv = \`date,product,quantity,revenue
+2025-01-01,A,12,360
+2025-01-01,B,5,250
+2025-01-02,A,7,210
+2025-01-02,C,3,90
+2025-01-03,B,9,450\`;
+
+const out = await runDataScienceCapstone(csv, {
+	onStep: (steps) => console.log('  · compute call', steps.length)
+});
+
+console.log('\\nFiles:', out.files.map((f) => f.path).join(', '));
+console.log('\\nReport:\\n', out.report ?? '(none)');
+console.log('\\nFinal:', out.finalText);
+`
+	};
 
 	let csv = $state(SAMPLE_CSV);
 	let busy = $state(false);
@@ -74,122 +86,6 @@
 		'Compute the daily revenue totals and chart them as bars.'
 	];
 
-	const INSTRUCTIONS = `You are a data-science agent. You have two custom tools:
-- \`compute({ code })\` runs JavaScript inside a scoped Worker. The variable \`csv\` is pre-bound to
-  the raw CSV text. Use \`return\` to produce a JSON-serialisable value.
-- \`plot({ mark, data, x, y, title })\` renders an Observable Plot chart to an SVG file under
-  /reports/figures/ and returns its path. \`data\` is an array of objects.
-
-Follow this recipe exactly:
-1. write_file('/data/sales.csv', <the CSV string the user provided>) — pass the CSV through verbatim.
-2. compute({ code: <JS that parses csv into rows, then aggregates quantity and revenue per product, then returns { rowCount, byProduct: [{ product, quantity, revenue }] }> })
-3. plot({ mark: 'bar', data: <the byProduct array>, x: 'product', y: 'revenue', title: 'Revenue by product' })
-4. write_file('/reports/sales.md', <a short markdown report with three sections:
-   - "Summary" — one paragraph with rowCount and product count.
-   - "Revenue by product" — a markdown table of product / quantity / revenue.
-   - "Chart" — the line  ![Revenue by product](/reports/figures/1.svg)  >)
-5. Reply with one sentence noting where the report was saved and how many rows were analysed.
-
-Do not chat between tool calls. Do not skip steps.`;
-
-	async function renderPlot(spec: {
-		mark: string;
-		data: Record<string, unknown>[];
-		x: string;
-		y: string;
-		title?: string;
-	}): Promise<string> {
-		const Plot = await import('@observablehq/plot');
-		const fill = 'var(--color-accent-deepagents, #8a6cff)';
-		const marks =
-			spec.mark === 'line'
-				? [Plot.line(spec.data, { x: spec.x, y: spec.y, stroke: fill, strokeWidth: 2 }), Plot.dot(spec.data, { x: spec.x, y: spec.y, fill })]
-				: spec.mark === 'dot'
-					? [Plot.dot(spec.data, { x: spec.x, y: spec.y, fill })]
-					: [Plot.barY(spec.data, { x: spec.x, y: spec.y, fill })];
-		const chart = Plot.plot({
-			title: spec.title,
-			width: 520,
-			height: 300,
-			marginLeft: 64,
-			marginBottom: 44,
-			x: { label: spec.x },
-			y: { label: spec.y, grid: true },
-			marks
-		});
-		const svgEl =
-			chart.tagName.toLowerCase() === 'svg' ? chart : chart.querySelector('svg');
-		const out = svgEl ? new XMLSerializer().serializeToString(svgEl) : chart.outerHTML;
-		chart.remove?.();
-		return out;
-	}
-
-	function buildAgent(localEvents: TraceEvent[], collectStep: (s: ComputeStep) => void) {
-		const tracer = createTracer();
-		tracer.subscribe((ev) => {
-			localEvents.push(ev);
-			events = [...localEvents];
-		});
-
-		const sandbox = new JsSandbox();
-		const backend = new StateBackend();
-		let figureCount = 0;
-
-		const computeTool = tool(
-			async ({ code }) => {
-				const out = await sandbox.run(code, { csv });
-				const result = out.ok ? JSON.stringify(out.value, null, 2) : `Error: ${out.error}`;
-				collectStep({ code, result });
-				return result;
-			},
-			{
-				name: 'compute',
-				description:
-					'Run a self-contained JavaScript expression in a scoped Worker (no DOM, no network). Use `csv` as the variable holding the raw CSV text. Use `return` to produce a value.',
-				schema: z.object({ code: z.string() })
-			}
-		);
-
-		const plotTool = tool(
-			async ({ mark, data, x, y, title }) => {
-				try {
-					const svg = await renderPlot({ mark, data, x, y, title });
-					const path = `/reports/figures/${++figureCount}.svg`;
-					await backend.write(path, svg);
-					return `Wrote chart to ${path}`;
-				} catch (e) {
-					return `Plot error: ${e instanceof Error ? e.message : String(e)}`;
-				}
-			},
-			{
-				name: 'plot',
-				description:
-					'Render an Observable Plot chart to an SVG file under /reports/figures/. data is an array of row objects; x and y are field names; mark is "bar", "line", or "dot".',
-				schema: z.object({
-					mark: z.enum(['bar', 'line', 'dot']),
-					data: z.array(z.record(z.string(), z.unknown())),
-					x: z.string(),
-					y: z.string(),
-					title: z.string().optional()
-				})
-			}
-		);
-
-		const agentPromise = (async () => {
-			const model = await getModel({ temperature: 0, maxTokens: 1200 });
-			return createDeepAgent({
-				model,
-				backend,
-				tools: [computeTool, plotTool],
-				instructions: INSTRUCTIONS,
-				tracer,
-				maxIterations: 16
-			});
-		})();
-
-		return { agentPromise, sandbox, backend };
-	}
-
 	async function run() {
 		busy = true;
 		files = [];
@@ -200,37 +96,29 @@ Do not chat between tool calls. Do not skip steps.`;
 		liveSandbox?.terminate();
 		liveAgent = null;
 		try {
-			const localSteps: ComputeStep[] = [];
+			const csvForRun = csv;
 			const result = await withRunCache<RunPayload>(
-				{ demoId: `l3-capstone-ds-${slugify(csv)}` },
+				{ demoId: `l3-capstone-ds-${slugify(csvForRun)}` },
 				async () => {
-					const localEvents: TraceEvent[] = [];
-					const { agentPromise, sandbox, backend } = buildAgent(localEvents, (s) => {
-						localSteps.push(s);
-						steps = [...localSteps];
+					const out = await runDataScienceCapstone(csvForRun, {
+						onTrace: (ev) => (events = ev),
+						onFiles: (f) => (files = f),
+						onStep: (s) => (steps = s)
 					});
-					const agent = await agentPromise;
-					agent.subscribe((s) => (files = [...s.files]));
-
-					liveThread = `ds-${Math.random().toString(36).slice(2, 6)}`;
-					const out = await agent.invoke({
-						input: `Here is the CSV. Analyse it and produce a sales report.\n\n${csv}`,
-						thread: liveThread
-					});
-					const text = lastText(out.messages);
 
 					// Keep handles alive for follow-up chips (only on a fresh run, not a cache hit).
-					liveAgent = agent;
-					liveBackend = backend;
-					liveSandbox = sandbox;
+					liveAgent = out.live.agent;
+					liveBackend = out.live.backend;
+					liveSandbox = out.live.sandbox;
+					liveThread = out.live.thread;
 
 					return {
-						csv,
-						files: await backend.list(),
-						events: localEvents,
-						steps: localSteps,
-						report: (await backend.read('/reports/sales.md')) ?? null,
-						finalText: text
+						csv: out.csv,
+						files: out.files,
+						events: out.events,
+						steps: out.steps,
+						report: out.report,
+						finalText: out.finalText
 					};
 				}
 			);
@@ -320,6 +208,7 @@ createDeepAgent({ model, backend, tools: [computeTool, plotTool] });`;
 		id: 'l3-capstone-data-science',
 		alt: "A scholar's lab with beakers labeled by glyph and a chart-press etching plots"
 	}}
+	source={demoSource}
 >
 	{#snippet intro()}
 		<p>

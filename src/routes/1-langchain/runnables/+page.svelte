@@ -8,67 +8,53 @@
 	import StateInspector from '$lib/components/StateInspector.svelte';
 	import Diagram from '$lib/components/Diagram.svelte';
 	import { lcelPipeline } from '$lib/diagrams';
-	import { ChatPromptTemplate } from '@langchain/core/prompts';
-	import { StringOutputParser } from '@langchain/core/output_parsers';
-	import {
-		RunnableLambda,
-		RunnableParallel,
-		RunnablePassthrough
-	} from '@langchain/core/runnables';
 	import { getModel } from '$lib/runtime/llm';
 	import { withRunCache, loadCachedRun } from '$lib/runtime/runs';
+	import { runPipeDemo, type PipeStep } from '$lib/demos/runnables-pipe';
+	import pipeSrc from '$lib/demos/runnables-pipe.ts?raw';
+	import { runFanoutDemo, type FanoutResult } from '$lib/demos/runnables-fanout';
+	import fanoutSrc from '$lib/demos/runnables-fanout.ts?raw';
+	import type { DemoManifest } from '$lib/demos/download';
 	import { onMount } from 'svelte';
+
+	const demoSource: DemoManifest = {
+		id: 'runnables',
+		title: 'Runnables and LCEL',
+		summary: 'Compose prompt → model → parser with LCEL, then fan one input out with RunnableParallel.',
+		entries: [
+			{ path: 'lib/demos/runnables-pipe.ts', code: pipeSrc },
+			{ path: 'lib/demos/runnables-fanout.ts', code: fanoutSrc }
+		],
+		runner: `import { runPipeDemo } from './lib/demos/runnables-pipe';
+import { runFanoutDemo } from './lib/demos/runnables-fanout';
+
+console.log('=== Sequential pipe ===');
+const pipe = await runPipeDemo('the reactor pattern', (s) => console.log('  ·', s.step));
+console.log('Final:', pipe.finalText, '\\n');
+
+console.log('=== Parallel fan-out ===');
+const fan = await runFanoutDemo('the reactor pattern');
+console.log(fan);
+`
+	};
 
 	let topic = $state('the reactor pattern');
 
 	let demoARun = $state(false);
 	let demoAResult = $state('');
-	let demoASteps = $state<{ step: string; data: unknown }[]>([]);
+	let demoASteps = $state<PipeStep[]>([]);
 
-	type DemoAPayload = { topic: string; finalText: string; steps: typeof demoASteps };
+	type DemoAPayload = { finalText: string; steps: PipeStep[] };
 
 	async function runDemoA() {
 		demoARun = true;
 		demoAResult = '';
 		demoASteps = [];
 		try {
+			const topicForRun = topic;
 			const out = await withRunCache<DemoAPayload>(
 				{ demoId: 'l1-runnables-pipe' },
-				async () => {
-					const prompt = ChatPromptTemplate.fromMessages([
-						[
-							'system',
-							'You are a concise tutor. Answer in 1 short paragraph (≤ 60 words).'
-						],
-						[
-							'human',
-							"Explain {topic} like the reader is a senior engineer who hasn't met it."
-						]
-					]);
-					const model = await getModel({ temperature: 0.2, maxTokens: 220 });
-					const parser = new StringOutputParser();
-
-					const promptValue = await prompt.invoke({ topic });
-					const steps: { step: string; data: unknown }[] = [];
-					steps.push({
-						step: 'prompt → ChatPromptValue',
-						data: promptValue.toChatMessages().map((m) => ({
-							role: m._getType(),
-							content: m.content
-						}))
-					});
-
-					const response = await model.invoke(promptValue);
-					steps.push({
-						step: 'model → AIMessage',
-						data: { content: response.content }
-					});
-
-					const finalText = await parser.invoke(response);
-					steps.push({ step: 'parser → string', data: finalText });
-
-					return { topic, finalText, steps };
-				}
+				async () => await runPipeDemo(topicForRun)
 			);
 			demoAResult = out.finalText;
 			demoASteps = out.steps;
@@ -78,49 +64,17 @@
 	}
 
 	let demoBRun = $state(false);
-	let demoBResult = $state<{ short: string; bullets: string; passthrough: string } | null>(null);
+	let demoBResult = $state<FanoutResult | null>(null);
 
 	async function runDemoB() {
 		demoBRun = true;
 		demoBResult = null;
 		try {
-			const result = await withRunCache<{
-				short: string;
-				bullets: string;
-				passthrough: string;
-			}>({ demoId: 'l1-runnables-fanout' }, async () => {
-				const model = await getModel({ temperature: 0.2, maxTokens: 220 });
-				const shortChain = ChatPromptTemplate.fromMessages([
-					['human', 'In one sentence (≤ 25 words), what is {topic}?']
-				])
-					.pipe(model)
-					.pipe(new StringOutputParser());
-				const bulletChain = ChatPromptTemplate.fromMessages([
-					[
-						'human',
-						'List exactly three short bullet facts about {topic}. Use a leading "• " and one line per bullet. No prose.'
-					]
-				])
-					.pipe(model)
-					.pipe(new StringOutputParser());
-
-				const fanout = RunnableParallel.from({
-					short: shortChain,
-					bullets: bulletChain,
-					passthrough: RunnablePassthrough.assign({}).pipe(
-						new RunnableLambda({
-							func: (x: { topic: string }) => `(input echoed: ${x.topic})`
-						})
-					)
-				});
-
-				return (await fanout.invoke({ topic })) as {
-					short: string;
-					bullets: string;
-					passthrough: string;
-				};
-			});
-			demoBResult = result;
+			const topicForRun = topic;
+			demoBResult = await withRunCache<FanoutResult>(
+				{ demoId: 'l1-runnables-fanout' },
+				async () => await runFanoutDemo(topicForRun)
+			);
 		} finally {
 			demoBRun = false;
 		}
@@ -132,11 +86,7 @@
 			demoAResult = cachedA.payload.finalText;
 			demoASteps = cachedA.payload.steps;
 		}
-		const cachedB = await loadCachedRun<{
-			short: string;
-			bullets: string;
-			passthrough: string;
-		}>({ demoId: 'l1-runnables-fanout' });
+		const cachedB = await loadCachedRun<FanoutResult>({ demoId: 'l1-runnables-fanout' });
 		if (cachedB) demoBResult = cachedB.payload;
 	});
 
@@ -176,6 +126,7 @@ const { short, bullets, passthrough } = await fanout.invoke({ topic });`;
 		id: 'l1-runnables',
 		alt: 'A factory line of brass machines passing a glowing token hand to hand'
 	}}
+	source={demoSource}
 >
 	{#snippet intro()}
 		<p>

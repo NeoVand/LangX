@@ -10,70 +10,37 @@
 	import FileTreeViewer from '$lib/components/FileTreeViewer.svelte';
 	import TraceLog from '$lib/components/TraceLog.svelte';
 	import SkillInspector from '$lib/components/SkillInspector.svelte';
-	import {
-		createDeepAgent,
-		StateBackend,
-		type Skill,
-		type VirtualFile
-	} from '$lib/deepagents';
-	import { getModel } from '$lib/runtime/llm';
-	import { displayContent } from '$lib/runtime/messages';
+	import { type VirtualFile } from '$lib/deepagents';
 	import { withRunCache, loadCachedRun } from '$lib/runtime/runs';
-	import { createTracer } from '$lib/runtime/tracer';
 	import type { TraceEvent } from '$lib/runtime/tracer/types';
+	import { runSkillsDemo, SKILLS, type SkillsRunResult } from '$lib/demos/da-skills';
+	import skillsSrc from '$lib/demos/da-skills.ts?raw';
+	import type { DemoManifest } from '$lib/demos/download';
 
-	const skills: Skill[] = [
-		{
-			name: 'cite',
-			description:
-				'Insert proper citations for every claim in the form [Author, Year] with a sources block at the end.',
-			body: `# cite
+	const demoSource: DemoManifest = {
+		id: 'da-skills',
+		title: 'Skills (progressive disclosure)',
+		summary:
+			'Only skill names + descriptions ship in the prompt; bodies load on demand via load_skill.',
+		entries: [{ path: 'lib/demos/da-skills.ts', code: skillsSrc }],
+		runner: `import { runSkillsDemo } from './lib/demos/da-skills';
 
-1. After each non-trivial claim, append [Author, Year].
-2. At the end of the document, add a "Sources" section with a numbered list and full URLs.
-3. Prefer primary sources. Avoid secondary aggregators.`
-		},
-		{
-			name: 'shrink',
-			description:
-				'Reduce a markdown document by ~40% while preserving every numeric claim, every URL, and the original section headings.',
-			body: `# shrink
+const { files, finalText } = await runSkillsDemo({
+	onFiles: (live) => console.log('  · files:', live.map((f) => f.path).join(', '))
+});
 
-1. Run a frequency analysis on adjectives and adverbs; remove weak ones.
-2. Collapse list items that share a verb.
-3. Never delete a number, a date, or a URL.
-4. Keep section headings exactly as they were.`
-		},
-		{
-			name: 'eli12',
-			description:
-				'Rewrite the input to be understandable to a smart 12-year-old. Maintain accuracy.',
-			body: `# eli12
+console.log('\\nDraft written by the agent:');
+for (const f of files) console.log('\\n--- ' + f.path + ' ---\\n' + f.content);
+console.log('\\nSummary:', finalText);
+`
+	};
 
-1. Replace jargon with plain words. Keep proper nouns.
-2. Use ≤15-word sentences when possible.
-3. Lead each paragraph with a concrete example.`
-		}
-	];
-
-	interface RunPayload {
-		events: TraceEvent[];
-		files: VirtualFile[];
-		finalText: string;
-	}
+	const skills = SKILLS;
 
 	let busy = $state(false);
 	let events = $state<TraceEvent[]>([]);
 	let files = $state<VirtualFile[]>([]);
 	let finalText = $state<string>('');
-
-	const INSTRUCTIONS = `You are writing a short paragraph and citing it properly.
-
-Process:
-1. First call load_skill({ name: 'cite' }) — read the returned skill body carefully.
-2. Then write_file('/draft.md', <one paragraph applying the cite skill, with a Sources section>).
-3. Do not load any other skills. Do not chat between tool calls.
-4. End with one short summary sentence.`;
 
 	async function run() {
 		busy = true;
@@ -81,41 +48,13 @@ Process:
 		files = [];
 		finalText = '';
 		try {
-			const result = await withRunCache<RunPayload>(
+			const result = await withRunCache<SkillsRunResult>(
 				{ demoId: 'l3-skills-run' },
-				async () => {
-					const localEvents: TraceEvent[] = [];
-					const tracer = createTracer();
-					tracer.subscribe((ev) => {
-						localEvents.push(ev);
-						events = [...localEvents];
-					});
-
-					const model = await getModel({ temperature: 0, maxTokens: 600 });
-					const backend = new StateBackend();
-					const agent = createDeepAgent({
-						model,
-						backend,
-						skills,
-						instructions: INSTRUCTIONS,
-						tracer,
-						maxIterations: 30
-					});
-					agent.subscribe((s) => (files = [...s.files]));
-
-					const out = await agent.invoke({
-						input:
-							'Write a single paragraph on stateful agent runtimes — and cite it properly.',
-						thread: `skills-${Math.random().toString(36).slice(2, 6)}`
-					});
-					const last = out.messages[out.messages.length - 1];
-					const text = displayContent(last?.content);
-					return {
-						events: localEvents,
-						files: await backend.list(),
-						finalText: text
-					};
-				}
+				async () =>
+					runSkillsDemo({
+						onFiles: (f) => (files = f),
+						onTrace: (e) => (events = e)
+					})
 			);
 			events = result.events;
 			files = result.files;
@@ -127,7 +66,7 @@ Process:
 
 	$effect(() => {
 		(async () => {
-			const cached = await loadCachedRun<RunPayload>({ demoId: 'l3-skills-run' });
+			const cached = await loadCachedRun<SkillsRunResult>({ demoId: 'l3-skills-run' });
 			if (cached) {
 				events = cached.payload.events;
 				files = cached.payload.files;
@@ -173,6 +112,7 @@ createDeepAgent({ model, skills, /* ... */ });
 		id: 'l3-skills',
 		alt: 'A three-tiered apothecary cabinet with progressively expanded labels'
 	}}
+	source={demoSource}
 >
 	{#snippet intro()}
 		<p>

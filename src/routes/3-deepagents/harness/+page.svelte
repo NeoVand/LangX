@@ -9,17 +9,31 @@
 	import RunButton from '$lib/components/RunButton.svelte';
 	import FileTreeViewer from '$lib/components/FileTreeViewer.svelte';
 	import TraceLog from '$lib/components/TraceLog.svelte';
-	import {
-		BASE_AGENT_PROMPT,
-		assembleSystemPrompt,
-		createDeepAgent,
-		StateBackend,
-		type VirtualFile
-	} from '$lib/deepagents';
-	import { getModel } from '$lib/runtime/llm';
-	import { displayContent } from '$lib/runtime/messages';
-	import { createTracer } from '$lib/runtime/tracer';
+	import { BASE_AGENT_PROMPT, assembleSystemPrompt, type VirtualFile } from '$lib/deepagents';
 	import type { TraceEvent } from '$lib/runtime/tracer/types';
+	import { runHarnessDemo } from '$lib/demos/da-harness';
+	import harnessSrc from '$lib/demos/da-harness.ts?raw';
+	import type { DemoManifest } from '$lib/demos/download';
+
+	const demoSource: DemoManifest = {
+		id: 'da-harness',
+		title: 'The deep-agent harness',
+		summary:
+			'Build a deep-agent harness from toggles (compaction, HITL) and drive one end-to-end run.',
+		entries: [{ path: 'lib/demos/da-harness.ts', code: harnessSrc }],
+		runner: `import { runHarnessDemo } from './lib/demos/da-harness';
+
+const { finalText } = await runHarnessDemo({
+	instructions: 'You are a senior researcher helping the user write a brief on the LangGraph runtime. Always plan before you act.',
+	useCompaction: true,
+	useHitl: false,
+	onTrace: () => {},
+	onFiles: (files) => console.log('  · files:', files.map((f) => f.path).join(', '))
+});
+
+console.log('\\nFinal:', finalText);
+`
+	};
 
 	let userInstructions = $state(`You are a senior researcher helping the user
 write a brief on the LangGraph runtime. Always plan before you act.`);
@@ -49,37 +63,14 @@ write a brief on the LangGraph runtime. Always plan before you act.`);
 		events = [];
 		finalText = '';
 		try {
-			const tracer = createTracer();
-			tracer.subscribe((ev) => (events = [...events, ev]));
-			const model = await getModel({ temperature: 0, maxTokens: 400 });
-			const backend = new StateBackend();
-			const thread = `harness-${Math.random().toString(36).slice(2, 6)}`;
-			const agent = createDeepAgent({
-				model,
-				backend,
+			const out = await runHarnessDemo({
 				instructions: userInstructions,
-				tracer,
-				maxIterations: 16,
-				...(useCompaction
-					? { compaction: { maxTokens: 4000, evictThresholdPct: 45, summarizeThresholdPct: 80 } }
-					: {}),
-				...(useHitl ? { interruptOn: ['write_file'] } : {})
+				useCompaction,
+				useHitl,
+				onTrace: (e) => (events = e),
+				onFiles: (f) => (files = f)
 			});
-			agent.subscribe((s) => (files = [...s.files]));
-
-			// Drive the run; auto-approve any HITL pause so this lesson stays focused
-			// on assembly (the HITL lesson covers approval UX in depth).
-			let res = await agent.start({
-				input: 'Plan two steps, write a one-line note to /scratch/plan.md, then summarize what you did.',
-				thread
-			});
-			while (res.status === 'interrupted') {
-				res = await agent.resume({ decision: 'approve' }, thread);
-			}
-			finalText = displayContent(
-				(res.state.messages[res.state.messages.length - 1] as { content?: unknown })
-					?.content as never
-			);
+			finalText = out.finalText;
 		} catch (e) {
 			finalText = `Run failed: ${e instanceof Error ? e.message : String(e)}`;
 		} finally {
@@ -118,6 +109,7 @@ const result = await agent.invoke({ input: 'Brief me on LangGraph.' });`;
 		id: 'l3-harness',
 		alt: 'An exploded diagram of a leather harness with brass fittings labeled by glyph'
 	}}
+	source={demoSource}
 >
 	{#snippet intro()}
 		<p>

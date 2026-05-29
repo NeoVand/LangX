@@ -142,6 +142,7 @@
 		max-width: 40rem;
 		margin: 0 auto;
 		padding: 4rem 2.75rem 8rem;
+		min-width: 0;
 	}
 
 	.eyebrow {
@@ -211,7 +212,7 @@
 	}
 
 	.demo-pane {
-		background: var(--color-paper);
+		background: var(--color-bg-elev);
 		max-height: calc(100vh - 56px);
 		overflow: hidden;
 		display: flex;
@@ -291,6 +292,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 1.5rem;
+		min-width: 0;
 	}
 
 	/* Multiple <Panel>s / DemoFrames inside one snippet are direct children of

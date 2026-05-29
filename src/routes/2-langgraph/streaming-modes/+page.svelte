@@ -5,46 +5,40 @@
 	import Panel from '$lib/components/Panel.svelte';
 	import CodeBlock from '$lib/components/CodeBlock.svelte';
 	import RunButton from '$lib/components/RunButton.svelte';
-	import { StateGraph, MessagesAnnotation, START, END } from '@langchain/langgraph/web';
-	import { ToolNode } from '@langchain/langgraph/prebuilt';
-	import { weatherTool } from '$lib/runtime/tools';
-	import { HumanMessage, AIMessage, type BaseMessage } from '@langchain/core/messages';
-	import { displayContent } from '$lib/runtime/messages';
-	import { getModel } from '$lib/runtime/llm';
 	import { withRunCache, loadCachedRun } from '$lib/runtime/runs';
+	import {
+		runStreamingModesDemo,
+		type ValuesEvent,
+		type UpdatesEvent,
+		type MessagesEvent,
+		type StreamingPayload
+	} from '$lib/demos/lg-streaming-modes';
+	import lgStreamingSrc from '$lib/demos/lg-streaming-modes.ts?raw';
+	import type { DemoManifest } from '$lib/demos/download';
 	import { onMount } from 'svelte';
 
-	type ValuesEvent = { messageCount: number; last: string };
-	type UpdatesEvent = Record<string, { added: number; last: string }>;
-	type MessagesEvent = { chunk: string; from: string };
+	const demoSource: DemoManifest = {
+		id: 'streaming-modes',
+		title: 'Streaming modes',
+		summary: 'Observe one graph run three ways: values, updates, and per-token messages.',
+		entries: [{ path: 'lib/demos/lg-streaming-modes.ts', code: lgStreamingSrc }],
+		runner: `import { runStreamingModesDemo } from './lib/demos/lg-streaming-modes';
 
-	interface DemoPayload {
-		values: ValuesEvent[];
-		updates: UpdatesEvent[];
-		messages: MessagesEvent[];
-	}
+const out = await runStreamingModesDemo();
+
+console.log('streamMode: values');
+out.values.forEach((v) => console.log('  ', JSON.stringify(v)));
+console.log('\\nstreamMode: updates');
+out.updates.forEach((u) => console.log('  ', JSON.stringify(u)));
+console.log('\\nstreamMode: messages (reassembled text)');
+console.log('  ', out.messages.map((m) => m.chunk).join(''));
+`
+	};
 
 	let busy = $state(false);
 	let valuesEvents = $state<ValuesEvent[]>([]);
 	let updatesEvents = $state<UpdatesEvent[]>([]);
 	let messagesEvents = $state<MessagesEvent[]>([]);
-
-	async function buildGraph() {
-		const model = await getModel({ temperature: 0, maxTokens: 200 });
-		const bound = model.bindTools!([weatherTool]);
-		const tools = new ToolNode([weatherTool]);
-
-		return new StateGraph(MessagesAnnotation)
-			.addNode('agent', async (s) => ({ messages: [await bound.invoke(s.messages)] }))
-			.addNode('tools', tools)
-			.addEdge(START, 'agent')
-			.addConditionalEdges('agent', (s) => {
-				const last = s.messages[s.messages.length - 1] as AIMessage;
-				return last.tool_calls?.length ? 'tools' : END;
-			})
-			.addEdge('tools', 'agent')
-			.compile();
-	}
 
 	async function runAll() {
 		busy = true;
@@ -52,55 +46,14 @@
 		updatesEvents = [];
 		messagesEvents = [];
 		try {
-			const out = await withRunCache<DemoPayload>(
+			const out = await withRunCache<StreamingPayload>(
 				{ demoId: 'l2-streaming-modes' },
-				async () => {
-					const promptText = "What's the weather in Tokyo? Reply in one short sentence.";
-					const input = { messages: [new HumanMessage(promptText)] };
-
-					const v: ValuesEvent[] = [];
-					const u: UpdatesEvent[] = [];
-					const m: MessagesEvent[] = [];
-
-					const g1 = await buildGraph();
-					for await (const evt of await g1.stream(input, { streamMode: 'values' })) {
-						const msgs = (evt as { messages: BaseMessage[] }).messages;
-						v.push({
-							messageCount: msgs.length,
-							last: msgs[msgs.length - 1]?.constructor?.name ?? '?'
-						});
-					}
-					valuesEvents = v;
-
-					const g2 = await buildGraph();
-					for await (const evt of await g2.stream(input, { streamMode: 'updates' })) {
-						const entry: UpdatesEvent = {};
-						for (const [node, payload] of Object.entries(evt)) {
-							const msgs = (payload as { messages: BaseMessage[] }).messages;
-							entry[node] = {
-								added: msgs.length,
-								last: msgs[msgs.length - 1]?.constructor?.name ?? '?'
-							};
-						}
-						u.push(entry);
-					}
-					updatesEvents = u;
-
-					const g3 = await buildGraph();
-					for await (const [chunk, meta] of await g3.stream(input, {
-						streamMode: 'messages'
-					})) {
-						const c = chunk as { content?: unknown };
-						const md = meta as { langgraph_node?: string };
-						// Anthropic streams content as block arrays, not strings — extract
-						// the text so the messages panel isn't silently empty.
-						const text = displayContent(c.content as never);
-						if (text) m.push({ chunk: text, from: md.langgraph_node ?? '?' });
-					}
-					messagesEvents = m;
-
-					return { values: v, updates: u, messages: m };
-				}
+				async () =>
+					await runStreamingModesDemo({
+						onValues: (e) => (valuesEvents = e),
+						onUpdates: (e) => (updatesEvents = e),
+						onMessages: (e) => (messagesEvents = e)
+					})
 			);
 			valuesEvents = out.values;
 			updatesEvents = out.updates;
@@ -111,7 +64,7 @@
 	}
 
 	onMount(async () => {
-		const cached = await loadCachedRun<DemoPayload>({ demoId: 'l2-streaming-modes' });
+		const cached = await loadCachedRun<StreamingPayload>({ demoId: 'l2-streaming-modes' });
 		if (cached) {
 			valuesEvents = cached.payload.values;
 			updatesEvents = cached.payload.updates;
@@ -137,6 +90,7 @@ for await (const [chunk, meta] of await graph.stream(input, { streamMode: 'messa
 		id: 'l2-streaming-modes',
 		alt: 'A three-channel printing press emitting different paper ribbons'
 	}}
+	source={demoSource}
 >
 	{#snippet intro()}
 		<p>

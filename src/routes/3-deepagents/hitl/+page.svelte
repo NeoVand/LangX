@@ -7,17 +7,33 @@
 	import RunButton from '$lib/components/RunButton.svelte';
 	import FileTreeViewer from '$lib/components/FileTreeViewer.svelte';
 	import TraceLog from '$lib/components/TraceLog.svelte';
-	import {
-		createDeepAgent,
-		StateBackend,
-		type CompiledDeepAgent,
-		type HarnessInterrupt,
-		type VirtualFile
-	} from '$lib/deepagents';
-	import { getModel } from '$lib/runtime/llm';
+	import type { CompiledDeepAgent, HarnessInterrupt, VirtualFile } from '$lib/deepagents';
 	import { displayContent } from '$lib/runtime/messages';
-	import { createTracer } from '$lib/runtime/tracer';
 	import type { TraceEvent } from '$lib/runtime/tracer/types';
+	import { createHitlAgent } from '$lib/demos/da-hitl';
+	import daHitlSrc from '$lib/demos/da-hitl.ts?raw';
+	import type { DemoManifest } from '$lib/demos/download';
+
+	const demoSource: DemoManifest = {
+		id: 'da-hitl',
+		title: 'Human-in-the-loop',
+		summary:
+			'Gate write_file behind a human approval interrupt; the host drives start → resume per pause.',
+		entries: [{ path: 'lib/demos/da-hitl.ts', code: daHitlSrc }],
+		runner: `import { runHitlDemo } from './lib/demos/da-hitl';
+
+// A CLI host auto-approves every gated write_file call.
+const finalText = await runHitlDemo(
+	(interrupt) => {
+		console.log('  · approval needed:', interrupt.tool, JSON.stringify(interrupt.args));
+		return { decision: 'approve' };
+	},
+	{ onTrace: (ev) => console.log('    trace:', ev.kind, '—', ev.label) }
+);
+
+console.log('\\nFinal:', finalText);
+`
+	};
 
 	let busy = $state(false);
 	let files = $state<VirtualFile[]>([]);
@@ -28,12 +44,6 @@
 	let agent: CompiledDeepAgent | null = null;
 	let thread = '';
 	let log = $state<{ tool: string; decision: string }[]>([]);
-
-	const INSTRUCTIONS = `You are about to write two files. Call write_file twice in order:
-1. write_file('/draft.md',     '# First draft')
-2. write_file('/published.md', '# Published\\n\\nReady for the team.')
-
-Then reply with one short summary sentence. Do not chat between tool calls.`;
 
 	function presentInterrupt(i: HarnessInterrupt) {
 		pending = i;
@@ -48,22 +58,14 @@ Then reply with one short summary sentence. Do not chat between tool calls.`;
 		finalText = '';
 		log = [];
 		try {
-			const tracer = createTracer();
-			tracer.subscribe((ev) => (events = [...events, ev]));
-			const model = await getModel({ temperature: 0, maxTokens: 400 });
-			const backend = new StateBackend();
-			thread = `hitl-${Math.random().toString(36).slice(2, 6)}`;
-			agent = createDeepAgent({
-				model,
-				backend,
-				interruptOn: ['write_file'],
-				instructions: INSTRUCTIONS,
-				tracer,
-				maxIterations: 8
+			const built = await createHitlAgent({
+				onTrace: (ev) => (events = [...events, ev]),
+				onFiles: (f) => (files = f)
 			});
-			agent.subscribe((s) => (files = [...s.files]));
+			agent = built.agent;
+			thread = built.thread;
 
-			const res = await agent.start({ input: 'Write the draft and the published file.', thread });
+			const res = await agent.start({ input: built.input, thread });
 			if (res.status === 'interrupted') presentInterrupt(res.interrupt);
 			else finishFrom(res.state);
 		} finally {
@@ -121,6 +123,7 @@ while (res.status === 'interrupted') {
 		id: 'l3-hitl',
 		alt: "A judge's bench: a small mechanical agent awaits an approve/deny stamp"
 	}}
+	source={demoSource}
 >
 	{#snippet intro()}
 		<p>

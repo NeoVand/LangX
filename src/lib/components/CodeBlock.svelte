@@ -32,7 +32,7 @@
 	}
 </script>
 
-<figure class="code" class:dense>
+<figure class="code code-surface" class:dense>
 	<div class="hl">
 		{#if html}
 			<!-- eslint-disable-next-line svelte/no-at-html-tags -->
@@ -41,7 +41,7 @@
 			<pre class="shiki"><code>{@html escape(code)}</code></pre>
 		{/if}
 	</div>
-	<figcaption>
+	<figcaption class="code-surface-footer">
 		<span class="lang">{lang}</span>
 		{#if caption}
 			<span class="sep" aria-hidden="true">·</span>
@@ -54,34 +54,50 @@
 </figure>
 
 <style>
-	/* One recessed unit: code surface + a borderless footer bar. No nested boxes. */
 	.code {
-		margin: 1.25rem 0;
-		border-radius: 0.55rem;
-		overflow: hidden;
-		background: var(--color-paper);
+		margin: 1.5rem 0;
+		min-width: 0;
+		max-width: 100%;
 	}
 
 	.code.dense {
 		margin: 0.5rem 0;
 	}
 
+	.hl {
+		position: relative;
+		z-index: 1;
+		min-width: 0;
+		max-width: 100%;
+		overflow: hidden;
+	}
+
 	.hl :global(pre.shiki) {
 		margin: 0;
+		padding: 1.15rem 1.3rem;
 		background: transparent !important;
 		border-radius: 0;
+		overflow-x: hidden;
+		max-width: 100%;
+	}
+
+	.code.dense .hl :global(pre.shiki) {
+		padding: 0.95rem 1.15rem;
 	}
 
 	figcaption {
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
-		padding: 0.4rem 0.7rem;
-		border-top: 1px solid color-mix(in oklch, var(--color-border) 60%, transparent);
+		gap: 0.55rem;
+		padding: 0.55rem 1.3rem 0.65rem;
 		font-family: var(--font-mono);
 		font-size: 0.72rem;
 		color: var(--color-fg-faint);
 		letter-spacing: 0.04em;
+	}
+
+	.code.dense figcaption {
+		padding: 0.45rem 1.15rem 0.55rem;
 	}
 
 	.lang {
@@ -105,21 +121,19 @@
 	.copy {
 		margin-left: auto;
 		font-size: 0.7rem;
-		padding: 0.15rem 0.55rem;
-		border-radius: 0.3rem;
-		background: color-mix(in oklch, var(--color-fg-muted) 8%, transparent);
-		color: var(--color-fg-muted);
+		padding: 0.12rem 0.4rem;
+		border-radius: 0.25rem;
+		background: transparent;
+		color: var(--color-fg-faint);
 		border: none;
 		font-family: var(--font-mono);
 		cursor: pointer;
-		transition:
-			color 0.18s ease,
-			background 0.18s ease;
+		transition: color 0.18s ease;
 	}
 
 	.copy:hover,
 	.copy:focus-visible {
-		color: var(--color-fg);
-		background: color-mix(in oklch, var(--color-fg-muted) 16%, transparent);
+		color: var(--accent-ink);
+		background: transparent;
 	}
 </style>

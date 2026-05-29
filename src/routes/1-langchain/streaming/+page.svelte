@@ -5,15 +5,38 @@
 	import Panel from '$lib/components/Panel.svelte';
 	import CodeBlock from '$lib/components/CodeBlock.svelte';
 	import RunButton from '$lib/components/RunButton.svelte';
-	import { ChatPromptTemplate } from '@langchain/core/prompts';
-	import { StringOutputParser } from '@langchain/core/output_parsers';
-	import { getModel } from '$lib/runtime/llm';
 	import { withRunCache, loadCachedRun } from '$lib/runtime/runs';
+	import {
+		runTokenStream,
+		runEventStream,
+		type StreamEvent as Ev
+	} from '$lib/demos/streaming';
+	import streamingSrc from '$lib/demos/streaming.ts?raw';
+	import type { DemoManifest } from '$lib/demos/download';
 	import { onMount } from 'svelte';
+
+	const demoSource: DemoManifest = {
+		id: 'streaming',
+		title: 'Streaming',
+		summary: 'Stream a chain token-by-token, and emit one typed event per Runnable boundary with streamEvents.',
+		entries: [{ path: 'lib/demos/streaming.ts', code: streamingSrc }],
+		runner: `import { runTokenStream, runEventStream } from './lib/demos/streaming';
+
+console.log('=== Token chunks ===');
+await runTokenStream('checkpointers in LangGraph', (_tokens, text) => {
+	process.stdout.write('\\r' + text);
+});
+console.log('\\n');
+
+console.log('=== streamEvents v2 ===');
+const { events } = await runEventStream('checkpointers in LangGraph');
+for (const ev of events) console.log('  ·', ev.event, ev.name, ev.data ? '— ' + ev.data : '');
+`
+	};
 
 	let topic = $state('checkpointers in LangGraph');
 
-	type Demo1Payload = { topic: string; final: string; tokens: string[] };
+	type Demo1Payload = { final: string; tokens: string[] };
 	let demo1Run = $state(false);
 	let demo1Tokens = $state<string[]>([]);
 	let demo1Final = $state('');
@@ -23,29 +46,14 @@
 		demo1Tokens = [];
 		demo1Final = '';
 		try {
+			const topicForRun = topic;
 			const out = await withRunCache<Demo1Payload>(
 				{ demoId: 'l1-streaming-tokens' },
-				async () => {
-					const prompt = ChatPromptTemplate.fromMessages([
-						[
-							'system',
-							'You are a concise tutor. Reply in 2 short sentences (≤ 60 words).'
-						],
-						['human', 'Explain {topic}.']
-					]);
-					const model = await getModel({ temperature: 0.2, maxTokens: 220 });
-					const chain = prompt.pipe(model).pipe(new StringOutputParser());
-					const stream = await chain.stream({ topic });
-					const tokens: string[] = [];
-					let buf = '';
-					for await (const chunk of stream) {
-						tokens.push(chunk);
-						buf += chunk;
-						demo1Tokens = tokens.slice();
-						demo1Final = buf;
-					}
-					return { topic, final: buf, tokens };
-				}
+				async () =>
+					await runTokenStream(topicForRun, (tokens, text) => {
+						demo1Tokens = tokens;
+						demo1Final = text;
+					})
 			);
 			demo1Final = out.final;
 			demo1Tokens = out.tokens;
@@ -54,12 +62,7 @@
 		}
 	}
 
-	interface Ev {
-		event: string;
-		name: string;
-		data?: string;
-	}
-	type Demo2Payload = { topic: string; events: Ev[] };
+	type Demo2Payload = { events: Ev[] };
 	let demo2Run = $state(false);
 	let demo2Events = $state<Ev[]>([]);
 
@@ -67,44 +70,13 @@
 		demo2Run = true;
 		demo2Events = [];
 		try {
+			const topicForRun = topic;
 			const out = await withRunCache<Demo2Payload>(
 				{ demoId: 'l1-streaming-events' },
-				async () => {
-					const prompt = ChatPromptTemplate.fromMessages([
-						['human', 'In two short bullets, list two facts about {topic}.']
-					]).withConfig({ runName: 'prompt' });
-					const baseModel = await getModel({ temperature: 0, maxTokens: 180 });
-					const model = baseModel.withConfig({ runName: 'model' });
-					const parser = new StringOutputParser().withConfig({ runName: 'parser' });
-					const chain = prompt.pipe(model).pipe(parser);
-
-					const events: Ev[] = [];
-					for await (const ev of chain.streamEvents({ topic }, { version: 'v2' })) {
-						if (
-							ev.event === 'on_chain_start' ||
-							ev.event === 'on_chain_end' ||
-							ev.event === 'on_chat_model_start' ||
-							ev.event === 'on_chat_model_end' ||
-							ev.event === 'on_chat_model_stream' ||
-							ev.event === 'on_parser_end'
-						) {
-							const dataPreview =
-								ev.event === 'on_chat_model_stream'
-									? (ev.data?.chunk as { content?: unknown })?.content
-											?.toString()
-											.slice(0, 30)
-									: undefined;
-							const row: Ev = {
-								event: ev.event.replace('on_', ''),
-								name: ev.name,
-								data: dataPreview
-							};
-							events.push(row);
-							demo2Events = events.slice();
-						}
-					}
-					return { topic, events };
-				}
+				async () =>
+					await runEventStream(topicForRun, (events) => {
+						demo2Events = events;
+					})
 			);
 			demo2Events = out.events;
 		} finally {
@@ -148,6 +120,7 @@ for await (const chunk of stream) {
 		id: 'l1-streaming',
 		alt: 'A copper-basin water clock with cascading droplets'
 	}}
+	source={demoSource}
 >
 	{#snippet intro()}
 		<p>

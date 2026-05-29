@@ -8,27 +8,36 @@
 	import FileTreeViewer from '$lib/components/FileTreeViewer.svelte';
 	import Diff from '$lib/components/Diff.svelte';
 	import TraceLog from '$lib/components/TraceLog.svelte';
-	import { createDeepAgent, StateBackend, type VirtualFile } from '$lib/deepagents';
-	import { getModel } from '$lib/runtime/llm';
+	import { type VirtualFile } from '$lib/deepagents';
 	import { withRunCache, loadCachedRun } from '$lib/runtime/runs';
-	import { createTracer } from '$lib/runtime/tracer';
 	import type { TraceEvent } from '$lib/runtime/tracer/types';
+	import {
+		runVirtualFsDemo,
+		type FsRunResult,
+		type FileEdit,
+		type FsScenario as Scenario
+	} from '$lib/demos/da-virtual-fs';
+	import virtualFsSrc from '$lib/demos/da-virtual-fs.ts?raw';
+	import type { DemoManifest } from '$lib/demos/download';
 
-	type Scenario = 'organize' | 'edit';
+	const demoSource: DemoManifest = {
+		id: 'da-virtual-fs',
+		title: 'The virtual filesystem',
+		summary:
+			'An agent working files through the six-tool filesystem API — write, edit surgically, verify.',
+		entries: [{ path: 'lib/demos/da-virtual-fs.ts', code: virtualFsSrc }],
+		runner: `import { runVirtualFsDemo } from './lib/demos/da-virtual-fs';
 
-	interface FileEdit {
-		path: string;
-		before: string;
-		after: string;
-	}
+const { files, edits, finalText } = await runVirtualFsDemo('edit', {
+	onFiles: (live) => console.log('  · files:', live.map((f) => f.path).join(', '))
+});
 
-	interface RunPayload {
-		scenario: Scenario;
-		files: VirtualFile[];
-		events: TraceEvent[];
-		finalText: string;
-		edits: FileEdit[];
-	}
+console.log('\\nFinal filesystem:');
+for (const f of files) console.log('  -', f.path);
+for (const e of edits) console.log('\\nedit ' + e.path + ':\\n  before: ' + e.before + '\\n  after:  ' + e.after);
+console.log('\\nSummary:', finalText);
+`
+	};
 
 	let scenario = $state<Scenario>('organize');
 	let busy = $state(false);
@@ -37,35 +46,6 @@
 	let finalText = $state<string>('');
 	let edits = $state<FileEdit[]>([]);
 
-	const PROMPT: Record<Scenario, { input: string; instructions: string }> = {
-		organize: {
-			instructions: `You are an autonomous file organizer. The user will hand you a free-form note
-dump. Split it into one file per category under /notes/, named /notes/<category>.md.
-Each category file must contain a bulleted list of its items, one per line, prefixed with "- ".
-After the writes, run ls() once and reply with one short sentence summarising what you did.
-Do not chat. Only call tools until the work is complete.`,
-			input: `Organize this raw dump into /notes/:
-
-shopping: milk, eggs, bread
-ideas: drone delivery for groceries, voice-first todo list
-todo: respond to alex, finish the brief`
-		},
-		edit: {
-			instructions: `You are a careful refactor agent. First write the file you're given at the exact
-path requested using write_file. Then use edit_file to replace the marked line with the requested
-replacement (oldString must be unique). Then read_file to confirm. Reply with one short summary line.
-Use tools only; do not chat.`,
-			input: `Create /code/util.ts with this exact contents:
-
-export function greet(name: string) {
-  return 'Hello, ' + name;
-}
-
-Then edit it so the body becomes:  return \`Hi, \${name}!\`;
-Then read_file to verify.`
-		}
-	};
-
 	async function run() {
 		busy = true;
 		files = [];
@@ -73,66 +53,15 @@ Then read_file to verify.`
 		finalText = '';
 		edits = [];
 		try {
-			const result = await withRunCache<RunPayload>(
-				{ demoId: `l3-virtual-fs-${scenario}` },
-				async () => {
-					const localEvents: TraceEvent[] = [];
-					const tracer = createTracer();
-					tracer.subscribe((ev) => {
-						localEvents.push(ev);
-						events = [...localEvents];
-					});
-
-					const model = await getModel({ temperature: 0, maxTokens: 800 });
-					const backend = new StateBackend();
-					const agent = createDeepAgent({
-						model,
-						backend,
-						instructions: PROMPT[scenario].instructions,
-						tracer,
-						maxIterations: 14
-					});
-
-					// Track per-file content across state updates so an edit_file (a change to an
-					// already-written file) surfaces as a real before→after diff, like git diff.
-					const prevContent = new Map<string, string>();
-					const editMap = new Map<string, FileEdit>();
-					agent.subscribe((s) => {
-						files = [...s.files];
-						for (const f of s.files) {
-							const old = prevContent.get(f.path);
-							if (old !== undefined && old !== f.content) {
-								const existing = editMap.get(f.path);
-								editMap.set(f.path, {
-									path: f.path,
-									before: existing?.before ?? old,
-									after: f.content
-								});
-								edits = [...editMap.values()];
-							}
-							prevContent.set(f.path, f.content);
-						}
-					});
-
-					const out = await agent.invoke({
-						input: PROMPT[scenario].input,
-						thread: `fs-${scenario}-${Math.random().toString(36).slice(2, 6)}`
-					});
-
-					const last = out.messages[out.messages.length - 1];
-					const text =
-						typeof last?.content === 'string'
-							? last.content
-							: JSON.stringify(last?.content ?? '');
-					const finalFiles = await backend.list();
-					return {
-						scenario,
-						files: finalFiles,
-						events: localEvents,
-						finalText: text,
-						edits: [...editMap.values()]
-					};
-				}
+			const which = scenario;
+			const result = await withRunCache<FsRunResult>(
+				{ demoId: `l3-virtual-fs-${which}` },
+				async () =>
+					runVirtualFsDemo(which, {
+						onFiles: (f) => (files = f),
+						onTrace: (e) => (events = e),
+						onEdits: (ed) => (edits = ed)
+					})
 			);
 			files = result.files;
 			events = result.events;
@@ -146,7 +75,7 @@ Then read_file to verify.`
 	$effect(() => {
 		const which = scenario;
 		(async () => {
-			const cached = await loadCachedRun<RunPayload>({
+			const cached = await loadCachedRun<FsRunResult>({
 				demoId: `l3-virtual-fs-${which}`
 			});
 			if (cached && cached.payload.scenario === which) {
@@ -188,6 +117,7 @@ Then read_file to verify.`
 		id: 'l3-virtual-fs',
 		alt: 'A wall of small wooden file drawers with abstract glyph labels'
 	}}
+	source={demoSource}
 >
 	{#snippet intro()}
 		<p>
