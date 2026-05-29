@@ -203,13 +203,16 @@ createDeepAgent({ model, backend, tools: [computeTool, plotTool] });`;
 <Lesson
 	title="Capstone — Data Science"
 	eyebrow="Phase 3 · Capstone 2"
-	motivation="Bring the data; let the agent bring the analysis. A scoped JS interpreter plus a virtual filesystem is enough for end-to-end CSV → report."
 	hero={{
 		id: 'l3-capstone-data-science',
 		alt: "A scholar's lab with beakers labeled by glyph and a chart-press etching plots"
 	}}
 	source={demoSource}
 >
+	{#snippet motivation()}
+		Bring the data; let the agent bring the analysis. A <Term t="Scoped interpreter">scoped JS interpreter</Term> plus a <Term t="Virtual filesystem">virtual filesystem</Term> is enough for end-to-end CSV → report.
+	{/snippet}
+
 	{#snippet intro()}
 		<p>
 			A second capstone with a different shape: the agent ingests a CSV, runs analysis in a
@@ -222,25 +225,25 @@ createDeepAgent({ model, backend, tools: [computeTool, plotTool] });`;
 	{#snippet narrative()}
 		<Slide eyebrow="Why this shape" title="Data is a file; analysis is a tool" variant="dropcap">
 			<p>
-				A real data-science agent does not need a vector store or a graph database to start
+				A real data-science agent does not need a <Term t="Vector store">vector store</Term> or a graph database to start
 				being useful. It needs a place to put the input, a place to run code on it, and a
-				place to put the output. The harness already supplies the first and third — the
-				virtual filesystem. Adding a scoped JS interpreter as a tool gives the agent the
-				second, and the loop becomes obvious: write the CSV, compute, write the report.
+				place to put the output. The <Term t="Harness">harness</Term> already supplies the first and third — the
+				<Term t="Virtual filesystem">virtual filesystem</Term>. Adding a <Term t="Scoped interpreter">scoped JS interpreter</Term> as a <Term t="tool">tool</Term> gives the agent the
+				second, and the loop becomes obvious: <Term t="write_file">write</Term> the CSV, compute, write the report.
 			</p>
 			<p>
-				The shape generalises. Swap the Worker for a managed sandbox (Modal, Daytona,
-				Runloop) and the same agent runs against full Python stacks. Swap the CSV for a
-				notebook and you get a notebook agent. The interface is what stays put.
+				The shape generalises. Swap the <Term t="Web Worker">Worker</Term> for a managed sandbox (<Term t="Modal">Modal</Term>, <Term t="Daytona">Daytona</Term>,
+				<Term t="Runloop">Runloop</Term>) and the same agent runs against full Python stacks. Swap the CSV for a
+				notebook and you get a notebook agent. The <Term t="Harness">harness</Term> interface is what stays put.
 			</p>
 		</Slide>
 
 		<Slide title="Why a worker" variant="code-first">
 			<p>
-				A Web Worker has no access to <code>document</code>, no cookies from the parent
+				A <Term t="Web Worker">Web Worker</Term> has no access to <code>document</code>, no cookies from the parent
 				page, and dies on a configurable timeout. That makes it a reasonable substitute for
-				the QuickJS-based interpreter the production Deep Agents harness uses for code
-				execution. Here, the agent ships JS source via a tool; the worker evaluates it and
+				the <Term t="QuickJS">QuickJS</Term>-based interpreter the production <Term t="Harness">Deep Agents harness</Term> uses for code
+				execution. Here, the agent ships JS source via a <Term t="tool">tool</Term>; the worker evaluates it and
 				returns the result.
 			</p>
 			<CodeBlock code={code} lang="ts" caption="Agent gets a compute tool; sandbox runs the code." />
@@ -248,8 +251,8 @@ createDeepAgent({ model, backend, tools: [computeTool, plotTool] });`;
 
 		<Slide variant="pull-quote">
 			<p>
-				A virtual filesystem plus a scoped interpreter is roughly the smallest substrate on
-				which an agent can do real analysis. Everything else is a richer sandbox or a
+				A <Term t="Virtual filesystem">virtual filesystem</Term> plus a <Term t="Scoped interpreter">scoped interpreter</Term> is roughly the smallest substrate on
+				which a <Term t="Deep Agent">agent</Term> can do real analysis. Everything else is a richer sandbox or a
 				prettier chart.
 			</p>
 		</Slide>

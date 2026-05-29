@@ -118,18 +118,21 @@ createDeepAgent({
 <Lesson
 	title="Context compaction"
 	eyebrow="Phase 3 · Lesson 08"
-	motivation="Context windows are finite; useful agent runs aren't. Compaction is how you keep the relevant past available without paying for the whole transcript."
 	hero={{
 		id: 'l3-compaction',
 		alt: 'Long pages distilled in a printing press into a single summary card'
 	}}
 	source={demoSource}
 >
+	{#snippet motivation()}
+		<Term t="Context window">Context windows</Term> are finite; useful agent runs aren't. <Term t="Context compaction">Compaction</Term> is how you keep the relevant past available without paying for the whole transcript.
+	{/snippet}
+
 	{#snippet intro()}
 		<p>
-			Long-horizon agents fill the model's context window. The harness has a four-tier
-			pipeline for handling that — <Term t="Eviction" />, argument truncation,
-			<Term t="Summarization" />, and overflow recovery — and a low-threshold demo here so
+			<Term t="Long-horizon">Long-horizon</Term> agents fill the model's <Term t="Context window">context window</Term>. The <Term t="Harness">harness</Term> has a four-tier
+			pipeline for handling that — <Term t="Eviction" />, <Term t="Argument truncation">argument truncation</Term>,
+			<Term t="Summarization" />, and <Term t="Overflow recovery">overflow recovery</Term> — and a low-threshold demo here so
 			you can actually see the tiers fire.
 		</p>
 	{/snippet}
@@ -144,9 +147,9 @@ createDeepAgent({
 				material onto disk so nothing is silently lost.
 			</p>
 			<p>
-				Four tiers, applied in order before every model call: evict the bulkiest tool
-				results to disk; truncate repeated tool arguments; summarise older middle messages;
-				and finally raise an error rather than truncate the system prompt. Each tier is
+				Four tiers, applied in order before every model call: <Term t="Eviction">evict</Term> the bulkiest tool
+				results to the <Term t="Virtual filesystem">virtual filesystem</Term>; <Term t="Argument truncation">truncate</Term> repeated tool arguments; <Term t="Summarization">summarise</Term> older middle messages;
+				and finally <Term t="Overflow recovery">raise an error</Term> rather than truncate the <Term t="System prompt">system prompt</Term>. Each tier is
 				cheap; together they keep an agent coherent across dozens of turns.
 			</p>
 		</Slide>

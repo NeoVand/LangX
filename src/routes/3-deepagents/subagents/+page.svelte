@@ -97,17 +97,20 @@ createDeepAgent({ model, subagents, /* ... */ });
 <Lesson
 	title="Subagents"
 	eyebrow="Phase 3 · Lesson 06"
-	motivation="When a task needs its own working memory, you don't expand the parent's context — you spawn a subagent. The task tool is delegation made first-class."
 	hero={{
 		id: 'l3-subagents',
 		alt: 'A central scholar gestures to three smaller assistants at flanking desks'
 	}}
 	source={demoSource}
 >
+	{#snippet motivation()}
+		When a task needs its own working memory, you don't expand the parent's <Term t="Context window">context</Term> — you spawn a <Term t="Subagent">subagent</Term>. The <Term t="task"><code>task</code></Term> tool is delegation made first-class.
+	{/snippet}
+
 	{#snippet intro()}
 		<p>
-			A <Term t="Subagent" /> is an ephemeral child agent with its own context window, its own
-			tools, and its own goal. The parent calls <code>task(name, description)</code> and gets
+			A <Term t="Subagent" /> is an ephemeral child agent with its own <Term t="Context window">context window</Term>, its own
+			<Term t="tool">tools</Term>, and its own goal. The parent calls <Term t="task"><code>task(name, description)</code></Term> and gets
 			back one concise summary — never the subagent's internal messages.
 		</p>
 	{/snippet}
@@ -117,15 +120,15 @@ createDeepAgent({ model, subagents, /* ... */ });
 			<p>
 				The naïve way to do "research, then write, then critique" is to keep every fetched
 				URL, every revision, every margin note in a single conversation. That conversation
-				crosses the token horizon before it produces anything useful, and the model spends
+				crosses the <Term t="Context window">token horizon</Term> before it produces anything useful, and the model spends
 				half its budget remembering why it was looking at <code>example.com</code> in the
 				first place.
 			</p>
 			<p>
-				A subagent is the inverse: a child with its own context, its own tools, its own
+				A <Term t="Subagent">subagent</Term> is the inverse: <Term t="context quarantine">context quarantine</Term> — a child with its own context, its own tools, its own
 				50-message argument about which URL to fetch — and a single-line report back to the
 				parent. The parent never sees the debate; it sees the conclusion. The same loop a
-				senior engineer would use to delegate, expressed as a tool call.
+				senior engineer would use to delegate, expressed as <Term t="task"><code>task</code></Term>.
 			</p>
 		</Slide>
 
@@ -145,8 +148,8 @@ createDeepAgent({ model, subagents, /* ... */ });
 		<Slide title="Why isolation matters">
 			<p>
 				The parent's context stays small because the subagent's internal debate never
-				enters the parent's view. This is the single biggest reason long-horizon tasks
-				remain coherent in practice — and why the harness treats subagents as a first-class
+				enters the parent's view. This is the single biggest reason <Term t="Long-horizon">long-horizon</Term> tasks
+				remain coherent in practice — and why the <Term t="Harness">harness</Term> treats <Term t="Subagent">subagents</Term> as a first-class
 				primitive rather than an optional pattern.
 			</p>
 		</Slide>

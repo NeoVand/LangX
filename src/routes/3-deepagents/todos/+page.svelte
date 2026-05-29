@@ -96,19 +96,22 @@ console.log('\\nSummary:', finalText);
 <Lesson
 	title="Planning with write_todos"
 	eyebrow="Phase 3 · Lesson 03"
-	motivation="Plans live longer than turns. write_todos externalises the plan into a structured artifact the model — and you — can audit, reorder, and resume."
 	hero={{
 		id: 'l3-todos',
 		alt: 'A clipboard checklist of pictographs with one item checked, two pending'
 	}}
 	source={demoSource}
 >
+	{#snippet motivation()}
+		Plans live longer than turns. <Term t="write_todos"><code>write_todos</code></Term> externalises <Term t="Planning">planning</Term> into a structured artifact the model — and you — can audit, reorder, and resume.
+	{/snippet}
+
 	{#snippet intro()}
 		<p>
-			<Term t="write_todos" /> is the smallest cognitive prosthesis the harness ships. The
+			<Term t="write_todos" /> is the smallest cognitive prosthesis the <Term t="Harness">harness</Term> ships. The
 			agent breaks the goal into discrete steps, marks one in-progress, and updates the list
-			as it goes. The plan lives in graph state, not in the prompt — so the model's working
-			memory stays clean.
+			as it goes. The plan lives in graph state, not in the prompt — so the model's <Term t="Context window">working
+			memory</Term> stays clean.
 		</p>
 	{/snippet}
 
@@ -116,21 +119,21 @@ console.log('\\nSummary:', finalText);
 		<Slide eyebrow="Why this shape" title="Plans deserve to be objects" variant="dropcap">
 			<p>
 				Free-form chain-of-thought rots quickly under pressure. A re-rolled response forgets
-				earlier intent, summarisation erases the milestones, and long tasks drift toward
-				whatever the model last typed. A persistent to-do list is checkpointable,
-				inspectable, and survives compaction — plans become objects, not vibes.
+				earlier intent, <Term t="Summarization">summarisation</Term> erases the milestones, and long tasks drift toward
+				<Term t="Goal drift">goal drift</Term> toward whatever the model last typed. A persistent to-do list is checkpointable,
+				inspectable, and survives <Term t="Context compaction">compaction</Term> — plans become objects, not vibes.
 			</p>
 			<p>
-				The cost of write_todos is one tool call per state change. The payoff is an agent
+				The cost of <Term t="write_todos"><code>write_todos</code></Term> is one tool call per state change. The payoff is an agent
 				that can be paused, audited, and resumed without re-deriving its own intent. It is
-				the cheapest mechanism that makes long-horizon work behave like project work.
+				the cheapest mechanism that makes <Term t="Long-horizon">long-horizon</Term> work behave like project work.
 			</p>
 		</Slide>
 
 		<Slide title="The protocol" variant="code-first">
 			<CodeBlock code={protocolCode} lang="ts" />
 			<p>
-				The harness's middleware re-renders the live list into the system prompt every turn,
+				The harness's <Term t="Middleware">middleware</Term> re-renders the live list into the <Term t="System prompt">system prompt</Term> every turn,
 				so the agent always sees its own plan when it decides what to do next.
 			</p>
 		</Slide>

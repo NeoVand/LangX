@@ -153,42 +153,50 @@ const graph = new StateGraph(State)
 <Lesson
 	title="Conditional edges & reducers"
 	eyebrow="Phase 2 · Lesson 02"
-	motivation="The agent's choices need a place to live. Conditional edges plus reducers turn 'what next?' from a prompt-engineering trick into a routing decision your code can read."
 	hero={{
 		id: 'l2-conditional-edges',
 		alt: 'A railway switch viewed from above with two tracks merging into one'
 	}}
 	source={demoSource}
 >
+	{#snippet motivation()}
+		The agent's choices need a place to live. <Term t="Conditional edge">Conditional edges</Term> plus
+		<Term t="Reducer">reducers</Term> turn "what next?" from a prompt-engineering trick into a routing
+		decision your code can read.
+	{/snippet}
 	{#snippet intro()}
 		<p>
-			A graph is a router and a merge strategy in one. Conditional edges decide where execution
-			goes; <Term t="Reducer" /> functions decide how concurrent updates combine when nodes
-			write to the same field.
+			A <Term t="StateGraph" /> is a router and a merge strategy in one.
+			<Term t="Conditional edge">Conditional edges</Term> decide where execution goes;
+			<Term t="Reducer" /> functions decide how concurrent updates combine when
+			<Term t="Node">nodes</Term> write to the same field.
 		</p>
 	{/snippet}
 
 	{#snippet narrative()}
 		<Slide eyebrow="Why this shape" title="Routing is a design surface" variant="dropcap">
 			<p>
-				Without conditional edges, every "if/else" inside an agent collapses into a prompt
-				instruction the model may or may not follow. With them, your routing logic becomes a
-				piece of code your colleagues can read, your tests can hit, and your monitoring can
-				count. The model's job becomes <em>producing the signal</em>; the graph decides what
-				to do with it.
+				Without <Term t="Conditional edge">conditional edges</Term>, every "if/else" inside an
+				<Term t="Agent">agent</Term> collapses into a prompt instruction the model may or may not
+				follow. With them, your routing logic becomes a piece of code your colleagues can read,
+				your tests can hit, and your monitoring can count. The model's job becomes
+				<em>producing the signal</em>; the graph decides what to do with it.
 			</p>
 			<p>
-				Reducers play the same trick on writes. When two nodes can update the same field, you
-				stop hoping last-write-wins is the right semantics and you spell out exactly how
-				updates combine. The state schema becomes a contract instead of a guess.
+				<Term t="Reducer">Reducers</Term> play the same trick on writes. When two
+				<Term t="Node">nodes</Term> can update the same field, you stop hoping
+				<Term t="Last-write-wins">last-write-wins</Term> is the right semantics and you spell out
+				exactly how updates combine. The <Term t="State schema">state schema</Term> becomes a
+				contract instead of a guess.
 			</p>
 		</Slide>
 
 		<Slide title="Conditional edges" variant="code-first">
 			<p>
-				<Term t="addConditionalEdges"><code>addConditionalEdges('source', router, mapping)</code></Term> calls the router with
-				the current state and uses the returned key to look up the next node. You can return
-				any string, an array of strings (run multiple branches), or an array of <Term t="Send"><code>Send</code></Term>
+				<Term t="addConditionalEdges"><code>addConditionalEdges('source', router, mapping)</code></Term>
+				calls the <Term t="Router">router</Term> with the current <Term t="State" /> and uses the
+				returned key to look up the next <Term t="Node" />. You can return any string, an array of
+				strings (run multiple branches), or an array of <Term t="Send"><code>Send</code></Term>
 				objects (covered in lesson 06).
 			</p>
 			<CodeBlock code={codeRoute} caption="A real-LLM support-ticket triage graph." />
@@ -205,9 +213,11 @@ const graph = new StateGraph(State)
 
 		<Slide title="Why reducers exist" variant="code-first">
 			<p>
-				When two nodes run in parallel and both write to <code>messages</code>, who wins? With
-				default last-write-wins semantics, you'd silently lose data. Reducers tell the runtime
-				how to merge writes — concatenate, sum, dedupe, whatever your domain wants.
+				When two <Term t="Node">nodes</Term> run in parallel and both write to
+				<code>messages</code>, who wins? With default
+				<Term t="Last-write-wins">last-write-wins</Term> semantics, you'd silently lose data.
+				<Term t="Reducer">Reducers</Term> tell the runtime how to merge writes — concatenate, sum,
+				dedupe, whatever your domain wants.
 			</p>
 			<CodeBlock code={codeMerge} caption="Three reducer styles in one schema." />
 			<p>
@@ -228,9 +238,11 @@ const graph = new StateGraph(State)
 
 		<Slide title="What this unlocks" ornament>
 			<p>
-				Conditional edges are the runtime surface for every router-style agent (triage,
-				multi-tool selection, escalation). Reducers are the substrate every "concurrent
-				writers" pattern in this chapter rests on.
+				<Term t="Conditional edge">Conditional edges</Term> are the runtime surface for every
+				router-style agent (triage, multi-tool selection, escalation).
+				<Term t="Reducer">Reducers</Term> are the substrate every concurrent-writer pattern in
+				this chapter rests on — including <Term t="Fan-out">fan-out</Term> and
+				<Term t="Map-reduce">map-reduce</Term> in later lessons.
 			</p>
 		</Slide>
 	{/snippet}

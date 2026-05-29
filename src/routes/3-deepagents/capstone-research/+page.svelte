@@ -119,18 +119,21 @@ console.log('Final:', out.finalText);
 <Lesson
 	title="Capstone — Deep Research"
 	eyebrow="Phase 3 · Capstone 1"
-	motivation="A capstone is where the parts compose. Plan, delegate, summarise, publish — the same loop a senior researcher would run, expressed in code."
 	hero={{
 		id: 'l3-capstone-research',
 		alt: "A grand reading room with three subagents sending findings via pneumatic tubes to an editor's desk"
 	}}
 	source={demoSource}
 >
+	{#snippet motivation()}
+		A <Term t="Capstone">capstone</Term> is where the parts compose. <Term t="write_todos">Plan</Term>, <Term t="task">delegate</Term>, <Term t="Summarization">summarise</Term>, publish — the same loop a senior researcher would run, expressed via the <Term t="Harness">harness</Term>.
+	{/snippet}
+
 	{#snippet intro()}
 		<p>
-			Everything you've seen comes together: <Term t="write_todos" /> for planning, parallel
-			researcher subagents for context isolation, a <Term t="CompositeBackend" /> that routes
-			the final report to durable memory, and a virtual filesystem so intermediate notes
+			Everything you've seen comes together: <Term t="write_todos" /> for <Term t="Planning">planning</Term>, parallel
+			researcher <Term t="Subagent">subagents</Term> for <Term t="context quarantine">context isolation</Term>, a <Term t="CompositeBackend" /> that routes
+			the final report to <Term t="StoreBackend">durable memory</Term>, and a <Term t="Virtual filesystem">virtual filesystem</Term> so intermediate notes
 			don't pollute the conversation.
 		</p>
 	{/snippet}
@@ -138,17 +141,17 @@ console.log('Final:', out.finalText);
 	{#snippet narrative()}
 		<Slide eyebrow="Why this shape" title="A team, expressed in tools" variant="dropcap">
 			<p>
-				The first chapters built the primitives; this one shows them composed into the
-				smallest shape that earns the name "research agent". One parent agent owns the plan
-				and the publish step. Three subagents — researcher, writer, critic — each take a
-				slice of the cognitive load with their own context window, their own prompt, and
-				their own one-line report back. The parent never sees the debate.
+				The first chapters built the primitives; this <Term t="Capstone">capstone</Term> shows them composed into the
+				smallest shape that earns the name "research agent". One parent <Term t="Deep Agent">agent</Term> owns the plan
+				and the publish step. Three <Term t="Subagent">subagents</Term> — researcher, writer, critic — each take a
+				slice of the cognitive load with their own <Term t="Context window">context window</Term>, their own prompt, and
+				their own one-line report back via <Term t="task"><code>task</code></Term>. The parent never sees the debate.
 			</p>
 			<p>
 				This is the loop a senior researcher actually runs: scope the question, hand the
 				slices to specialists, draft, review, archive the final under a stable name. The
-				difference is that here it is declarative — the same six tools, the same backends,
-				the same planner — composed by a real model in real time.
+				difference is that here it is declarative — the same <Term t="Virtual filesystem">filesystem tools</Term>, the same <Term t="Backend">backends</Term>,
+				the same <Term t="write_todos">planner</Term> — composed by a real <Term t="Model">model</Term> in real time.
 			</p>
 		</Slide>
 
@@ -188,7 +191,7 @@ console.log('Final:', out.finalText);
 			<p>
 				The parent never sees the researcher's full debate, the writer's draft revisions,
 				or the critic's deliberations — only the one-line summaries each returns. This is
-				the core context-quarantine idea, and it is what makes 30-step runs feel as crisp
+				the core <Term t="context quarantine">context-quarantine</Term> idea, and it is what makes <Term t="Long-horizon">30-step</Term> runs feel as crisp
 				as 3-step ones.
 			</p>
 		</Slide>

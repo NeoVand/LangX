@@ -86,8 +86,8 @@
 			</span>
 		</div>
 		<p class="status-note">
-			Local models run faster on WebGPU. If WebGPU is missing, LangX falls back to WebAssembly
-			(~5× slower) or you can use a hosted provider below.
+			Local models run faster on <Term t="WebGPU">WebGPU</Term>. If WebGPU is missing, LangX falls back to <Term t="WebAssembly">WebAssembly</Term>
+			(~5× slower) or you can use a hosted <Term t="Model">model</Term> provider below.
 		</p>
 	</section>
 
@@ -95,8 +95,8 @@
 		<div class="gate-body">
 			<h2>Step 1 · Hosted-API key</h2>
 			<p class="muted">
-				Anthropic is the recommended path — Claude Haiku 4.5 is fast, agentic, and Browser-CORS
-				enabled. Paste any key below and LangX will use it as the default.
+				Anthropic is the recommended path — <Term t="ChatAnthropic">Claude Haiku 4.5</Term> is fast, <Term t="Agentic grade">agentic</Term>, and Browser-CORS
+				enabled. Paste any <Term t="API key">API key</Term> below and LangX will use it as the default.
 			</p>
 			<div class="keys">
 				<label>
@@ -165,22 +165,22 @@
 	</section>
 
 	<section class="block">
-		<h2>Step 2 · Default provider</h2>
+		<h2>Step 2 · Default <Term t="Model">model</Term> provider</h2>
 		<div class="providers">
 			<label class="provider" class:selected={provider === 'anthropic'}>
 				<input type="radio" name="provider" bind:group={provider} value="anthropic" />
 				<span class="p-title">Anthropic</span>
-				<span class="p-desc">Claude Haiku 4.5. Strong tool use, fast first token.</span>
+				<span class="p-desc"><Term t="ChatAnthropic">Claude Haiku 4.5</Term>. Strong <Term t="Tool calling">tool use</Term>, fast first token.</span>
 			</label>
 			<label class="provider" class:selected={provider === 'openai'}>
 				<input type="radio" name="provider" bind:group={provider} value="openai" />
 				<span class="p-title">OpenAI</span>
-				<span class="p-desc">GPT-4o mini via the browser-CORS endpoint.</span>
+				<span class="p-desc"><Term t="ChatOpenAI">GPT-4o mini</Term> via the browser-CORS endpoint.</span>
 			</label>
 			<label class="provider" class:selected={provider === 'groq'}>
 				<input type="radio" name="provider" bind:group={provider} value="groq" />
 				<span class="p-title">Groq</span>
-				<span class="p-desc">Hosted Llama-3.3 70B at high token throughput.</span>
+				<span class="p-desc"><Term t="ChatGroq">Hosted Llama-3.3 70B</Term> at high token throughput.</span>
 			</label>
 			<label class="provider" class:selected={provider === 'transformers-js'}>
 				<input
@@ -190,7 +190,7 @@
 					value="transformers-js"
 				/>
 				<span class="p-title">Transformers.js</span>
-				<span class="p-desc">Local model in your browser. No key, no network at runtime.</span>
+				<span class="p-desc">Local <Term t="Transformers.js">Transformers.js</Term> model in your browser. No key, no network at runtime.</span>
 			</label>
 		</div>
 	</section>
@@ -198,8 +198,8 @@
 	<section class="block">
 		<h2>Step 3 · Local model (optional)</h2>
 		<p class="muted">
-			These models live on Hugging Face and download once into your browser cache. The harness
-			needs at least <strong>good</strong> agentic grade for the Deep Agents chapter to behave
+			These models live on Hugging Face and download once into your browser cache. The <Term t="Harness">harness</Term>
+			needs at least <strong>good</strong> <Term t="Agentic grade">agentic grade</Term> for the <Term t="Deep Agent">Deep Agents</Term> chapter to behave
 			properly.
 		</p>
 		<div class="models">

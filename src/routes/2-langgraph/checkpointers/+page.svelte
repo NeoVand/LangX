@@ -201,52 +201,61 @@ await graph.invoke({ messages: [new HumanMessage("What's my name?")] }, cfg);`;
 <Lesson
 	title="Checkpointers & time travel"
 	eyebrow="Phase 2 · Lesson 03"
-	motivation="An agent without persistence is a goldfish. Checkpointers give you resumption, branching histories, and forensic time-travel — the difference between a demo and a system."
 	hero={{
 		id: 'l2-checkpointers',
 		alt: 'A grandfather clock with gears whose dots align like saved checkpoints'
 	}}
 	source={demoSource}
 >
+	{#snippet motivation()}
+		An agent without persistence is a goldfish. <Term t="Checkpointer">Checkpointers</Term> give you
+		resumption, branching histories, and forensic <Term t="Time travel">time travel</Term> — the
+		difference between a demo and a system.
+	{/snippet}
 	{#snippet intro()}
 		<p>
-			Plug a <Term t="Checkpointer" /> into a compiled graph and every step writes a snapshot.
-			That single fact unlocks resume-after-crash, multi-turn conversations, and time travel —
-			replay or fork from any earlier point in the run.
+			Plug a <Term t="Checkpointer" /> into a compiled graph and every
+			<Term t="Superstep">superstep</Term> writes a <Term t="Checkpoint">checkpoint</Term>. That
+			single fact unlocks resume-after-crash, multi-turn conversations, and
+			<Term t="Time travel">time travel</Term> — replay or fork from any earlier point in the run.
 		</p>
 	{/snippet}
 
 	{#snippet narrative()}
 		<Slide eyebrow="Why this shape" title="State you can re-enter" variant="dropcap">
 			<p>
-				Most "agent frameworks" treat memory as a feature you bolt on later. LangGraph treats
-				it as a property of the runtime. As long as your state is well-typed, the same saver
-				that powers a multi-turn chat also powers crash recovery, A/B branching, and
-				point-in-time debugging — three problems that look unrelated until they share an
-				implementation.
+				Most "agent frameworks" treat memory as a feature you bolt on later.
+				<Term t="LangGraph" /> treats it as a property of the runtime. As long as your
+				<Term t="State">state</Term> is well-typed, the same saver that powers a multi-turn chat
+				also powers crash recovery, A/B branching, and point-in-time debugging — three problems
+				that look unrelated until they share an implementation.
 			</p>
 			<p>
-				The mental shift: stop thinking of a graph run as one thing and start thinking of it
-				as <strong>a stream of supersteps with a checkpoint after each one</strong>. Every
-				snapshot is addressable. Every snapshot is forkable. Every thread is just a sequence
-				of those snapshots, scoped by an id.
+				The mental shift: stop thinking of a graph run as one thing and start thinking of it as
+				<strong>a stream of <Term t="Superstep">supersteps</Term> with a checkpoint after each one</strong>.
+				Every snapshot is addressable. Every snapshot is forkable. Every
+				<Term t="Thread">thread</Term> is just a sequence of those snapshots, scoped by an id.
 			</p>
 		</Slide>
 
 		<Slide title="Compile with a checkpointer" variant="code-first">
 			<p>
-				<code>graph.compile({'{ checkpointer }'})</code> wires the runtime to call the saver
-				after every node. <code>MemorySaver</code> is in-memory; production setups use SQLite,
-				Postgres, or any custom store you implement against the saver interface.
+				<Term t="compile"><code>graph.compile({'{ checkpointer }'})</code></Term> wires the runtime
+				to call the saver after every <Term t="Node">node</Term>.
+				<Term t="MemorySaver"><code>MemorySaver</code></Term> is in-memory; production setups use
+				SQLite, <Term t="PostgresSaver">Postgres</Term>, or any custom store you implement against
+				the saver interface.
 			</p>
 			<CodeBlock code={code} caption="One MemorySaver, three superpowers." />
 		</Slide>
 
 		<Slide title="Threads">
 			<p>
-				Every call passes <code>thread_id</code> in <code>config.configurable</code>. The
-				checkpointer treats threads as isolated: snapshots from one don't bleed into another.
-				Two users on your app simply use two thread IDs — the runtime handles the rest.
+				Every call passes <Term t="thread_id"><code>thread_id</code></Term> in
+				<Term t="configurable"><code>config.configurable</code></Term>. The
+				<Term t="Checkpointer">checkpointer</Term> treats <Term t="Thread">threads</Term> as
+				isolated: snapshots from one don't bleed into another. Two users on your app simply use
+				two thread IDs — the runtime handles the rest.
 			</p>
 		</Slide>
 
@@ -254,26 +263,29 @@ await graph.invoke({ messages: [new HumanMessage("What's my name?")] }, cfg);`;
 
 		<Slide variant="pull-quote">
 			<p>
-				A checkpoint is more than a backup — it's an address. Once your runtime hands you
-				addresses for every superstep, "memory" and "debugging" stop being separate
-				disciplines.
+				A <Term t="Checkpoint">checkpoint</Term> is more than a backup — it's an address. Once your
+				runtime hands you addresses for every <Term t="Superstep">superstep</Term>, "memory" and
+				"debugging" stop being separate disciplines.
 			</p>
 		</Slide>
 
 		<Slide title="Time travel">
 			<p>
-				<code>getStateHistory</code> walks every checkpoint for a thread. You can pick one,
-				call <code>updateState</code> to edit it, and call <code>invoke(null, newConfig)</code>
-				to run forward from that fork. The original branch stays intact, both branches stay
-				queryable.
+				<Term t="getStateHistory"><code>getStateHistory</code></Term> walks every checkpoint for a
+				<Term t="Thread">thread</Term>. You can pick one, call
+				<Term t="updateState"><code>updateState</code></Term> to edit it, and call
+				<code>invoke(null, newConfig)</code> to run forward from that fork. The original branch
+				stays intact, both branches stay queryable.
 			</p>
 		</Slide>
 
 		<Slide title="Same primitive, multi-turn chat" variant="code-first">
 			<p>
-				The same checkpointer that powers time travel also powers a multi-turn chat. State is
-				whatever you defined; LangGraph just keeps loading the latest snapshot before each
-				new <code>invoke</code> on the same <code>thread_id</code>.
+				The same <Term t="Checkpointer">checkpointer</Term> that powers
+				<Term t="Time travel">time travel</Term> also powers a multi-turn chat.
+				<Term t="State">State</Term> is whatever you defined; LangGraph just keeps loading the
+				latest snapshot before each new <Term t="invoke">invoke</Term> on the same
+				<Term t="thread_id"><code>thread_id</code></Term>.
 			</p>
 			<CodeBlock code={chatCode} caption="Memory is a free side-effect of persistence." />
 		</Slide>

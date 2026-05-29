@@ -91,13 +91,16 @@ console.log('Final:', out.finalText);
 <Lesson
 	title="Filesystem permissions"
 	eyebrow="Phase 3 · Lesson 05"
-	motivation="An agent that can write to your filesystem is a feature; one that can write to /etc is a CVE. Permissions are the smallest, sharpest tool for that distinction."
 	hero={{
 		id: 'l3-permissions',
 		alt: 'Ornate doors with unique glyphs and tiny padlocks set into a stone wall'
 	}}
 	source={demoSource}
 >
+	{#snippet motivation()}
+		An agent that can <Term t="write_file"><code>write_file</code></Term> to your filesystem is a feature; one that can write to <code>/etc</code> is a CVE. <Term t="Permissions">Permissions</Term> are the smallest, sharpest tool for that distinction.
+	{/snippet}
+
 	{#snippet intro()}
 		<p>
 			<Term t="Permissions">Permissions</Term> are declarative: a list of <code>{'{ operations, paths, mode }'}</code>
@@ -110,14 +113,14 @@ console.log('Final:', out.finalText);
 		<Slide eyebrow="Why this shape" title="Prompts ask; rules enforce" variant="dropcap">
 			<p>
 				Telling a model "do not write to <code>.env</code>" works some of the time.
-				Code-level enforcement works every time. The harness layers them in the right order:
-				the prompt explains intent, the permission list is the ground truth, and the agent
+				Code-level enforcement works every time. The <Term t="Harness">harness</Term> layers them in the right order:
+				the <Term t="System prompt">prompt</Term> explains intent, the <Term t="Permissions">permission</Term> list is the ground truth, and the agent
 				gets a clear error message when it crosses a line — so it can adapt instead of
 				silently failing.
 			</p>
 			<p>
-				Concretely, every read or write is evaluated against the rule list before it
-				executes. The first matching rule wins. Specific deny rules pin the dangerous
+				Concretely, every <Term t="read_file">read</Term> or <Term t="write_file">write</Term> is evaluated against the rule list before it
+				executes. <Term t="first-match-wins">First-match-wins</Term>. Specific deny rules pin the dangerous
 				ground; specific allows open the rest; a final catch-all deny is the safety net.
 			</p>
 		</Slide>

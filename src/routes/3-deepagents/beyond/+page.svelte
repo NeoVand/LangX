@@ -12,17 +12,20 @@
 <Lesson
 	title="Beyond V1"
 	eyebrow="Phase 3 · what's next"
-	motivation="What we built is V1. Production lives beyond — managed sandboxes, multi-agent deployments, observability. Here's the map."
 	hero={{
 		id: 'l3-beyond',
 		alt: 'A horizon view: finished workshop, half-built bridge, mountain peaks beyond'
 	}}
 >
+	{#snippet motivation()}
+		What we built is V1. Production lives beyond — managed sandboxes, <Term t="Subagent">multi-agent</Term> deployments, <Term t="LangSmith">observability</Term>. Here's the map.
+	{/snippet}
+
 	{#snippet intro()}
 		<p>
-			LangX V1 covers the full conceptual surface of LangChain, LangGraph, and Deep Agents,
+			LangX V1 covers the full conceptual surface of <Term t="LangChain">LangChain</Term>, <Term t="LangGraph">LangGraph</Term>, and <Term t="Deep Agent">Deep Agents</Term>,
 			but it makes a few deliberate trade-offs to keep everything running in a single static
-			tab. This page names them so you know which dotted lines in the architecture are still
+			tab. This page names them so you know which dotted lines in the <Term t="Harness">harness</Term> architecture are still
 			worth crossing.
 		</p>
 	{/snippet}
@@ -31,12 +34,12 @@
 		<Slide eyebrow="Why this slide deck exists" title="V1 is a map, not a destination" variant="dropcap">
 			<p>
 				A teaching environment is a deliberate simplification. Every "this is good enough"
-				you have read in this chapter — a Web Worker as a sandbox, IndexedDB as durable
-				storage, deterministic stand-ins for browser tools — was the right call for a
+				you have read in this chapter — a <Term t="Web Worker">Web Worker</Term> as a sandbox, <Term t="IndexedDB">IndexedDB</Term> as durable
+				storage, deterministic stand-ins for browser <Term t="tool">tools</Term> — was the right call for a
 				single static tab. None of them are the right call for a production deployment.
 			</p>
 			<p>
-				The harness shape, though, is. The pieces you have configured here are the same
+				The <Term t="Harness">harness</Term> shape, though, is. The pieces you have configured here — <Term t="createDeepAgent"><code>createDeepAgent</code></Term>, <Term t="Backend">backends</Term>, <Term t="Permissions">permissions</Term>, <Term t="Subagent">subagents</Term> — are the same
 				pieces a production deployment ships. What changes is the substrate underneath
 				each. Below is the substrate-by-substrate map.
 			</p>
@@ -88,11 +91,11 @@
 
 		<Slide title="Background async subagents">
 			<p>
-				In a long-lived deployment, subagents can run in the background over the
-				<a href="https://github.com/langchain-ai/agent-protocol" target="_blank" rel="noopener">Agent Protocol</a>:
+				In a long-lived deployment, <Term t="Subagent">subagents</Term> can run in the background over the
+				<Term t="Agent Protocol">Agent Protocol</Term>:
 				the parent does not block on a child's full transcript; it just receives a final
 				report. Static-site LangX runs them inline so you can watch the trace; the
-				delegation pattern is the same either way.
+				<Term t="task"><code>task</code></Term> delegation pattern is the same either way.
 			</p>
 		</Slide>
 

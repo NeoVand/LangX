@@ -9,7 +9,7 @@
 	interface Props {
 		title: string;
 		eyebrow?: string;
-		motivation?: string;
+		motivation?: string | Snippet;
 		hero?: { id: string; alt: string };
 		intro?: Snippet;
 		narrative: Snippet;
@@ -51,7 +51,13 @@
 				{/if}
 				<h1 class="font-display">{title}</h1>
 				{#if motivation}
-					<p class="motivation font-prose">{motivation}</p>
+					<p class="motivation font-prose">
+						{#if typeof motivation === 'string'}
+							{motivation}
+						{:else}
+							{@render motivation()}
+						{/if}
+					</p>
 				{/if}
 				{#if intro}
 					<div class="intro font-prose">{@render intro()}</div>

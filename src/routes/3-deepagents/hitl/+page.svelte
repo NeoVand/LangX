@@ -118,13 +118,16 @@ while (res.status === 'interrupted') {
 <Lesson
 	title="Human-in-the-loop"
 	eyebrow="Phase 3 · Lesson 09"
-	motivation="Some decisions need a human stamp. interruptOn turns 'pause and ask' from glue code into a property of the harness."
 	hero={{
 		id: 'l3-hitl',
 		alt: "A judge's bench: a small mechanical agent awaits an approve/deny stamp"
 	}}
 	source={demoSource}
 >
+	{#snippet motivation()}
+		Some decisions need a human stamp. <Term t="interruptOn"><code>interruptOn</code></Term> turns "pause and ask" from glue code into a property of the <Term t="Harness">harness</Term>.
+	{/snippet}
+
 	{#snippet intro()}
 		<p>
 			<Term t="interruptOn"><code>interruptOn: ['write_file']</code></Term> is enough to put any tool behind a
@@ -137,10 +140,10 @@ while (res.status === 'interrupted') {
 	{#snippet narrative()}
 		<Slide eyebrow="Why this shape" title="The smallest production-safe pause" variant="dropcap">
 			<p>
-				Some tools cannot be entrusted to a model alone — sending email, calling a mutating
+				Some <Term t="tool">tools</Term> cannot be entrusted to a model alone — sending email, calling a mutating
 				API, deleting files, running a shell. The right primitive is not a longer prompt
 				asking nicely; it is a pause. The harness's <Term t="interruptOn"><code>interruptOn</code></Term> turns any
-				named tool into one that halts the graph and surfaces a request for human approval,
+				named tool into one that halts the <Term t="LangGraph">graph</Term> and surfaces a request for <Term t="HITL">human approval</Term>,
 				with the proposed arguments visible.
 			</p>
 			<p>

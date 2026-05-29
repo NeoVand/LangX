@@ -115,35 +115,42 @@ for await (const chunk of stream) {
 <Lesson
 	title="Streaming"
 	eyebrow="Phase 1 · Lesson 02"
-	motivation="Watching tokens arrive is more than UX polish — it changes how you debug models, how you handle long contexts, and how a user lives with the latency of intelligence."
 	hero={{
 		id: 'l1-streaming',
 		alt: 'A copper-basin water clock with cascading droplets'
 	}}
 	source={demoSource}
 >
+	{#snippet motivation()}
+		Watching <Term t="Token">tokens</Term> arrive is more than UX polish — it changes how you debug
+		<Term t="Model">models</Term>, how you handle long <Term t="Context window">contexts</Term>, and how a
+		user lives with the latency of an <Term t="LLM" />.
+	{/snippet}
+
 	{#snippet intro()}
 		<p>
-			Streaming is not a separate API on top of LangChain — it's part of the <Term
-				t="Runnable"
-			/> protocol. Every chain has a final-value mode, a token-by-token mode, and a third one
-			that emits an event for every internal step.
+			<Term t="stream">Streaming</Term> is not a separate API on top of <Term t="LangChain" /> — it's
+			part of the <Term t="Runnable" /> protocol. Every <Term t="Chain">chain</Term> has a final-value
+			mode (<Term t="invoke" />), a <Term t="Token">token</Term>-by-token mode (<Term t="stream" />),
+			and a third one (<Term t="streamEvents" />) that emits an event for every internal
+			<Term t="Runnable" /> step.
 		</p>
 	{/snippet}
 
 	{#snippet narrative()}
 		<Slide eyebrow="Why this shape" title="Latency is part of the model" variant="dropcap">
 			<p>
-				Early LLM apps treated the model as a function: send a prompt, wait, receive a string.
-				That framing hides everything interesting that happens between the first token and the
-				last — and there can be a full second between them. Long enough for the user to
-				wonder whether anything is happening at all.
+				Early <Term t="LLM">LLM</Term> apps treated the <Term t="Model">model</Term> as a function:
+				send a <Term t="Prompt">prompt</Term>, wait, receive a string. That framing hides everything
+				interesting that happens between the first <Term t="Token">token</Term> and the last — and
+				there can be a full second between them. Long enough for the user to wonder whether anything
+				is happening at all.
 			</p>
 			<p>
-				Streaming is the alternative framing. The model is a <em>process</em> that emits
-				chunks; your job is to render them as they appear. Once you accept that, the same
-				machinery becomes a debugger, a progress bar, and the substrate for every agent
-				visualisation downstream.
+				<Term t="stream">Streaming</Term> is the alternative framing. The model is a
+				<em>process</em> that emits <Term t="Chunk">chunks</Term>; your job is to render them as
+				they appear. Once you accept that, the same machinery becomes a debugger, a progress bar,
+				and the substrate for every <Term t="Agent">agent</Term> visualisation downstream.
 			</p>
 		</Slide>
 
@@ -155,12 +162,16 @@ for await (const chunk of stream) {
 					user sees nothing until the full response is ready.
 				</li>
 				<li>
-					<Term t="stream"><code>stream</code></Term> — yield chunks of the final output as they
-					arrive. Best for chat UIs and live text.
+					<Term t="stream"><code>stream</code></Term> / <Term t="astream"><code>astream</code></Term> —
+					yield <Term t="Chunk">chunks</Term> of the final output as they arrive. Best for chat UIs
+					and live text.
 				</li>
 				<li>
-					<Term t="streamEvents"><code>streamEvents</code></Term> — yield typed events for every
-					internal step (chain, model, tool, parser). Best for inspectors and audit trails.
+					<Term t="streamEvents"><code>streamEvents</code></Term> / <Term t="astreamEvents"
+						><code>astreamEvents</code></Term
+					> — yield typed events for every internal step (<Term t="on_chain_start">chain</Term>,
+					<Term t="Model">model</Term>, <Term t="tool">tool</Term>,
+					<Term t="Parser">parser</Term>). Best for inspectors and audit trails.
 				</li>
 			</ul>
 		</Slide>
@@ -168,16 +179,18 @@ for await (const chunk of stream) {
 		<Slide title="Token chunks" variant="code-first">
 			<CodeBlock code={codeA} lang="ts" caption="A chain stream — Demo 1." />
 			<p>
-				Press <em>Run</em> on the right. The chain is a real LangChain pipeline; only the
-				model behind <Term t="getModel"><code>getModel()</code></Term> changes depending on which provider you have
-				configured.
+				Press <em>Run</em> on the right. The chain is a real <Term t="LCEL" /> pipeline (<Term
+					t="ChatPromptTemplate">prompt</Term
+				> → <Term t="Model">model</Term> → <Term t="StringOutputParser">parser</Term>); only the
+				model behind <Term t="getModel"><code>getModel()</code></Term> changes depending on which
+				<Term t="provider">provider</Term> you have configured.
 			</p>
 		</Slide>
 
 		<Slide variant="pull-quote">
 			<p>
-				A stream is the smallest interface that lets you tell a user the model is alive
-				before it is finished thinking.
+				A <Term t="stream">stream</Term> is the smallest interface that lets you tell a user the
+				<Term t="Model">model</Term> is alive before it is finished thinking.
 			</p>
 		</Slide>
 
@@ -185,16 +198,22 @@ for await (const chunk of stream) {
 			<CodeBlock code={codeB} lang="ts" caption="streamEvents emits one event per Runnable boundary." />
 			<p>
 				Use <Term t="withConfig"><code>withConfig({'{ runName }'})</code></Term> to label each
-				Runnable so the events have stable, human-readable names. Demo 2 prints the
-				chronological event log, including each token as it streams.
+				<Term t="Runnable" /> with a stable <Term t="runName">runName</Term> so events have
+				human-readable names. Demo 2 prints the chronological event log — including
+				<Term t="on_chat_model_stream">on_chat_model_stream</Term> for each token and
+				<Term t="on_parser_end">on_parser_end</Term> when the <Term t="StringOutputParser"
+					>parser</Term
+				> finishes.
 			</p>
 		</Slide>
 
 		<Slide title="What you do with this">
 			<p>
-				Token streaming is what makes a chat UI feel alive. Event streaming is what makes an
-				agent <em>auditable</em> — every tool call, every retrieval, every parse becomes a
-				visible boundary you can replay, log, or test against.
+				<Term t="Token">Token</Term> streaming is what makes a chat UI feel alive. Event streaming is
+				what makes an <Term t="Agent">agent</Term> <em>auditable</em> — every
+				<Term t="tool_calls">tool call</Term>, every <Term t="Retriever">retrieval</Term>, every
+				<Term t="Parser">parse</Term> becomes a visible boundary you can replay, log, or test against
+				via <Term t="callbacks">callbacks</Term> and <Term t="LangSmith" /> traces.
 			</p>
 		</Slide>
 

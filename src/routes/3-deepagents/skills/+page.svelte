@@ -107,34 +107,37 @@ createDeepAgent({ model, skills, /* ... */ });
 <Lesson
 	title="Skills (progressive disclosure)"
 	eyebrow="Phase 3 · Lesson 07"
-	motivation="Skills are progressively-disclosed instruction sets. Names always present, bodies loaded only when relevant — the right balance between awareness and overload."
 	hero={{
 		id: 'l3-skills',
 		alt: 'A three-tiered apothecary cabinet with progressively expanded labels'
 	}}
 	source={demoSource}
 >
+	{#snippet motivation()}
+		<Term t="Skill">Skills</Term> are <Term t="Progressive disclosure">progressively-disclosed</Term> instruction sets. Names always present, bodies loaded only when relevant via <Term t="load_skill"><code>load_skill</code></Term> — the right balance between awareness and overload.
+	{/snippet}
+
 	{#snippet intro()}
 		<p>
 			A <Term t="Skill" /> is a small markdown file with a description and a body of
-			instructions. The harness ships only the descriptions in the system prompt; bodies load
-			on demand via <code>load_skill</code>. That is <Term t="Progressive disclosure" />.
+			instructions. The <Term t="Harness">harness</Term> ships only the descriptions in the <Term t="System prompt">system prompt</Term>; bodies load
+			on demand via <Term t="load_skill"><code>load_skill</code></Term>. That is <Term t="Progressive disclosure" />.
 		</p>
 	{/snippet}
 
 	{#snippet narrative()}
 		<Slide eyebrow="Why this shape" title="Awareness without overload" variant="dropcap">
 			<p>
-				A modest catalog of 20 expert skills can easily be 50,000 tokens of full bodies, and
+				A modest catalog of 20 expert <Term t="Skill">skills</Term> can easily be 50,000 tokens of full bodies, and
 				most tasks use one or two of them. The naïve approach — ship every body in the
-				system prompt — pays for capabilities the agent does not need on this particular
+				<Term t="System prompt">system prompt</Term> — pays for capabilities the agent does not need on this particular
 				turn. The exotic approach — invisible skills the model has to guess at — pays in
 				missed opportunities.
 			</p>
 			<p>
-				Progressive disclosure splits the difference. Names and one-line descriptions live
+				<Term t="Progressive disclosure">Progressive disclosure</Term> splits the difference. Names and one-line descriptions live
 				in the system prompt so the model is <em>aware</em> of the catalog. Bodies come back
-				as a tool result only when the model decides a skill applies. The agent pays tokens
+				as a <Term t="ToolMessage">tool result</Term> only when the model calls <Term t="load_skill"><code>load_skill</code></Term>. The agent pays tokens
 				for relevance, not for the entire library.
 			</p>
 		</Slide>
@@ -154,8 +157,8 @@ createDeepAgent({ model, skills, /* ... */ });
 
 		<Slide title="What ships in the prompt" variant="code-first">
 			<p>
-				The harness assembles a "Skill catalog" block in the MIDDLEWARE section of the
-				system prompt. Below is the actual block this lesson would emit — three skills,
+				The harness assembles a "Skill catalog" block in the <Term t="Middleware">MIDDLEWARE</Term> section of the
+				<Term t="System prompt">system prompt</Term>. Below is the actual block this lesson would emit — three skills,
 				~120 tokens total instead of ~600 if we shipped the bodies.
 			</p>
 			<CodeBlock code={skillCatalogPrompt} lang="md" />

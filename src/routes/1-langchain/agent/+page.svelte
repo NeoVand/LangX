@@ -137,52 +137,65 @@ const result = await agent.invoke({
 <Lesson
 	title="create_agent"
 	eyebrow="Phase 1 · Lesson 06"
-	motivation="create_agent is the smallest real agent: a model, some tools, and a graph that loops until the model says it's done."
 	hero={{
 		id: 'l1-agent',
 		alt: 'A mechanical homunculus deciding among a row of tools at a desk'
 	}}
 	source={demoSource}
 >
+	{#snippet motivation()}
+		<Term t="create_agent"><code>create_agent</code></Term> is the smallest real
+		<Term t="Agent">agent</Term>: a <Term t="Model">model</Term>, some <Term t="tool">tools</Term>, and a
+		<Term t="LangGraph">LangGraph</Term> that loops until the model stops calling tools.
+	{/snippet}
+
 	{#snippet intro()}
 		<p>
-			A standard tool-using agent is a tiny graph: <em>agent</em> → <em>tools</em> →
-			<em>agent</em>
-			→ … → <em>end</em>. LangChain v1 wraps this as <Term t="create_agent"><code>create_agent</code></Term>; in JS the
-			equivalent prebuilt is <Term t="createReactAgent"><code>createReactAgent</code></Term> from LangGraph. This lesson is the
-			bridge from Phase 1 into Phase 2.
+			A standard tool-using <Term t="Agent">agent</Term> is a tiny graph:
+			<em>agent</em> → <em>tools</em> → <em>agent</em> → … → <Term t="END">end</Term>.
+			<Term t="LangChain" /> v1 wraps this as <Term t="create_agent"><code>create_agent</code></Term>; in JS the
+			equivalent prebuilt is <Term t="createReactAgent"><code>createReactAgent</code></Term> from
+			<Term t="LangGraph" />. This lesson is the bridge from Phase 1 into Phase 2.
 		</p>
 	{/snippet}
 
 	{#snippet narrative()}
 		<Slide eyebrow="Why this shape" title="A loop with a brain in it" variant="dropcap">
 			<p>
-				Every earlier lesson gave the model a single turn: prompt in, response out. Real
-				assistants do not work that way. They look at what they have, take a small action,
-				look again, and either continue or stop. The <Term t="ReAct" /> loop is the
-				smallest control flow that makes that posture possible.
+				Every earlier lesson gave the <Term t="Model">model</Term> a single turn:
+				<Term t="Prompt">prompt</Term> in, response out. Real assistants do not work that way. They look at
+				what they have, take a small action, look again, and either continue or stop. The
+				<Term t="ReAct" /> loop is the smallest control flow that makes that posture possible.
 			</p>
 			<p>
-				What is striking is how little code it takes. A model, a list of tools, and a graph
-				with two nodes — agent and tools — joined by a conditional edge. The prebuilt
-				<Term t="create_agent"><code>create_agent</code></Term> is exactly that loop, compiled and ready to run.
+				What is striking is how little code it takes. A <Term t="Model">model</Term>, a list of
+				<Term t="tool">tools</Term>, and a <Term t="StateGraph">StateGraph</Term> with two
+				<Term t="Node">nodes</Term> — agent and <Term t="ToolNode">tools</Term> — joined by a
+				<Term t="Conditional edge">conditional edge</Term>. The prebuilt
+				<Term t="createReactAgent"><code>createReactAgent</code></Term> is exactly that loop, compiled and
+				ready to <Term t="invoke">invoke</Term>.
 			</p>
 		</Slide>
 
 		<Slide title="The ReAct loop" variant="code-first">
 			<CodeBlock code={code} lang="ts" caption="Two lines and a list of tools — that's it." />
 			<p>
-				The agent calls the model, looks at the response. If there are tool calls, it
-				executes them and appends the results as <Term t="ToolMessage"><code>ToolMessage</code></Term>s. Then it calls
-				the model again with the longer history. The model decides whether to keep going.
+				The <Term t="Agent">agent</Term> <Term t="Node">node</Term> calls the <Term t="Model">model</Term>.
+				If there are <Term t="tool_calls">tool_calls</Term>, the <Term t="ToolNode">tools</Term> node
+				executes them and appends <Term t="ToolMessage"><code>ToolMessage</code></Term>s. Then the agent
+				<Term t="invoke">invokes</Term> the model again with the longer <Term t="Message">message</Term>
+				history. The model decides whether to keep going.
 			</p>
 		</Slide>
 
 		<Slide title="It's already a graph">
 			<p>
-				Notice that the prebuilt agent comes from <code>@langchain/langgraph</code>. That
-				is not an accident — every agent in LangChain v1 compiles to a LangGraph state
-				machine. The next chapter is what lives underneath this prebuilt.
+				Notice that the prebuilt <Term t="Agent">agent</Term> comes from
+				<code>@langchain/langgraph</code>. That is not an accident — every
+				<Term t="Agent">agent</Term> in <Term t="LangChain" /> v1 compiles to a
+				<Term t="LangGraph" /> <Term t="StateGraph">state machine</Term> with
+				<Term t="MessagesAnnotation">MessagesAnnotation</Term>. The next chapter is what lives underneath
+				this prebuilt.
 			</p>
 		</Slide>
 
@@ -190,25 +203,29 @@ const result = await agent.invoke({
 
 		<Slide variant="pull-quote">
 			<p>
-				An agent is not a smarter model. It is the smallest loop that lets a model use the
-				world between turns.
+				An <Term t="Agent">agent</Term> is not a smarter <Term t="LLM" />. It is the smallest loop that
+				lets a <Term t="Model">model</Term> use the world between turns via
+				<Term t="Tool calling">tool calling</Term>.
 			</p>
 		</Slide>
 
 		<Slide title="Two scenarios">
 			<p>
-				Demo 1 (single tool, single hop): a basic weather lookup. Demo 2 (parallel tools,
-				then a follow-up tool): the agent fans out to two weather lookups, then computes a
-				temperature difference. The graph view on the right highlights the active node and
-				the edges the model actually traverses.
+				Demo 1 (single <Term t="tool">tool</Term>, single hop): a basic weather lookup. Demo 2 (parallel
+				<Term t="tool_calls">tool calls</Term>, then a follow-up): the <Term t="Agent">agent</Term> fans out to
+				two weather lookups, then computes a temperature difference. The graph view uses
+				<Term t="getGraphAsync">getGraphAsync</Term> and <Term t="drawMermaid">drawMermaid</Term> to highlight the
+				active <Term t="Node">node</Term> and edges the model actually traverses.
 			</p>
 		</Slide>
 
 		<Slide title="Why this is a milestone">
 			<p>
-				If you have made it here, you can wire a real, useful agent today. Everything above
-				this line — chains, streaming, structured output, tools, RAG — is the toolbox.
-				From here we start owning the control flow.
+				If you have made it here, you can wire a real, useful <Term t="Agent">agent</Term> today. Everything
+				above this line — <Term t="Chain">chains</Term>, <Term t="stream">streaming</Term>,
+				<Term t="Structured output">structured output</Term>, <Term t="tool">tools</Term>,
+				<Term t="RAG" /> — is the toolbox. From here we start owning the
+				<Term t="StateGraph">control flow</Term>.
 			</p>
 		</Slide>
 

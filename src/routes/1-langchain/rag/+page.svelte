@@ -138,52 +138,69 @@ console.log('Answer:', answer);
 <Lesson
 	title="RAG"
 	eyebrow="Phase 1 · Lesson 05"
-	motivation="Retrieval-augmented generation is not magic; it is careful retrieval married to careful prompting. Done in the browser, the entire pipeline becomes legible."
 	hero={{
 		id: 'l1-rag',
 		alt: 'A library reading room with index cards floating between books'
 	}}
 	source={demoSource}
 >
+	{#snippet motivation()}
+		<Term t="RAG" /> is not magic; it is careful <Term t="Retriever">retrieval</Term> married to careful
+		<Term t="Prompt">prompting</Term>. Done in the browser, the entire pipeline becomes legible.
+	{/snippet}
+
 	{#snippet intro()}
 		<p>
-			Instead of training a model on your data, embed your data into vectors at write time,
-			find the closest matches at read time, and stuff them into the prompt. Everything in
-			this lesson runs in your browser — embeddings included.
+			Instead of training a <Term t="Model">model</Term> on your data, <Term t="Embedding">embed</Term>
+			your data into vectors at write time, <Term t="similaritySearch">search</Term> the closest matches
+			at read time, and stuff them into the <Term t="Prompt">prompt</Term>. Everything in this lesson
+			runs in your browser — <Term t="embedding model">embeddings</Term> included.
 		</p>
 	{/snippet}
 
 	{#snippet narrative()}
 		<Slide eyebrow="Why this shape" title="The librarian inside the prompt" variant="dropcap">
 			<p>
-				A language model has a long memory of the public internet and almost no memory of
-				you. Retrieval-augmented generation closes that gap, not by fine-tuning the model
-				but by changing what is on its desk when it speaks. The model stays general; the
-				librarian — a tiny encoder plus a vector index — gets specific.
+				A <Term t="LLM">language model</Term> has a long memory of the public internet and almost no
+				memory of you. <Term t="RAG">Retrieval-augmented generation</Term> closes that gap, not by
+				fine-tuning the model but by changing what is on its desk when it speaks. The
+				<Term t="Model">model</Term> stays general; the librarian — a tiny
+				<Term t="embedding model">encoder</Term> plus a <Term t="Vector store">vector index</Term> —
+				gets specific.
 			</p>
 			<p>
-				Once you see RAG as two halves, it becomes manageable. The retrieval half is
-				deterministic, testable, and where most failures live. The generation half is the
-				LLM you already know. The interesting work is at the seam between them.
+				Once you see <Term t="RAG" /> as two halves, it becomes manageable. The
+				<Term t="Retriever">retrieval</Term> half is deterministic, testable, and where most failures
+				live. The generation half is the <Term t="LLM" /> you already know. The interesting work is
+				at the seam — <Term t="grounding">grounding</Term> and <Term t="citation">citations</Term>.
 			</p>
 		</Slide>
 
 		<Slide title="The RAG sketch">
 			<ul>
 				<li>
-					<strong>Embed</strong> each document chunk into a fixed-length vector with a
-					small encoder model. We use <Term t="MiniLM"><code>Xenova/all-MiniLM-L6-v2</code></Term>, 384-dim, ~25 MB.
+					<strong>Chunk</strong> documents with <Term t="RecursiveCharacterTextSplitter"
+						>RecursiveCharacterTextSplitter</Term
+					> (<Term t="chunkSize">chunkSize</Term>, <Term t="chunkOverlap">chunkOverlap</Term>), then
+					<strong>embed</strong> each <Term t="Chunk">chunk</Term> into a fixed-length vector. We use
+					<Term t="MiniLM"><code>Xenova/all-MiniLM-L6-v2</code></Term> (384-dim, ~25 MB) or
+					<Term t="OpenAIEmbeddings">OpenAI</Term> / <Term t="Voyage">Voyage</Term> via
+					<Term t="makeEmbeddings">makeEmbeddings</Term>.
 				</li>
 				<li>
-					<strong>Index</strong> those vectors. For tiny corpora a plain array works; in
-					production you would reach for <Term t="pgvector">pgvector</Term>, <Term t="Pinecone">Pinecone</Term>, or <Term t="Chroma">Chroma</Term>.
+					<strong>Index</strong> vectors in a <Term t="Vector store">vector store</Term>. LangX uses
+					<Term t="InMemoryVectorStore">InMemoryVectorStore</Term>; production uses
+					<Term t="pgvector">pgvector</Term>, <Term t="Pinecone">Pinecone</Term>, or
+					<Term t="Chroma">Chroma</Term>.
 				</li>
 				<li>
-					<strong>Search</strong> by embedding the query and returning the nearest
-					neighbours by <Term t="Cosine similarity">cosine similarity</Term>.
+					<strong>Search</strong> with <Term t="similaritySearch">similaritySearch</Term> — embed the
+					query, return <Term t="Top-k">top-k</Term> neighbours by
+					<Term t="Cosine similarity">cosine similarity</Term>.
 				</li>
 				<li>
-					<strong>Generate</strong> by passing the top hits to an LLM as context.
+					<strong>Generate</strong> with <Term t="grounding">grounded</Term>
+					<Term t="Prompt">prompting</Term>: pass hits to an <Term t="LLM" /> as context only.
 				</li>
 			</ul>
 		</Slide>
@@ -191,8 +208,9 @@ console.log('Answer:', answer);
 		<Slide title="In your browser, on WebGPU" variant="code-first">
 			<CodeBlock code={code} lang="ts" caption="Indexing and searching three documents." />
 			<p>
-				The first run downloads the embedding model (small, cacheable). After that,
-				embedding is fast — try the two demos on the right.
+				The first run downloads the <Term t="embedding model">embedding model</Term> (small,
+				cacheable) via <Term t="WebGPU" /> or <Term t="WebAssembly">WASM</Term>. After that,
+				<Term t="Embedding">embedding</Term> is fast — run the demo on the right.
 			</p>
 		</Slide>
 
@@ -200,26 +218,31 @@ console.log('Answer:', answer);
 
 		<Slide variant="pull-quote">
 			<p>
-				RAG is a contract between retrieval and prompting. Inspect each half on its own, or
-				you will be debugging the wrong layer.
+				<Term t="RAG" /> is a contract between <Term t="Retriever">retrieval</Term> and
+				<Term t="Prompt">prompting</Term>. Inspect each half on its own, or you will be debugging the
+				wrong layer.
 			</p>
 		</Slide>
 
 		<Slide title="Why the demo focuses on retrieval">
 			<p>
-				The retrieval half is what we are inspecting here — the model is just a final step
-				that consumes whatever context retrieval returns. The two demos below do the
-				retrieval honestly with real cosine similarity over real embeddings, and the
-				similarity scores are surfaced so you can argue with the ranker.
+				The <Term t="Retriever">retrieval</Term> half is what we inspect here — the
+				<Term t="Model">model</Term> is just a final <Term t="Runnable">Runnable</Term> step that
+				consumes whatever context retrieval returns. The demo does
+				<Term t="similaritySearch">similarity search</Term> honestly with real
+				<Term t="Cosine similarity">cosine</Term> scores over real <Term t="Embedding">embeddings</Term>
+				so you can argue with the ranker before blaming the <Term t="LLM" />.
 			</p>
 		</Slide>
 
 		<Slide title="Caveats">
 			<p>
-				In a real system: chunk before you embed, deduplicate, store metadata for
-				<Term t="citation">citations</Term>, watch for <Term t="Context window">context-window</Term> inflation, and consider <Term t="hybrid search">hybrid search</Term> (<Term t="BM25">BM25</Term> +
-				vectors). The machinery is small but the operational details determine whether it
-				is actually useful.
+				In a real system: <Term t="Chunk">chunk</Term> before you embed, deduplicate, store
+				<Term t="Document">Document</Term> metadata for <Term t="citation">citations</Term>, watch for
+				<Term t="Context window">context-window</Term> inflation, and consider
+				<Term t="hybrid search">hybrid search</Term> (<Term t="BM25">BM25</Term> + vectors). The
+				machinery is small but the operational details determine whether
+				<Term t="RAG" /> is actually useful.
 			</p>
 		</Slide>
 

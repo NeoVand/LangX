@@ -151,18 +151,24 @@ const ai = await model.invoke('What is the weather in Tokyo?');
 <Lesson
 	title="Tools"
 	eyebrow="Phase 1 · Lesson 04"
-	motivation="A model that can call functions stops being a chat partner and becomes a participant in your system. Everything in agent design starts here."
 	hero={{
 		id: 'l1-tools',
 		alt: 'A scholar reaches for a wall of pegboard tools'
 	}}
 	source={demoSource}
 >
+	{#snippet motivation()}
+		A <Term t="Model">model</Term> that can call functions stops being a chat partner and becomes a
+		<Term t="participant">participant</Term> in your system. Everything in <Term t="Agent">agent</Term>
+		design starts with <Term t="Tool calling">tool calling</Term>.
+	{/snippet}
+
 	{#snippet intro()}
 		<p>
-			A <Term t="tool" /> is a typed function the model is allowed to call. The runtime handles
-			the plumbing: a JSON schema goes to the model, the model emits a tool call, you execute
-			it, the result returns as a tool message, and the loop continues.
+			A <Term t="tool" /> is a typed function the <Term t="Model">model</Term> is allowed to call. The
+			runtime handles the plumbing: a <Term t="JSON schema">JSON schema</Term> goes to the model, the
+			model emits <Term t="tool_calls">tool calls</Term>, you execute them, the result returns as a
+			<Term t="ToolMessage">tool message</Term>, and the loop continues.
 		</p>
 	{/snippet}
 
@@ -173,59 +179,66 @@ const ai = await model.invoke('What is the weather in Tokyo?');
 			variant="dropcap"
 		>
 			<p>
-				Early language models were <Term t="oracle">oracles</Term>. You asked a question, you got a paragraph back,
-				and any real-world side-effect happened somewhere else, written by you, plumbed by
-				you, debugged by you. The model never touched the world.
+				Early <Term t="LLM">language models</Term> were <Term t="oracle">oracles</Term>. You asked a
+				question, you got a paragraph back, and any real-world side-effect happened somewhere else,
+				written by you, plumbed by you, debugged by you. The model never touched the world.
 			</p>
 			<p>
-				Tool calling inverts that. You hand the model a small toolbox — typed functions with
-				descriptions — and the model decides, turn by turn, which one to reach for. The
-				oracle becomes a <Term t="participant">participant</Term>. Every agent in this course is, at its heart, a
-				well-designed toolbox plus a loop that lets the model use it.
+				<Term t="Tool calling">Tool calling</Term> inverts that. You hand the model a small toolbox —
+				typed <Term t="tool">tools</Term> with descriptions — and the model decides, turn by turn,
+				which one to reach for. The oracle becomes a <Term t="participant">participant</Term>. Every
+				<Term t="Agent">agent</Term> in this course is, at its heart, a well-designed toolbox plus a
+				<Term t="ReAct">ReAct</Term> loop that lets the model use it.
 			</p>
 		</Slide>
 
 		<Slide title="Defining a tool" variant="code-first">
 			<CodeBlock code={codeTool} lang="ts" caption="A typed weather tool, then bound to a model." />
 			<p>
-				Use the <code>tool()</code> helper from <code>@langchain/core/tools</code>. You give
-				it a function, a name, a description, and a Zod schema for its arguments. The schema
-				doubles as the JSON schema sent to the model.
+				Use the <Term t="tool"><code>tool()</code></Term> helper from
+				<code>@langchain/core/tools</code>. You give it a function, a name, a description, and a
+				<Term t="Zod" /> <Term t="Schema">schema</Term> for its arguments. The schema doubles as the
+				<Term t="JSON schema">JSON schema</Term> sent to the model.
 			</p>
 		</Slide>
 
 		<Slide title="bindTools, then invoke">
 			<p>
-				Call <Term t="bindTools"><code>model.bindTools([...])</code></Term> to attach tools to a
-				chat model. The model
-				can now respond with either content or a list of <Term t="tool_calls"><code>tool_calls</code></Term>. Your job
-				is to execute each call, return its output as a <Term t="ToolMessage"><code>ToolMessage</code></Term>, and ask
-				the model to continue.
+				Call <Term t="bindTools"><code>model.bindTools([...])</code></Term> to attach
+				<Term t="tool">tools</Term> to a chat <Term t="Model">model</Term>. The model can now respond
+				with either content or a list of <Term t="tool_calls"><code>tool_calls</code></Term>. Your job
+				is to execute each call, return its output as a <Term t="ToolMessage"><code>ToolMessage</code></Term>
+				(with matching <Term t="tool_call_id">tool_call_id</Term>), and
+				<Term t="invoke">invoke</Term> the model again.
 			</p>
 		</Slide>
 
 		<Slide variant="pull-quote">
 			<p>
-				A tool definition is the smallest unit of agency a model is allowed to have. Choose
-				its description carefully — that is the model's user manual.
+				A <Term t="tool">tool</Term> definition is the smallest unit of agency a
+				<Term t="Model">model</Term> is allowed to have. Choose its description carefully — that is
+				the model's user manual.
 			</p>
 		</Slide>
 
 		<Slide title="Two demos">
 			<p>
-				Demo 1 looks up the weather for a city. Demo 2 evaluates an arithmetic expression.
-				Both tools run in the browser; the model is whichever provider you have configured.
-				Watch the message timeline on the right grow:
-				<em>human → assistant (tool_call) → tool → assistant (final)</em>.
+				Demo 1 looks up the weather for a city. Demo 2 evaluates an arithmetic expression. Both
+				<Term t="tool">tools</Term> run in the browser; the <Term t="Model">model</Term> is whichever
+				<Term t="provider">provider</Term> you configured via <Term t="getModel">getModel</Term>.
+				Watch the <Term t="Message">message</Term> timeline on the right grow:
+				<em><Term t="HumanMessage">human</Term> → <Term t="AIMessage">assistant</Term> (tool_call) →
+				<Term t="ToolMessage">tool</Term> → <Term t="AIMessage">assistant</Term> (final)</em>.
 			</p>
 		</Slide>
 
 		<Slide title="Why small in-browser models flake here">
 			<p>
-				Tool calling depends on the model emitting precisely-formatted JSON. Smaller models
-				(under ~1B parameters) often hallucinate field names, miss required args, or skip
-				the call entirely. That is why the LangX setup page recommends Qwen3 0.6B for tool
-				demos, or a hosted provider via your own API key.
+				<Term t="Tool calling">Tool calling</Term> depends on the <Term t="Model">model</Term> emitting
+				precisely-formatted JSON. Smaller models (under ~1B parameters) often hallucinate field names,
+				miss required args, or skip the call entirely. That is why LangX setup recommends models with
+				good <Term t="Agentic grade">Agentic grade</Term> for tool demos, or a hosted
+				<Term t="provider">provider</Term> via your <Term t="API key">API key</Term>.
 			</p>
 		</Slide>
 

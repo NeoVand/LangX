@@ -73,6 +73,15 @@ const aliases: Record<string, string> = {
 	write_file: 'write_file',
 	edit_file: 'edit_file',
 	interrupt: 'Interrupt',
+	'create_deep_agent': 'createDeepAgent',
+	'create deep agent': 'createDeepAgent',
+	'system prompt': 'System prompt',
+	backend: 'Backend',
+	langgraph: 'LangGraph',
+	langchain: 'LangChain',
+	planning: 'Planning',
+	'sub-agent': 'Subagent',
+	'sub-agents': 'Subagent',
 	'__interrupt__': '__interrupt__',
 	tool_calls: 'tool_calls',
 	tool_call_id: 'tool_call_id',
@@ -1694,6 +1703,38 @@ export const glossary: GlossaryEntry[] = [
 		chapter: 'deepagents',
 		short: 'Hosted browser automation for web-agent tools.',
 		long: 'Beyond lesson MCP integration example for agents that need real web browsing; contrast with LangX reproducible mock tools in lesson demos.'
+	},
+
+	// ── Cross-cutting product names & harness concepts ───────────────────────
+	{
+		term: 'LangChain',
+		chapter: 'general',
+		short: 'Composable LLM framework — prompts, models, tools, agents.',
+		long: 'Phase 1 foundation: everything is a Runnable (invoke/stream/batch). create_agent and LCEL live here; LangGraph and Deep Agents build on the same message and tool types.'
+	},
+	{
+		term: 'LangGraph',
+		chapter: 'general',
+		short: 'Stateful agent runtime — graphs, checkpoints, interrupts.',
+		long: 'Phase 2 substrate: StateGraph + reducers + checkpointers. Every create_agent and createDeepAgent compiles to a LangGraph; Phase 2 teaches the machinery underneath those factories.'
+	},
+	{
+		term: 'System prompt',
+		chapter: 'general',
+		short: 'Instructions the model sees before message history.',
+		long: 'Deep Agent harness assembles BASE_AGENT_PROMPT + middleware layers (plan, files, skills) + user instructions via assembleSystemPrompt — highest-priority behavior contract per turn.'
+	},
+	{
+		term: 'Backend',
+		chapter: 'deepagents',
+		short: 'Storage layer behind virtual filesystem tools.',
+		long: 'createDeepAgent({ backend }) — StateBackend (ephemeral graph state), StoreBackend (IndexedDB), or CompositeBackend (prefix routing). Tools call read_file/write_file; backend decides where bytes live.'
+	},
+	{
+		term: 'Planning',
+		chapter: 'deepagents',
+		short: 'Externalized multi-step plan the agent can audit and update.',
+		long: 'Harness planning middleware + write_todos persist Todo[] in state and inject ## Active plan into the system prompt — keeps long-horizon tasks from living only in chat memory.'
 	}
 ];
 

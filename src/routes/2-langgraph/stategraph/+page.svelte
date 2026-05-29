@@ -208,13 +208,17 @@ const graph = new StateGraph(MessagesAnnotation)
 <Lesson
 	title="StateGraph"
 	eyebrow="Phase 2 · Lesson 01"
-	motivation="When the loop has shape — explicit nodes, explicit edges, explicit state — agents stop being mystery boxes and become inspectable systems."
 	hero={{
 		id: 'l2-stategraph',
 		alt: 'A garden-maze with gazebos as nodes and a glass jar of state at the center'
 	}}
 	source={demoSource}
 >
+	{#snippet motivation()}
+		When the loop has shape — explicit <Term t="Node">nodes</Term>, explicit
+		<Term t="Edge">edges</Term>, explicit <Term t="State">state</Term> — agents stop being mystery
+		boxes and become inspectable systems.
+	{/snippet}
 	{#snippet intro()}
 		<p>
 			Phase 2 starts here: instead of declaring a chain, you declare a state machine. A
@@ -227,33 +231,41 @@ const graph = new StateGraph(MessagesAnnotation)
 	{#snippet narrative()}
 		<Slide eyebrow="Why this shape" title="From pipe to plan" variant="dropcap">
 			<p>
-				LCEL chains are linear: A → B → C. That's enough for a tutor or a translator, but it
+				<Term t="LCEL" /> chains are linear: A → B → C. That's enough for a tutor or a translator, but it
 				falls apart the moment your agent needs to <em>loop</em> — call a tool, read the
-				result, decide whether to call another tool, and only then answer. A graph is the
-				smallest abstraction that cleanly describes that loop.
+				result, decide whether to call another tool, and only then answer. A
+				<Term t="StateGraph" /> is the smallest abstraction that cleanly describes that loop.
 			</p>
 			<p>
-				The trick is splitting the run into two things you can read separately: <strong>state</strong>
-				(what's known) and <strong>nodes</strong> (work to do next). Once those are explicit,
-				the runtime can checkpoint, resume, branch, and stream the same machine with no extra
-				API surface. The graph is the spec; everything else is bookkeeping.
+				The trick is splitting the run into two things you can read separately: <Term t="State"
+					><strong>state</strong></Term
+				>
+				(what's known) and <Term t="Node"><strong>nodes</strong></Term> (work to do next). Once those
+				are explicit, the runtime can <Term t="Checkpoint">checkpoint</Term>, resume, branch, and
+				<Term t="stream">stream</Term> the same machine with no extra API surface. The graph is the
+				spec; everything else is bookkeeping.
 			</p>
 		</Slide>
 
 		<Slide title="The three primitives">
 			<ul>
 				<li>
-					<strong>State</strong> — a typed object that flows through every node. We'll use
-					the prebuilt <code>MessagesAnnotation</code> here, which is a state with a single
-					<code>messages</code> field and an <code>add_messages</code> reducer.
+					<strong><Term t="State" /> schema</strong> — a typed object that flows through every
+					<Term t="Node" />. We'll use the prebuilt
+					<Term t="MessagesAnnotation"><code>MessagesAnnotation</code></Term> here, which is a
+					state with a single <code>messages</code> field and an
+					<Term t="add_messages"><code>add_messages</code></Term>
+					<Term t="Reducer">reducer</Term>.
 				</li>
 				<li>
-					<strong>Nodes</strong> — async functions <code>(state) → partialState</code>.
-					Anything you return is merged into the next state via the schema's reducer.
+					<strong><Term t="Node">Nodes</Term></strong> — async functions
+					<code>(state) → partialState</code>. Anything you return is merged into the next state
+					via the schema's <Term t="Reducer">reducer</Term>.
 				</li>
 				<li>
-					<strong>Edges</strong> — <Term t="addEdge"><code>addEdge('a', 'b')</code></Term> for
-					a fixed transition, <Term t="addConditionalEdges"
+					<strong><Term t="Edge">Edges</Term></strong> — <Term t="addEdge"
+						><code>addEdge('a', 'b')</code></Term
+					> for a fixed transition, <Term t="addConditionalEdges"
 						><code>addConditionalEdges('a', router)</code></Term
 					> when the next node depends on state.
 				</li>
@@ -264,40 +276,44 @@ const graph = new StateGraph(MessagesAnnotation)
 
 		<Slide variant="pull-quote">
 			<p>
-				A LangGraph isn't a clever way to call an LLM. It's a state machine where one of the
-				nodes happens to call an LLM — and that reframing is the whole point of the chapter.
+				A <Term t="LangGraph" /> isn't a clever way to call an <Term t="LLM" />. It's a
+				<Term t="StateGraph" /> where one of the <Term t="Node">nodes</Term> happens to call an
+				LLM — and that reframing is the whole point of the chapter.
 			</p>
 		</Slide>
 
 		<Slide title="Building the chat–tool loop" variant="code-first">
 			<p>
-				Here's the smallest interesting graph: an <code>agent</code> node that calls the model
-				and a <code>tools</code> node that runs whatever the model asked for. A conditional
-				edge after <code>agent</code> decides whether to keep looping or finish.
+				Here's the smallest interesting graph: an <code>agent</code> <Term t="Node" /> that calls the
+				model and a <code>tools</code> <Term t="Node" /> that runs whatever the model asked for. A
+				<Term t="Conditional edge">conditional edge</Term> after <code>agent</code> decides whether to
+				keep looping or finish.
 			</p>
 			<CodeBlock code={code} caption="The classic ReAct loop, hand-built from primitives." />
 			<p>
-				Phase 1's <code>create_agent</code> compiles to almost exactly this. Now you own the
-				wiring — the same wiring you'll keep extending in every later lesson.
+				Phase 1's <Term t="create_agent"><code>create_agent</code></Term> compiles to almost exactly
+				this. Now you own the wiring — the same wiring you'll keep extending in every later lesson.
 			</p>
 		</Slide>
 
 		<Slide title="Stream the values">
 			<p>
-				When you compile a graph you get back a Runnable. Calling <Term t="stream">stream</Term>
-				with <Term t="streamMode: values"><code>streamMode: 'values'</code></Term> yields the
-				<em>full state after every superstep</em> — that's how the right pane keeps the message
-				log and the highlighted graph in sync as
-				the agent loops.
+				When you <Term t="compile">compile</Term> a graph you get back a <Term t="Runnable" />.
+				Calling <Term t="stream">stream</Term> with
+				<Term t="streamMode: values"><code>streamMode: 'values'</code></Term> yields the
+				<em>full state after every <Term t="Superstep">superstep</Term></em> — that's how the right
+				pane keeps the message log and the highlighted graph in sync as the agent loops.
 			</p>
 		</Slide>
 
 		<Slide title="Why this matters" ornament>
 			<p>
-				Every later lesson — conditional routing, reducers, checkpointers, interrupts,
-				streaming modes, fan-out, subgraphs — is a property of <em>this</em> shape. Once you
-				see the graph, the rest of Phase 2 reads as a series of features bolted onto the same
-				skeleton.
+				Every later lesson — <Term t="Conditional edge">conditional routing</Term>,
+				<Term t="Reducer">reducers</Term>, <Term t="Checkpointer">checkpointers</Term>,
+				<Term t="Interrupt">interrupts</Term>, <Term t="streamMode">streaming modes</Term>,
+				<Term t="Fan-out">fan-out</Term>, <Term t="Subgraph">subgraphs</Term> — is a property of
+				<em>this</em> shape. Once you see the graph, the rest of Phase 2 reads as a series of
+				features bolted onto the same skeleton.
 			</p>
 		</Slide>
 	{/snippet}

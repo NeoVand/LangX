@@ -79,19 +79,24 @@ console.log(out.report);
 <Lesson
 	title="Send & fan-out"
 	eyebrow="Phase 2 · Lesson 06"
-	motivation="Map-reduce inside a graph. The Send primitive is how you make one node spawn many parallel computations and gather their answers back."
 	hero={{
 		id: 'l2-send-fanout',
 		alt: "A postmaster's desk fans out envelopes to several waiting messengers"
 	}}
 	source={demoSource}
 >
+	{#snippet motivation()}
+		<Term t="Map-reduce">Map-reduce</Term> inside a graph. The <Term t="Send">Send</Term> primitive is
+		how you make one <Term t="Node" /> spawn many parallel computations and gather their answers back.
+	{/snippet}
 	{#snippet intro()}
 		<p>
-			A conditional edge can return one node name, an array of node names, or an array of
-			<Term t="Send" /> objects. The last one is map-reduce inside a graph: every
-			<Term t="Send"><code>Send</code></Term> spawns a parallel branch with its own state payload, and the runtime
-			merges results back via your reducers next superstep.
+			A <Term t="Conditional edge">conditional edge</Term> can return one node name, an array of
+			node names, or an array of <Term t="Send" /> objects. The last one is
+			<Term t="Map-reduce">map-reduce</Term> inside a <Term t="StateGraph" />: every
+			<Term t="Send"><code>Send</code></Term> spawns a parallel branch with its own state payload,
+			and the runtime merges results back via your <Term t="Reducer">reducers</Term> next
+			<Term t="Superstep">superstep</Term>.
 		</p>
 	{/snippet}
 
@@ -99,15 +104,16 @@ console.log(out.report);
 		<Slide eyebrow="Why this shape" title="Map-reduce, declared" variant="dropcap">
 			<p>
 				Most "agent does N things in parallel" code ends up as a hand-rolled
-				<code>Promise.all</code> with a fragile join. The Send primitive turns that pattern
-				into a property of the graph: <em>here is one input, here are N parallel branches,
-				here's the reducer that combines their writes.</em> The runtime owns concurrency,
-				cancellation, retries, and merge order; you own the shape.
+				<code>Promise.all</code> with a fragile join. The <Term t="Send">Send</Term> primitive turns
+				that pattern into a property of the graph: <em>here is one input, here are N parallel
+				branches, here's the <Term t="Reducer">reducer</Term> that combines their writes.</em> The
+				runtime owns concurrency, cancellation, retries, and merge order; you own the shape.
 			</p>
 			<p>
-				The killer feature: each branch sees only the slice of state it needs. You don't have
-				to thread the whole conversation through. Branches stay small, the reducer keeps the
-				big picture, and the synthesis node gets a clean list to work from.
+				The killer feature: each branch sees only the slice of <Term t="State" /> it needs. You
+				don't have to thread the whole conversation through. Branches stay small, the
+				<Term t="Reducer">reducer</Term> keeps the big picture, and the synthesis
+				<Term t="Node" /> gets a clean list to work from.
 			</p>
 		</Slide>
 
@@ -119,26 +125,31 @@ console.log(out.report);
 
 		<Slide variant="pull-quote">
 			<p>
-				A Send is a thought experiment with a return path. You declare the parallelism, the
-				runtime does the join, and your reducers decide what "merge" means.
+				A <Term t="Send">Send</Term> is a thought experiment with a return path. You declare the
+				<Term t="Fan-out">parallelism</Term>, the runtime does the
+				<Term t="fan-in">join</Term>, and your <Term t="Reducer">reducers</Term> decide what
+				"merge" means.
 			</p>
 		</Slide>
 
 		<Slide title="Why this is a big deal">
 			<p>
 				Each branch sees only its own state slice — it doesn't have to thread the entire
-				conversation through. Their outputs flow back into a shared list (or any reducer-
-				combined field) so the next node can synthesize them. Classic map-reduce, but driven
-				by an LLM and observable as a graph.
+				conversation through. Their outputs flow back into a shared list (or any
+				<Term t="Reducer">reducer</Term>-combined field) so the next <Term t="Node" /> can
+				<Term t="synthesis">synthesize</Term> them. Classic
+				<Term t="Map-reduce">map-reduce</Term>, but driven by an <Term t="LLM" /> and observable as
+				a <Term t="StateGraph" />.
 			</p>
 		</Slide>
 
 		<Slide title="Demo · 5-way research">
 			<p>
-				The <em>plan</em> node asks a real LLM to break a topic into 5 sub-questions. The
-				conditional edge returns 5 <code>Send</code> objects, each carrying one question.
-				Five parallel <em>research</em> branches run; each appends to <code>answers</code>.
-				The <em>synthesize</em> node reads the merged list and asks the model for a final
+				The <em>plan</em> <Term t="Node" /> asks a real LLM to break a topic into 5 sub-questions.
+				The <Term t="Conditional edge">conditional edge</Term> returns 5
+				<Term t="Send"><code>Send</code></Term> objects, each carrying one question. Five parallel
+				<em>research</em> branches run; each appends to <code>answers</code>. The
+				<em>synthesize</em> <Term t="Node" /> reads the merged list and asks the model for a final
 				Markdown brief.
 			</p>
 		</Slide>
@@ -147,7 +158,7 @@ console.log(out.report);
 			<p>
 				Multi-source research, fan-out evaluation, batched code review, parallel translation,
 				reflective self-critique. Anywhere the loop is: split work → answer in parallel →
-				stitch back together.
+				<Term t="fan-in">fan-in</Term> via <Term t="Reducer">reducers</Term> → stitch back together.
 			</p>
 		</Slide>
 	{/snippet}

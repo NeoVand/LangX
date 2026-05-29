@@ -107,69 +107,80 @@ const report = await extractor.invoke([
 <Lesson
 	title="Structured output"
 	eyebrow="Phase 1 · Lesson 03"
-	motivation="Models speak prose; software speaks types. Structured output is the bridge — and Zod gives you guarantees the model alone cannot."
 	hero={{
 		id: 'l1-structured-output',
 		alt: "A printer's typecase with hand-set metal type"
 	}}
 	source={demoSource}
 >
+	{#snippet motivation()}
+		<Term t="Model">Models</Term> speak prose; software speaks types.
+		<Term t="Structured output">Structured output</Term> is the bridge — and
+		<Term t="Zod" /> gives you guarantees the <Term t="LLM" /> alone cannot.
+	{/snippet}
+
 	{#snippet intro()}
 		<p>
-			Free-form text is easy for the model and miserable for the rest of your code.
-			Schema-driven structured output makes the model emit JSON that matches a Zod schema you
-			define, so the downstream code stays typed and predictable.
+			Free-form text is easy for the <Term t="Model">model</Term> and miserable for the rest of
+			your code. <Term t="Schema">Schema</Term>-driven <Term t="Structured output">structured output</Term>
+			makes the model emit <Term t="JSON schema">JSON</Term> that matches a
+			<Term t="Zod" /> <Term t="Schema">schema</Term> you define, so downstream code stays typed and
+			predictable.
 		</p>
 	{/snippet}
 
 	{#snippet narrative()}
 		<Slide eyebrow="Why this shape" title="From prose to type" variant="dropcap">
 			<p>
-				A model is most natural when it writes paragraphs; a program is most natural when it
-				reads records. Between them is a thin border crossing where data has to switch
-				languages, and every shaky regex you have ever written has lived along that border.
+				A <Term t="Model">model</Term> is most natural when it writes paragraphs; a program is most
+				natural when it reads records. Between them is a thin border crossing where data has to
+				switch languages, and every shaky regex you have ever written has lived along that border.
 			</p>
 			<p>
-				The newer idea is to skip the border altogether. You hand the model a <Term
-					t="schema"
-				/> — a precise description of the record you want — and the provider's tool-calling
-				API forces the response into that shape. The model no longer narrates a result; it
-				produces one.
+				The newer idea is to skip the border altogether. You hand the model a
+				<Term t="Schema">schema</Term> — a precise description of the record you want — and the
+				provider's <Term t="Tool calling">tool-calling</Term> /
+				<Term t="Function calling">function-calling</Term> API forces the response into that shape.
+				The model no longer narrates a result; it produces one.
 			</p>
 		</Slide>
 
 		<Slide title="withStructuredOutput" variant="code-first">
 			<CodeBlock code={code} lang="ts" caption="Define once, get a typed function." />
 			<p>
-				LangChain's <Term t="withStructuredOutput"><code>withStructuredOutput</code></Term> wraps
-				a chat model so it returns a typed
-				value instead of an <code>AIMessage</code>. Under the hood it registers your Zod
-				schema as a tool and asks the model to fill it.
+				<Term t="LangChain" />'s <Term t="withStructuredOutput"><code>withStructuredOutput</code></Term>
+				wraps a chat <Term t="Model">model</Term> so it returns a typed value instead of an
+				<Term t="AIMessage"><code>AIMessage</code></Term>. Under the hood it registers your
+				<Term t="Zod" /> <Term t="Schema">schema</Term> as a <Term t="tool">tool</Term> and asks the
+				model to fill it — the same mechanism as <Term t="bindTools">bindTools</Term> for arbitrary
+				tools.
 			</p>
 		</Slide>
 
 		<Slide variant="pull-quote">
 			<p>
-				A schema is a contract the model has to sign before it speaks — and the contract is
-				written in your type system, not its.
+				A <Term t="Schema">schema</Term> is a contract the <Term t="LLM">model</Term> has to sign
+				before it speaks — and the contract is written in your type system, not its.
 			</p>
 		</Slide>
 
 		<Slide title="Two demos">
 			<p>
 				Demo 1 extracts a structured bug report from a free-form support message. Demo 2
-				classifies sentiment with a confidence number. Both schemas live in this very file
-				— the inspector shows you the parsed object as the model returns it.
+				classifies sentiment with a confidence number. Both <Term t="Schema">schemas</Term> live in
+				this very file — the inspector shows you the parsed object as
+				<Term t="invoke">invoke</Term> returns it.
 			</p>
 		</Slide>
 
 		<Slide title="In production">
 			<p>
-				Use schemas for: ticket extraction, classification, function arguments, evaluator
-				rubrics, structured agent plans, and any handoff between an LLM and the rest of your
-				system. Pair with retries (<Term t="withRetry"><code>withRetry</code></Term>) for
-				robustness, and prefer narrow
-				enums over open strings whenever you can.
+				Use <Term t="Schema">schemas</Term> for: ticket extraction, classification,
+				<Term t="tool">tool</Term> arguments, evaluator rubrics, structured
+				<Term t="Agent">agent</Term> plans, and any handoff between an <Term t="LLM" /> and the rest
+				of your system. Pair with retries (<Term t="withRetry"><code>withRetry</code></Term>) on the
+				<Term t="Runnable" /> for robustness, and prefer narrow enums over open strings whenever you
+				can.
 			</p>
 		</Slide>
 

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import ChapterIntro from '$lib/components/ChapterIntro.svelte';
+	import Term from '$lib/components/Term.svelte';
 </script>
 
 <ChapterIntro
@@ -10,9 +11,14 @@
 >
 	{#snippet intro()}
 		<p>
-			LangChain is the foundation layer: small, composable primitives — prompts, models,
-			parsers, tools, retrievers — that all speak the same Runnable protocol. Master these
-			six lessons and every later chapter is a recombination of them.
+			<Term t="LangChain" /> is the foundation layer: small, composable primitives —
+			<Term t="Prompt">prompts</Term>, <Term t="Model">models</Term>,
+			<Term t="Parser">parsers</Term>, <Term t="tool">tools</Term>,
+			<Term t="Retriever">retrievers</Term> — that all speak the same
+			<Term t="Runnable" /> protocol (<Term t="LCEL" />). Master these six lessons and every
+			later chapter — <Term t="LangGraph" />, <Term t="Deep Agent">Deep Agents</Term> — is a
+			recombination of <Term t="Chain">chains</Term>, <Term t="RAG" />, and
+			<Term t="Agent">agents</Term>.
 		</p>
 	{/snippet}
 </ChapterIntro>

@@ -110,13 +110,16 @@ const agent = createDeepAgent({ model, backend });`;
 <Lesson
 	title="Backends"
 	eyebrow="Phase 3 · Lesson 04"
-	motivation="Some files vanish at the end of the run; some persist forever; some live somewhere in between. The backend tells the harness which is which."
 	hero={{
 		id: 'l3-backends',
 		alt: "Two-room cutaway: a chalkboard 'State' and a stone vault 'Store'"
 	}}
 	source={demoSource}
 >
+	{#snippet motivation()}
+		Some files vanish at the end of the run; some persist forever; some live somewhere in between. The <Term t="Backend">backend</Term> tells the <Term t="Harness">harness</Term> which is which.
+	{/snippet}
+
 	{#snippet intro()}
 		<p>
 			Where files live is a pluggable choice. The harness ships three:
@@ -129,24 +132,23 @@ const agent = createDeepAgent({ model, backend });`;
 	{#snippet narrative()}
 		<Slide eyebrow="Why this shape" title="One protocol, three lifetimes" variant="dropcap">
 			<p>
-				A code agent and a memory agent live in the same harness but have completely
+				A code agent and a memory agent live in the same <Term t="Harness">harness</Term> but have completely
 				different ideas about persistence. A scratch buffer that survives the run is a
-				distraction; a memory that does not survive the run is broken. The backend protocol
-				lets the same six filesystem tools talk to either store, with the choice expressed
+				distraction; a memory that does not survive the run is broken. The <Term t="BackendProtocol"><code>BackendProtocol</code></Term>
+				lets the same six <Term t="Virtual filesystem">filesystem</Term> tools talk to either store, with the choice expressed
 				as routing rules rather than special cases scattered through the agent.
 			</p>
 			<p>
-				The default in practice is composite: a hot, ephemeral scratch space for the current
-				task and a small, deliberate memory area for things the next session will want to
+				The default in practice is <Term t="CompositeBackend">composite</Term>: <Term t="StateBackend">StateBackend</Term> for hot, ephemeral scratch and <Term t="StoreBackend">StoreBackend</Term> for a small, deliberate <Term t="Store">memory</Term> area the next session will want to
 				see. Two lifetimes; one protocol; one mental model.
 			</p>
 		</Slide>
 
 		<Slide title="Three backends, one protocol" variant="code-first">
 			<p>
-				All three implement the same <code>BackendProtocol</code> — <code>read</code>,
-				<code>write</code>, <code>delete</code>, <code>list</code>. Any tool that touches
-				files goes through the backend, so where the files live becomes pure configuration.
+				All three implement the same <Term t="BackendProtocol"><code>BackendProtocol</code></Term> — <code>read</code>,
+				<code>write</code>, <code>delete</code>, <code>list</code>. Any <Term t="tool">tool</Term> that touches
+				files goes through the <Term t="Backend">backend</Term>, so where the files live becomes pure configuration.
 			</p>
 			<CodeBlock code={code} lang="ts" caption="Routing /memories/ to a Dexie-backed store." />
 		</Slide>
@@ -163,7 +165,7 @@ const agent = createDeepAgent({ model, backend });`;
 		<Slide title="Demo · two writes, one reload">
 			<p>
 				The agent receives a brief and writes one note under <code>/scratch/</code>
-				(StateBackend) and one under <code>/memories/</code> (StoreBackend, IndexedDB).
+				(<Term t="StateBackend">StateBackend</Term>) and one under <code>/memories/</code> (<Term t="StoreBackend">StoreBackend</Term>, <Term t="IndexedDB">IndexedDB</Term> via <Term t="Dexie">Dexie</Term>).
 				Reload this tab — only the memory survives. The "after reload" panel reads directly
 				from IndexedDB to prove it.
 			</p>

@@ -112,33 +112,36 @@ console.log('\\nSummary:', finalText);
 <Lesson
 	title="Virtual filesystem"
 	eyebrow="Phase 3 · Lesson 02"
-	motivation="Conversation is bandwidth-limited. The virtual filesystem is how an agent thinks long-form — pin the artifact, edit it, share it with subagents, and never relitigate it in chat."
 	hero={{
 		id: 'l3-virtual-fs',
 		alt: 'A wall of small wooden file drawers with abstract glyph labels'
 	}}
 	source={demoSource}
 >
+	{#snippet motivation()}
+		Conversation is bandwidth-limited. The <Term t="Virtual filesystem">virtual filesystem</Term> is how an agent thinks long-form — pin the artifact, <Term t="edit_file"><code>edit_file</code></Term> it, share it with <Term t="Subagent">subagents</Term>, and never relitigate it in chat.
+	{/snippet}
+
 	{#snippet intro()}
 		<p>
-			The harness gives the agent a six-tool API for working with files. There is no real
-			disk — files live in graph state (or a <Term t="Store" />) — but the model thinks like a
-			coder, and that mental model is what unlocks long-horizon work.
+			The <Term t="Harness">harness</Term> gives the agent a six-tool API for working with files. There is no real
+			disk — files live in graph state (or a <Term t="Store" />) via <Term t="StateBackend">StateBackend</Term> / <Term t="StoreBackend">StoreBackend</Term> — but the model thinks like a
+			coder, and that mental model is what unlocks <Term t="Long-horizon">long-horizon</Term> work.
 		</p>
 	{/snippet}
 
 	{#snippet narrative()}
 		<Slide eyebrow="Why this shape" title="Files are slower-burning context" variant="dropcap">
 			<p>
-				Long outputs do not belong in the conversation. Past a couple hundred tokens, every
+				Long outputs do not belong in the <Term t="Context window">conversation</Term>. Past a couple hundred tokens, every
 				re-render of an artifact is wasted budget — the model paraphrases its own work and the
-				signal drifts. A virtual filesystem turns "render in chat" into "write to a path,
-				reference by name," and the same artifact survives planning, delegation, and
-				compaction without being rewritten.
+				signal drifts. A <Term t="Virtual filesystem">virtual filesystem</Term> turns "render in chat" into <Term t="write_file"><code>write_file</code></Term> to a path,
+				reference by name, and the same artifact survives <Term t="Planning">planning</Term>, <Term t="task">delegation</Term>, and
+				<Term t="Context compaction">compaction</Term> without being rewritten.
 			</p>
 			<p>
 				The result is an agent that can sustain a multi-step project across dozens of turns:
-				it pins what it has produced, edits it surgically, and asks subagents to extend it —
+				it pins what it has produced, <Term t="edit_file">edits</Term> it surgically, and asks <Term t="Subagent">subagents</Term> to extend it —
 				rather than re-narrating the entire body of work every round.
 			</p>
 		</Slide>
@@ -146,9 +149,9 @@ console.log('\\nSummary:', finalText);
 		<Slide title="Six tools is enough" variant="code-first">
 			<CodeBlock code={surfaceCode} lang="ts" caption="The full filesystem surface." />
 			<p>
-				Six tools cover the whole working set a code agent ever asked for: enumerate the
-				workspace, read a slice, write or overwrite, edit precisely, find by glob, search by
-				regex. Everything else is a composition of these.
+				Six tools cover the whole working set a code agent ever asked for: <Term t="ls"><code>ls</code></Term> the
+				workspace, <Term t="read_file"><code>read</code></Term> a slice, <Term t="write_file"><code>write</code></Term> or overwrite, <Term t="edit_file"><code>edit</code></Term> precisely, <Term t="glob"><code>glob</code></Term> by pattern, <Term t="grep"><code>grep</code></Term> by
+				regex. Everything routes through the configured <Term t="Backend">backend</Term>.
 			</p>
 		</Slide>
 

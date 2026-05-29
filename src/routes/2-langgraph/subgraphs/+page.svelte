@@ -108,35 +108,39 @@ const chat = new StateGraph(ChatState)
 <Lesson
 	title="Subgraphs"
 	eyebrow="Phase 2 · Lesson 07"
-	motivation="Composability scales. A subgraph behaves exactly like a node, so the architecture you sketch on a napkin matches the architecture you ship."
 	hero={{
 		id: 'l2-subgraphs',
 		alt: 'Nested architectural floor plans where one room zooms into its own complete plan'
 	}}
 	source={demoSource}
 >
+	{#snippet motivation()}
+		Composability scales. A <Term t="Subgraph" /> behaves exactly like a <Term t="Node" />, so the
+		architecture you sketch on a napkin matches the architecture you ship.
+	{/snippet}
 	{#snippet intro()}
 		<p>
-			A compiled graph is a Runnable, so a graph can be a node inside another graph. This is
-			how you compose specialized workflows — a RAG mini-graph, a code-review mini-graph, a
-			research mini-graph — into a larger orchestrator without flattening everything into one
-			giant diagram.
+			A compiled <Term t="StateGraph" /> is a <Term t="Runnable" />, so a graph can be a
+			<Term t="Node" /> inside another graph. This is how you compose specialized workflows — a
+			RAG mini-graph, a code-review mini-graph, a research mini-graph — into a larger orchestrator
+			without flattening everything into one giant diagram.
 		</p>
 	{/snippet}
 
 	{#snippet narrative()}
 		<Slide eyebrow="Why this shape" title="The graph is the API" variant="dropcap">
 			<p>
-				A subgraph isn't a special concept; it's the natural consequence of every compiled
-				graph being a <Term t="Runnable" />. The very same object that powered the chat-tool
-				loop in lesson 1 can drop into another graph as one of its nodes. Encapsulation,
-				testing, and reuse stop being framework features and become emergent properties of
-				the type signature.
+				A <Term t="Subgraph" /> isn't a special concept; it's the natural consequence of every
+				compiled graph being a <Term t="Runnable" />. The very same object that powered the
+				chat-tool loop in lesson 1 can drop into another graph as one of its
+				<Term t="Node">nodes</Term>. Encapsulation, testing, and reuse stop being framework
+				features and become emergent properties of the type signature.
 			</p>
 			<p>
-				The win is architectural, not technical. You can sketch your system as a tree of
-				graphs — outer orchestrator, retrieval subgraph, code-review subgraph, summary
-				subgraph — and every box on the napkin maps to a real, compilable, testable unit.
+				The win is architectural, not technical. You can sketch your system as a tree of graphs
+				— outer orchestrator, retrieval <Term t="Subgraph">subgraph</Term>, code-review
+				subgraph, summary subgraph — and every box on the napkin maps to a real, compilable,
+				testable unit.
 			</p>
 		</Slide>
 
@@ -151,41 +155,45 @@ const chat = new StateGraph(ChatState)
 
 		<Slide variant="pull-quote">
 			<p>
-				A subgraph is a contract: same input shape, same output shape, same Runnable
-				protocol. That's all the runtime needs to nest them as deep as you like.
+				A <Term t="Subgraph" /> is a contract: same input shape, same output shape, same
+				<Term t="Runnable" /> protocol. That's all the runtime needs to nest them as deep as you
+				like.
 			</p>
 		</Slide>
 
 		<Slide title="State namespacing">
 			<p>
-				Each subgraph has its own state schema. You map fields explicitly when you call into
-				it, and you map them back when you return. Subgraphs can have their own checkpointer
-				configuration too — useful when you want a sensitive subroutine to share or keep its
-				own audit trail.
+				Each <Term t="Subgraph" /> has its own <Term t="State schema">state schema</Term>. You map
+				fields explicitly when you call into it, and you map them back when you return.
+				Subgraphs can have their own <Term t="Checkpointer">checkpointer</Term> configuration too
+				— useful when you want a sensitive subroutine to share or keep its own audit trail.
 			</p>
 		</Slide>
 
 		<Slide title="When to reach for a subgraph">
 			<p>
-				Whenever a slice of your workflow has its own state, its own loop, and its own tests.
-				The Deep Agents harness uses subgraphs for every spawned subagent, which is the next
-				chapter's domain.
+				Whenever a slice of your workflow has its own <Term t="State" />, its own loop, and its
+				own tests. The <Term t="Deep Agent">Deep Agents</Term> harness uses
+				<Term t="Subgraph">subgraphs</Term> for every spawned <Term t="Subagent">subagent</Term>,
+				which is the next chapter's domain.
 			</p>
 		</Slide>
 
 		<Slide title="Demo · classify → (rag | chitchat)">
 			<p>
-				The outer graph classifies the question, then either calls a real RAG subgraph
-				(retrieve → generate, both real model calls grounded in a tiny knowledge base) or
-				replies with chit-chat. The subgraph is invoked exactly like any other node — the
-				outer graph never has to know how RAG works inside.
+				The outer <Term t="StateGraph" /> classifies the question, then either calls a real RAG
+				<Term t="Subgraph" /> (retrieve → generate, both real model calls grounded in a tiny
+				knowledge base) or replies with chit-chat. The subgraph is invoked exactly like any other
+				<Term t="Node" /> — the outer graph never has to know how <Term t="RAG">RAG</Term> works
+				inside.
 			</p>
 		</Slide>
 
 		<Slide title="From here to harness" ornament>
 			<p>
-				That's Phase 2. Next chapter swaps "you wire the graph" for "the harness wires it,
-				you declare policy" — and every subgraph technique here keeps working underneath.
+				That's Phase 2. Next chapter swaps "you wire the <Term t="StateGraph" />" for "the
+				<Term t="Harness">harness</Term> wires it, you declare policy" — and every
+				<Term t="Subgraph">subgraph</Term> technique here keeps working underneath.
 			</p>
 		</Slide>
 	{/snippet}

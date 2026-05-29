@@ -85,52 +85,60 @@ for await (const [chunk, meta] of await graph.stream(input, { streamMode: 'messa
 <Lesson
 	title="Streaming modes"
 	eyebrow="Phase 2 · Lesson 05"
-	motivation="Three different streams answer three different questions: what changed, where are we now, what just got said. Pick the right one and the UI writes itself."
 	hero={{
 		id: 'l2-streaming-modes',
 		alt: 'A three-channel printing press emitting different paper ribbons'
 	}}
 	source={demoSource}
 >
+	{#snippet motivation()}
+		Three different streams answer three different questions: what changed, where are we now, what
+		just got said. Pick the right <Term t="streamMode">streamMode</Term> and the UI writes itself.
+	{/snippet}
 	{#snippet intro()}
 		<p>
-			LangGraph offers three streaming projections of the same run. Use <Term t="streamMode: values"><code>values</code></Term> to
-			keep a UI in sync with the full state, <Term t="streamMode: updates"><code>updates</code></Term> for compact deltas, and
-			<Term t="streamMode: messages"><code>messages</code></Term> to render real-time tokens.
+			<Term t="LangGraph" /> offers three streaming projections of the same run. Use
+			<Term t="streamMode: values"><code>values</code></Term> to keep a UI in sync with the full
+			<Term t="State" />, <Term t="streamMode: updates"><code>updates</code></Term> for compact
+			<Term t="Partial state update">deltas</Term>, and
+			<Term t="streamMode: messages"><code>messages</code></Term> to render real-time
+			<Term t="ChatGenerationChunk">tokens</Term>.
 		</p>
 	{/snippet}
 
 	{#snippet narrative()}
 		<Slide eyebrow="Why this shape" title="Three lenses, one run" variant="dropcap">
 			<p>
-				Streaming an agent isn't really one feature — it's three different questions wearing
-				the same word. Do you want the <em>current state</em> after each step, the
-				<em>delta</em> a node just produced, or the <em>tokens</em> emerging from inside an
-				LLM call? Each answer needs a different shape. Conflating them is why most agent UIs
-				look either boringly flat (full re-renders) or noisily jittery (token chaos).
+				Streaming an <Term t="Agent">agent</Term> isn't really one feature — it's three different
+				questions wearing the same word. Do you want the <em>current <Term t="State">state</Term></em>
+				after each <Term t="Superstep">superstep</Term>, the <em>delta</em> a
+				<Term t="Node" /> just produced, or the <em>tokens</em> emerging from inside an
+				<Term t="LLM">LLM</Term> call? Each answer needs a different shape. Conflating them is why
+				most agent UIs look either boringly flat (full re-renders) or noisily jittery (token chaos).
 			</p>
 			<p>
-				LangGraph names the three lenses and gives each a stable shape. Pick one. Build the UI
-				to that shape. Swap to a different mode when the surface changes — for example,
-				switching from a chat bubble to an audit trail with two lines of code.
+				LangGraph names the three lenses and gives each a stable <Term t="streamMode">streamMode</Term>
+				shape. Pick one. Build the UI to that shape. Swap to a different mode when the surface
+				changes — for example, switching from a chat bubble to an audit trail with two lines of code.
 			</p>
 		</Slide>
 
 		<Slide title="The three modes">
 			<ul>
 				<li>
-					<strong>values</strong> — emits the entire state object after each superstep. Best
-					for a "current state" inspector or any view that re-derives from full state.
+					<strong><Term t="streamMode: values">values</Term></strong> — emits the entire
+					<Term t="State" /> object after each <Term t="Superstep">superstep</Term>. Best for a
+					"current state" inspector or any view that re-derives from full state.
 				</li>
 				<li>
-					<strong>updates</strong> — emits <code>{'{ nodeName: delta }'}</code> after each
-					superstep. Best for an event log, for syncing diffs to a server, or for showing
-					what each node contributed.
+					<strong><Term t="streamMode: updates">updates</Term></strong> — emits
+					<code>{'{ nodeName: delta }'}</code> after each superstep. Best for an event log, for
+					syncing diffs to a server, or for showing what each <Term t="Node" /> contributed.
 				</li>
 				<li>
-					<strong>messages</strong> — emits <code>[chunk, metadata]</code> tuples for every
-					LLM token. Best for chat-style typing animation. The metadata tag tells you which
-					node produced the chunk.
+					<strong><Term t="streamMode: messages">messages</Term></strong> — emits
+					<code>[chunk, metadata]</code> tuples for every LLM token. Best for chat-style typing
+					animation. The metadata tag tells you which <Term t="Node" /> produced the chunk.
 				</li>
 			</ul>
 		</Slide>
@@ -139,14 +147,14 @@ for await (const [chunk, meta] of await graph.stream(input, { streamMode: 'messa
 			<CodeBlock code={code} caption="One run can be observed three ways." />
 			<p>
 				The graph below is the chat–tool loop from Lesson 1. We run it three times — once per
-				mode — and show what each lens yields.
+				<Term t="streamMode">streamMode</Term> — and show what each lens yields.
 			</p>
 		</Slide>
 
 		<Slide variant="pull-quote">
 			<p>
-				A streaming mode is just a projection. Pick the lens that matches the surface you're
-				building, and stop trying to make one stream do every job.
+				A <Term t="streamMode">streaming mode</Term> is just a projection. Pick the lens that matches
+				the surface you're building, and stop trying to make one stream do every job.
 			</p>
 		</Slide>
 
@@ -208,7 +216,7 @@ for await (const [chunk, meta] of await graph.stream(input, { streamMode: 'messa
 				</div>
 				<div class="legend">
 					Tokens highlighted by source node. The runtime tags each chunk with
-					<Term t="langgraph_node"><code>metadata.langgraph_node</code></Term> so the UI knows where it came from.
+					<code>metadata.langgraph_node</code> so the UI knows where it came from.
 				</div>
 			{:else}
 				<p class="empty">No tokens yet.</p>

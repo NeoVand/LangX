@@ -1,11 +1,12 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import { chapterById, type Chapter } from '$lib/curriculum';
 	import Diagram from '$lib/components/Diagram.svelte';
 	import type { DiagramSpec } from '$lib/diagrams/types';
 
 	interface Props {
 		chapterId: Chapter['id'];
-		blurb: string;
+		blurb: string | Snippet;
 		next?: { href: string; label: string } | null;
 		complete?: boolean;
 		diagram?: DiagramSpec | null;
@@ -19,7 +20,13 @@
 	<div class="inner">
 		<div class="eyebrow font-mono">Phase {chapter.number} · Recap</div>
 		<h1 class="font-display">{chapter.title} — what you learned</h1>
-		<p class="blurb font-prose">{blurb}</p>
+		<p class="blurb font-prose">
+			{#if typeof blurb === 'string'}
+				{blurb}
+			{:else}
+				{@render blurb()}
+			{/if}
+		</p>
 
 		{#if diagram}
 			<Diagram spec={diagram} />

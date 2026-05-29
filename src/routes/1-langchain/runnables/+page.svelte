@@ -121,13 +121,17 @@ const { short, bullets, passthrough } = await fanout.invoke({ topic });`;
 <Lesson
 	title="Runnables and LCEL"
 	eyebrow="Phase 1 · Lesson 01"
-	motivation="Before you can build an agent you need a way to compose work. LangChain's answer is a tiny protocol: every step speaks the same four methods, so the pipe between them is real."
 	hero={{
 		id: 'l1-runnables',
 		alt: 'A factory line of brass machines passing a glowing token hand to hand'
 	}}
 	source={demoSource}
 >
+	{#snippet motivation()}
+		Before you can build an <Term t="Agent">agent</Term> you need a way to compose work.
+		<Term t="LangChain" />'s answer is a tiny <Term t="Runnable" /> protocol: every step speaks
+		the same four methods, so the <Term t="pipe">pipe</Term> between them is real.
+	{/snippet}
 	{#snippet intro()}
 		<p>
 			Everything in LangChain is a <Term t="Runnable" />. A <Term t="Prompt template" />, a
@@ -140,14 +144,16 @@ const { short, bullets, passthrough } = await fanout.invoke({ topic });`;
 		<Slide eyebrow="Why this shape" title="Composition first, model second" variant="dropcap">
 			<p>
 				LangChain's earliest designs hard-coded "chain types" — a SummarizationChain, a
-				QuestionAnsweringChain. That made every new use case a new class. The Runnable protocol
-				inverted the design: <strong>shape the pieces alike, and composition does the work</strong>.
+				QuestionAnsweringChain. That made every new use case a new class. The
+				<Term t="Runnable" /> protocol inverted the design:
+				<strong>shape the pieces alike, and composition does the work</strong>.
 			</p>
 			<p>
-				A senior engineer can read a Runnable diagram the way a plumber reads pipes. Knobs
-				(prompts) feed into chambers (models), get filtered (parsers), and drain into the next
-				system. You don't memorise twenty chain classes; you learn one verb and use it
-				everywhere.
+				A senior engineer can read a <Term t="Runnable" /> diagram the way a plumber reads
+				pipes. Knobs (<Term t="Prompt">prompts</Term>) feed into chambers (<Term
+					t="Model">models</Term
+				>), get filtered (<Term t="Parser">parsers</Term>), and drain into the next system. You
+				don't memorise twenty chain classes; you learn one verb and use it everywhere.
 			</p>
 		</Slide>
 
@@ -173,14 +179,16 @@ const { short, bullets, passthrough } = await fanout.invoke({ topic });`;
 		<Slide title="LCEL — the pipe operator" variant="code-first">
 			<p>
 				<Term t="LCEL" /> uses the <Term t="pipe"><code>.pipe(...)</code></Term> operator to chain
-				Runnables. The output of the left side becomes the input of the right side. The chain is
-				lazy — nothing runs until you call <Term t="invoke">invoke</Term>.
+				Runnables into a <Term t="RunnableSequence">RunnableSequence</Term>. The output of the left
+				side becomes the input of the right side. The chain obeys
+				<Term t="Lazy evaluation">lazy evaluation</Term> — nothing runs until you call
+				<Term t="invoke">invoke</Term>.
 			</p>
 			<CodeBlock code={codeA} lang="ts" caption="A prompt → model → parser chain (Demo 1)." />
 			<p>
 				Run Demo 1 on the right and watch the value's shape change at each stop:
 				<code>{'{ topic }'}</code> → <Term t="ChatPromptValue"><code>ChatPromptValue</code></Term> → <Term t="AIMessage"><code>AIMessage</code></Term> →
-				<code>string</code>.
+				<Term t="StringOutputParser"><code>string</code></Term>.
 			</p>
 		</Slide>
 
@@ -188,8 +196,10 @@ const { short, bullets, passthrough } = await fanout.invoke({ topic });`;
 
 		<Slide variant="pull-quote">
 			<p>
-				The pipe is the smallest interface that lets every other LangChain primitive — retries,
-				batching, callbacks, streaming — apply uniformly to everything you compose.
+				The <Term t="pipe">pipe</Term> is the smallest interface that lets every other
+				<Term t="LangChain" /> primitive — retries, batching,
+				<Term t="callbacks">callbacks</Term>, streaming, <Term t="fallbacks">fallbacks</Term> — apply
+				uniformly to everything you compose.
 			</p>
 		</Slide>
 
@@ -205,9 +215,11 @@ const { short, bullets, passthrough } = await fanout.invoke({ topic });`;
 
 		<Slide title="Why this matters" ornament>
 			<p>
-				The pipe is more than syntactic sugar. Because every step is a Runnable, you also get
-				batched execution, streaming, retries, fallbacks, and observable callbacks for free.
-				When LangChain v1 says “every agent is a Runnable,” this is what they mean.
+				The pipe is more than syntactic sugar. Because every step is a <Term t="Runnable" />, you
+				also get batched execution, <Term t="stream">streaming</Term>, <Term t="withRetry">retries</Term>,
+				<Term t="fallbacks">fallbacks</Term>, and observable <Term t="callbacks">callbacks</Term> for
+				free. When LangChain v1 says “every <Term t="Agent">agent</Term> is a Runnable,” this is what
+				they mean.
 			</p>
 		</Slide>
 	{/snippet}

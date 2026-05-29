@@ -171,34 +171,43 @@ if (decision !== 'approve') return { aborted: true };
 <Lesson
 	title="Interrupts & HITL"
 	eyebrow="Phase 2 · Lesson 04"
-	motivation="Some decisions belong to humans. Interrupts make 'pause and ask' a first-class language feature, not a gluey hack."
 	hero={{
 		id: 'l2-interrupts',
 		alt: 'A scholar pauses mid-stride as a human steps out with a sealed envelope'
 	}}
 	source={demoSource}
 >
+	{#snippet motivation()}
+		Some decisions belong to humans. <Term t="Interrupt">Interrupts</Term> make "pause and ask" a
+		first-class language feature, not a gluey hack — the same primitive behind
+		<Term t="HITL">human-in-the-loop</Term> in Phase 3.
+	{/snippet}
 	{#snippet intro()}
 		<p>
-			An <Term t="Interrupt" /> turns any node into a "wait for the human" gate. The graph
-			pauses, the checkpointer records exact state, and execution resumes when the host calls
-			<code>invoke</code> with a <code>Command(&#123; resume &#125;)</code>.
+			An <Term t="Interrupt" /> turns any <Term t="Node" /> into a "wait for the human" gate. The
+			graph pauses, the <Term t="Checkpointer">checkpointer</Term> records exact
+			<Term t="State" />, and execution resumes when the host calls
+			<Term t="invoke">invoke</Term> with a <Term t="Command"><code>Command(&#123; resume &#125;)</code></Term>.
 		</p>
 	{/snippet}
 
 	{#snippet narrative()}
 		<Slide eyebrow="Why this shape" title="Approval as a primitive" variant="dropcap">
 			<p>
-				Every team that ships an agent eventually invents the same hack: a regex, a
-				confirmation prompt, a side-channel queue. Interrupts make that hack a first-class
-				graph feature. The runtime owns the pause; the checkpointer owns the state; your code
-				just declares <em>where</em> the pause lives.
+				Every team that ships an <Term t="Agent">agent</Term> eventually invents the same hack: a
+				regex, a confirmation prompt, a side-channel queue. <Term t="Interrupt">Interrupts</Term>
+				make that hack a first-class graph feature. The runtime owns the pause; the
+				<Term t="Checkpointer">checkpointer</Term> owns the <Term t="State" />; your code just
+				declares <em>where</em> the pause lives.
 			</p>
 			<p>
-				This is the same primitive the Deep Agents harness uses for its HITL middleware in
-				Phase 3. Wrapping a tool call in <code>interruptOn</code> compiles down to a node that
-				calls <code>interrupt(...)</code> and waits for a <code>Command</code>. Once you see
-				how thin the underlying surface is, you stop reinventing it.
+				This is the same primitive the <Term t="Deep Agent">Deep Agents</Term> harness uses for its
+				<Term t="HITL">HITL</Term> middleware in Phase 3. Wrapping a
+				<Term t="tool">tool</Term> call in <Term t="interruptOn"><code>interruptOn</code></Term>
+				compiles down to a <Term t="Node" /> that calls <Term t="Interrupt"
+					><code>interrupt(...)</code></Term
+				> and waits for a <Term t="Command"><code>Command</code></Term>. Once you see how thin the
+				underlying surface is, you stop reinventing it.
 			</p>
 		</Slide>
 
@@ -208,9 +217,11 @@ if (decision !== 'approve') return { aborted: true };
 				caption="Interrupt + Command(resume) is a complete pause/resume API."
 			/>
 			<p>
-				Behind the scenes, <code>interrupt(value)</code> throws a special signal that the
-				runtime catches. The checkpointer saves state with <code>next: ['approve']</code>; the
-				next call with a <code>Command</code> resumes from exactly that point.
+				Behind the scenes, <Term t="Interrupt"><code>interrupt(value)</code></Term> throws a special
+				signal that the runtime catches. The <Term t="Checkpointer">checkpointer</Term> saves
+				<Term t="State" /> with <Term t="checkpoint next"><code>next: ['approve']</code></Term>; the
+				next call with a <Term t="Command"><code>Command</code></Term> and
+				<Term t="resume"><code>resume</code></Term> payload continues from exactly that point.
 			</p>
 		</Slide>
 
@@ -219,16 +230,16 @@ if (decision !== 'approve') return { aborted: true };
 		<Slide variant="pull-quote">
 			<p>
 				The runtime owns the pause. Your code owns the policy. That separation is what makes
-				HITL a feature instead of a project.
+				<Term t="HITL">HITL</Term> a feature instead of a project.
 			</p>
 		</Slide>
 
 		<Slide title="Demo · email approval">
 			<p>
-				The graph drafts a real internal email with the model, then interrupts. On the right
-				you can <em>approve</em>, <em>edit</em> (the textarea content becomes the resume
-				value), or <em>reject</em>. Try editing then approving — you'll see the final state
-				reflect the edit.
+				The graph drafts a real internal email with the model, then
+				<Term t="Interrupt">interrupts</Term>. On the right you can <em>approve</em>,
+				<em>edit</em> (the textarea content becomes the <Term t="resume">resume</Term> value), or
+				<em>reject</em>. Try editing then approving — you'll see the final state reflect the edit.
 			</p>
 		</Slide>
 
@@ -244,8 +255,9 @@ if (decision !== 'approve') return { aborted: true };
 		<Slide title="One pattern, many UIs" ornament>
 			<p>
 				Approval queues. Plan editors. Confirmation dialogs. Agent rooms with reviewers. They
-				all read the same payload off <code>__interrupt__</code> and resume with a
-				<code>Command</code>. The graph is the contract; the UI is the wrapper.
+				all read the same payload off <Term t="__interrupt__"><code>__interrupt__</code></Term> and
+				resume with a <Term t="Command"><code>Command</code></Term>. The
+				<Term t="StateGraph" /> is the contract; the UI is the wrapper.
 			</p>
 		</Slide>
 	{/snippet}

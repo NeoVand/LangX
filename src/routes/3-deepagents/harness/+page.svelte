@@ -104,18 +104,23 @@ const result = await agent.invoke({ input: 'Brief me on LangGraph.' });`;
 <Lesson
 	title="The harness"
 	eyebrow="Phase 3 · Lesson 01"
-	motivation="LangGraph gives you primitives. The harness gives you a working agent. This lesson is about the difference — and why most teams will never build their own."
 	hero={{
 		id: 'l3-harness',
 		alt: 'An exploded diagram of a leather harness with brass fittings labeled by glyph'
 	}}
 	source={demoSource}
 >
+	{#snippet motivation()}
+		<Term t="LangGraph">LangGraph</Term> gives you primitives. The <Term t="Harness">harness</Term> gives
+		you a working agent. This lesson is about the difference — and why most teams will never build
+		their own.
+	{/snippet}
+
 	{#snippet intro()}
 		<p>
-			A <Term t="Harness" /> is what you get when LangGraph's primitives have been pre-wired into
-			a working cognitive system. The harness owns planning, the virtual filesystem, subagent
-			delegation, summarization, and human approval — you configure it, you don't reimplement
+			A <Term t="Harness" /> is what you get when <Term t="LangGraph">LangGraph</Term>'s primitives have been pre-wired into
+			a working cognitive system. The harness owns <Term t="Planning">planning</Term>, the <Term t="Virtual filesystem">virtual filesystem</Term>, <Term t="Subagent">subagent</Term>
+			delegation, <Term t="Summarization">summarization</Term>, and <Term t="HITL">human approval</Term> — you configure it, you don't reimplement
 			it.
 		</p>
 	{/snippet}
@@ -125,31 +130,31 @@ const result = await agent.invoke({ input: 'Brief me on LangGraph.' });`;
 			<p>
 				Most production agents reinvent the same five things: a way to plan, a place to write
 				notes, a way to delegate, a way to summarize when context overflows, and a way to ask a
-				human. The harness ships these as pre-wired middleware so your job becomes
+				human. The harness ships these as pre-wired <Term t="Middleware">middleware</Term> so your job becomes
 				<strong>declaring policy</strong>, not assembling plumbing.
 			</p>
 			<p>
-				If you've used LangChain's <code>create_agent</code>, the harness is the same idea taken
-				one floor higher. <code>create_agent</code> wraps the ReAct loop. The harness wraps a
-				planning-and-delegation loop with a virtual filesystem and skill catalog underneath.
+				If you've used LangChain's <Term t="create_agent"><code>create_agent</code></Term>, the harness is the same idea taken
+				one floor higher. <Term t="create_agent"><code>create_agent</code></Term> wraps the <Term t="ReAct">ReAct</Term> loop. The harness wraps a
+				planning-and-delegation loop with a <Term t="Virtual filesystem">virtual filesystem</Term> and <Term t="Skill">skill</Term> catalog underneath.
 			</p>
 		</Slide>
 
 		<Slide eyebrow="The shape" title="One factory, many middlewares">
 			<p>
-				The mental model: <code>createDeepAgent({'{...}'})</code> takes a model and a list of
-				configurable concerns, then returns a graph you can <code>invoke</code> /
-				<code>stream</code> like any other Runnable.
+				The mental model: <Term t="createDeepAgent"><code>createDeepAgent({'{...}'})</code></Term> takes a <Term t="Model">model</Term> and a list of
+				configurable concerns, then returns a graph you can <Term t="invoke"><code>invoke</code></Term> /
+				<Term t="stream"><code>stream</code></Term> like any other <Term t="Runnable">Runnable</Term>.
 			</p>
 			<ul>
-				<li><strong>System prompt</strong> — assembled from base + your instructions + middleware.</li>
-				<li><strong>Graph</strong> — <code>agent → tools → agent</code>, with compaction baked between rounds.</li>
-				<li><strong>Tools</strong> — write_todos, ls/read/write/edit/glob/grep, task, load_skill.</li>
-				<li><strong>Backend</strong> — where files live (state, store, or composite).</li>
-				<li><strong>Permissions</strong> — declarative allow/deny on filesystem ops.</li>
-				<li><strong>Subagents</strong> — ephemeral child agents spawned via <code>task</code>.</li>
-				<li><strong>Skills</strong> — progressive-disclosure catalog of expertise.</li>
-				<li><strong>Interrupts</strong> — <code>interruptOn</code> wraps named tools in HITL gates.</li>
+				<li><strong><Term t="System prompt">System prompt</Term></strong> — assembled from base + your instructions + middleware.</li>
+				<li><strong>Graph</strong> — <code>agent → tools → agent</code>, with <Term t="Context compaction">compaction</Term> baked between rounds.</li>
+				<li><strong><Term t="tool">Tools</Term></strong> — <Term t="write_todos"><code>write_todos</code></Term>, <Term t="ls"><code>ls</code></Term>/<Term t="read_file"><code>read</code></Term>/<Term t="write_file"><code>write</code></Term>/<Term t="edit_file"><code>edit</code></Term>/<Term t="glob"><code>glob</code></Term>/<Term t="grep"><code>grep</code></Term>, <Term t="task"><code>task</code></Term>, <Term t="load_skill"><code>load_skill</code></Term>.</li>
+				<li><strong><Term t="Backend">Backend</Term></strong> — where files live (state, store, or composite).</li>
+				<li><strong><Term t="Permissions">Permissions</Term></strong> — declarative allow/deny on filesystem ops.</li>
+				<li><strong><Term t="Subagent">Subagents</Term></strong> — ephemeral child agents spawned via <Term t="task"><code>task</code></Term>.</li>
+				<li><strong><Term t="Skill">Skills</Term></strong> — <Term t="Progressive disclosure">progressive-disclosure</Term> catalog of expertise.</li>
+				<li><strong><Term t="Interrupt">Interrupts</Term></strong> — <Term t="interruptOn"><code>interruptOn</code></Term> wraps named tools in <Term t="HITL">HITL</Term> gates.</li>
 			</ul>
 		</Slide>
 
@@ -164,8 +169,8 @@ const result = await agent.invoke({ input: 'Brief me on LangGraph.' });`;
 
 		<Slide title="The factory" variant="code-first">
 			<p>
-				Here is the entire public surface. Almost every key is optional — only <code>model</code>
-				is strictly required. Everything else is middleware you opt into.
+				Here is the entire public surface. Almost every key is optional — only <Term t="Model"><code>model</code></Term>
+				is strictly required. Everything else is <Term t="Middleware">middleware</Term> you opt into.
 			</p>
 			<CodeBlock
 				code={code}
@@ -176,7 +181,7 @@ const result = await agent.invoke({ input: 'Brief me on LangGraph.' });`;
 
 		<Slide title="Read the source">
 			<p>
-				Open <code>src/lib/deepagents/</code> in this repo. The harness is built from scratch in
+				Open <code>src/lib/deepagents/</code> in this repo. The <Term t="Harness">harness</Term> is built from scratch in
 				about 600 lines of TypeScript so you can read it next to the lesson. Every concept in
 				this chapter maps to an obvious file there.
 			</p>
@@ -184,19 +189,19 @@ const result = await agent.invoke({ input: 'Brief me on LangGraph.' });`;
 
 		<Slide title="The base prompt" variant="code-first">
 			<p>
-				Below is the actual <code>BASE_AGENT_PROMPT</code> the harness ships with. It is the
+				Below is the actual <Term t="BASE_AGENT_PROMPT"><code>BASE_AGENT_PROMPT</code></Term> the harness ships with. It is the
 				smallest piece of context that gives the agent its operating shape — plan first, prefer
-				files over chat, delegate to subagents, mark progress.
+				files over chat, delegate to <Term t="Subagent">subagents</Term>, mark progress.
 			</p>
 			<CodeBlock code={BASE_AGENT_PROMPT} lang="md" />
 		</Slide>
 
 		<Slide title="What you'll see in this chapter" ornament>
 			<p>
-				Each remaining lesson zooms in on one of the harness's pieces — the virtual filesystem,
-				the planner, the backends, the permissions model, the subagents, the skills catalog,
-				context compaction, and human-in-the-loop. By the end you'll have built two capstones
-				against a real model.
+				Each remaining lesson zooms in on one of the harness's pieces — the <Term t="Virtual filesystem">virtual filesystem</Term>,
+				the planner, the <Term t="Backend">backends</Term>, the <Term t="Permissions">permissions</Term> model, the <Term t="Subagent">subagents</Term>, the <Term t="Skill">skills</Term> catalog,
+				<Term t="Context compaction">context compaction</Term>, and <Term t="HITL">human-in-the-loop</Term>. By the end you'll have built two capstones
+				against a real <Term t="Model">model</Term>.
 			</p>
 		</Slide>
 	{/snippet}
