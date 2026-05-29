@@ -147,20 +147,10 @@
 		color: var(--color-cream-0);
 	}
 
-	.chapter-link[data-chapter='langchain'].active {
+	.chapter-link.active {
 		color: color-mix(in oklch, var(--color-accent-langchain) 90%, var(--color-cream-0));
 		background: color-mix(in oklch, var(--color-accent-langchain) 16%, transparent);
 		border-color: color-mix(in oklch, var(--color-accent-langchain) 28%, transparent);
-	}
-	.chapter-link[data-chapter='langgraph'].active {
-		color: color-mix(in oklch, var(--color-accent-langgraph) 90%, var(--color-cream-0));
-		background: color-mix(in oklch, var(--color-accent-langgraph) 16%, transparent);
-		border-color: color-mix(in oklch, var(--color-accent-langgraph) 28%, transparent);
-	}
-	.chapter-link[data-chapter='deepagents'].active {
-		color: color-mix(in oklch, var(--color-accent-deepagents) 90%, var(--color-cream-0));
-		background: color-mix(in oklch, var(--color-accent-deepagents) 16%, transparent);
-		border-color: color-mix(in oklch, var(--color-accent-deepagents) 28%, transparent);
 	}
 
 	.num {

@@ -359,19 +359,10 @@ createDeepAgent({ model, backend, tools: [computeTool, plotTool] });`;
 <style>
 	textarea {
 		width: 100%;
-		background: var(--color-bg);
-		border: 1px solid var(--color-rule);
-		border-radius: 0.45rem;
-		padding: 0.6rem 0.75rem;
 		font-family: var(--font-mono);
 		font-size: 0.8rem;
 		line-height: 1.5;
-		color: var(--color-ink-100);
 		resize: vertical;
-	}
-	textarea:focus {
-		outline: none;
-		border-color: var(--accent-ink);
 	}
 	.actions {
 		margin-top: 0.65rem;
@@ -394,7 +385,7 @@ createDeepAgent({ model, backend, tools: [computeTool, plotTool] });`;
 		font-size: 0.72rem;
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
-		color: var(--accent-ink, var(--color-accent-deepagents));
+		color: var(--accent-ink, var(--color-accent-langchain));
 	}
 	.step-out {
 		margin: 0;
@@ -454,7 +445,7 @@ createDeepAgent({ model, backend, tools: [computeTool, plotTool] });`;
 		transition: border-color 0.15s ease, background 0.15s ease;
 	}
 	.chip:hover:not(:disabled) {
-		border-color: var(--accent-ink, var(--color-accent-deepagents));
+		border-color: var(--accent-ink, var(--color-accent-langchain));
 		background: var(--color-paper);
 	}
 	.chip:disabled {

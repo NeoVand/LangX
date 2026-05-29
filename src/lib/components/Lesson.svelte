@@ -167,7 +167,6 @@
 		margin: 0 0 2rem;
 		border-radius: 0.7rem;
 		overflow: hidden;
-		border: 1px solid var(--color-rule);
 		aspect-ratio: 16 / 9;
 		background: var(--color-paper);
 	}

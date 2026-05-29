@@ -117,7 +117,7 @@
 		background: var(--color-accent-success);
 	}
 	.seg[data-kind='memory'] {
-		background: var(--color-accent-deepagents);
+		background: color-mix(in oklch, var(--accent) 55%, var(--color-cream-0));
 	}
 	.seg[data-kind='pending'] {
 		background: var(--color-accent-danger);
@@ -180,7 +180,7 @@
 		background: var(--color-accent-success);
 	}
 	.dot[data-kind='memory'] {
-		background: var(--color-accent-deepagents);
+		background: color-mix(in oklch, var(--accent) 55%, var(--color-cream-0));
 	}
 	.dot[data-kind='pending'] {
 		background: var(--color-accent-danger);

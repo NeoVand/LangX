@@ -123,16 +123,6 @@
 		margin-bottom: 2.5rem;
 	}
 
-	section[data-chapter='langchain'] {
-		--accent: var(--color-accent-langchain);
-	}
-	section[data-chapter='langgraph'] {
-		--accent: var(--color-accent-langgraph);
-	}
-	section[data-chapter='deepagents'] {
-		--accent: var(--color-accent-deepagents);
-	}
-
 	h2 {
 		font-family: var(--font-serif);
 		font-size: 1.5rem;

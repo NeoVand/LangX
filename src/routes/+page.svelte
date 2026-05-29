@@ -7,8 +7,8 @@
 	<section class="hero">
 		<div class="eyebrow">A teaching environment for agentic systems</div>
 		<h1>
-			Learn <span class="g a1">LangChain</span>, <span class="g a2">LangGraph</span>, and
-			<span class="g a3">Deep Agents</span> by watching them run.
+			Learn <span class="g">LangChain</span>, <span class="g">LangGraph</span>, and
+			<span class="g">Deep Agents</span> by watching them run.
 		</h1>
 		<p class="lead">
 			LangX is a single-page tour of three architectural phases — declarative chains, stateful
@@ -110,17 +110,8 @@
 	}
 
 	.g {
-		color: var(--color-fg);
-		font-weight: 600;
-	}
-	.a1 {
 		color: var(--color-accent-langchain);
-	}
-	.a2 {
-		color: var(--color-accent-langgraph);
-	}
-	.a3 {
-		color: var(--color-accent-deepagents);
+		font-weight: 600;
 	}
 
 	.lead {
@@ -198,18 +189,8 @@
 		font-size: 0.7rem;
 		text-transform: uppercase;
 		letter-spacing: 0.12em;
-		color: var(--color-fg-faint);
-		font-weight: 600;
-	}
-
-	.card[data-chapter='langchain'] .card-num {
 		color: var(--color-accent-langchain);
-	}
-	.card[data-chapter='langgraph'] .card-num {
-		color: var(--color-accent-langgraph);
-	}
-	.card[data-chapter='deepagents'] .card-num {
-		color: var(--color-accent-deepagents);
+		font-weight: 600;
 	}
 
 	.card-title {

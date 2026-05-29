@@ -363,13 +363,8 @@ await graph.invoke({ messages: [new HumanMessage("What's my name?")] }, cfg);`;
 	}
 	.thread input {
 		flex: 1;
-		background: var(--color-bg);
-		border: 1px solid var(--color-rule);
-		border-radius: 0.4rem;
-		padding: 0.4rem 0.55rem;
 		font-family: var(--font-mono);
 		font-size: 0.82rem;
-		color: var(--color-ink-100);
 	}
 	.row {
 		display: flex;
@@ -385,17 +380,7 @@ await graph.invoke({ messages: [new HumanMessage("What's my name?")] }, cfg);`;
 		font-family: var(--font-mono);
 	}
 	.row input {
-		background: var(--color-bg);
-		border: 1px solid var(--color-rule);
-		border-radius: 0.4rem;
-		padding: 0.45rem 0.6rem;
-		font-size: 0.88rem;
-		color: var(--color-ink-100);
-	}
-	.row input:focus,
-	.thread input:focus {
-		outline: none;
-		border-color: var(--accent-ink);
+		width: 100%;
 	}
 	.ghost {
 		font-size: 0.78rem;

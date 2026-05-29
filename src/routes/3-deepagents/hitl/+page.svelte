@@ -269,11 +269,6 @@ while (res.status === 'interrupted') {
 		font-family: var(--font-mono);
 		font-size: 0.8rem;
 		line-height: 1.5;
-		background: var(--color-bg);
-		border: 1px solid var(--color-rule);
-		border-radius: 0.4rem;
-		padding: 0.55rem 0.7rem;
-		color: var(--color-ink-100);
 		resize: vertical;
 	}
 	.actions {

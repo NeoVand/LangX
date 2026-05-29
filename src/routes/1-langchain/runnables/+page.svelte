@@ -262,16 +262,6 @@ const { short, bullets, passthrough } = await fanout.invoke({ topic });`;
 	}
 	input {
 		flex: 1;
-		background: var(--color-bg);
-		border: 1px solid var(--color-rule);
-		border-radius: 0.4rem;
-		padding: 0.4rem 0.6rem;
-		font-size: 0.88rem;
-		color: var(--color-ink-100);
-	}
-	input:focus {
-		outline: none;
-		border-color: var(--accent-ink);
 	}
 
 	.output {

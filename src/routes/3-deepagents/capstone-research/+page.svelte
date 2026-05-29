@@ -252,17 +252,6 @@ console.log('Final:', out.finalText);
 <style>
 	input {
 		width: 100%;
-		background: var(--color-bg);
-		border: 1px solid var(--color-rule);
-		border-radius: 0.45rem;
-		padding: 0.55rem 0.7rem;
-		font-family: var(--font-sans);
-		font-size: 0.92rem;
-		color: var(--color-ink-100);
-	}
-	input:focus {
-		outline: none;
-		border-color: var(--accent-ink);
 	}
 	.actions {
 		margin-top: 0.65rem;

@@ -5,9 +5,11 @@
 	interface Props {
 		spec: DiagramSpec;
 		title?: string;
+		/** Staggered node entrance and edge tokens — off for chapter intros. */
+		animated?: boolean;
 	}
 
-	let { spec, title }: Props = $props();
+	let { spec, title, animated = true }: Props = $props();
 
 	// Unique suffix so gradient/filter ids never collide between diagrams on a page.
 	const uid = `dgm-${Math.random().toString(36).slice(2, 8)}`;
@@ -161,7 +163,7 @@
 	}
 </script>
 
-<figure class="diagram">
+<figure class="diagram" class:static={!animated}>
 	{#if title}<div class="dgm-title">{title}</div>{/if}
 	<svg
 		viewBox={`0 0 ${W} ${H}`}
@@ -181,24 +183,26 @@
 			<marker
 				id={`${uid}-arrow`}
 				viewBox="0 0 10 10"
-				refX="8.5"
+				refX="0"
 				refY="5"
-				markerWidth="7"
-				markerHeight="7"
-				orient="auto-start-reverse"
+				markerWidth="6"
+				markerHeight="6"
+				markerUnits="userSpaceOnUse"
+				orient="auto"
 			>
-				<path d="M 0 1 L 9 5 L 0 9" fill="none" class="arrowhead" />
+				<path d="M 0 0 L 10 5 L 0 10 Z" class="arrowhead" />
 			</marker>
 			<marker
 				id={`${uid}-arrow-link`}
 				viewBox="0 0 10 10"
-				refX="8.5"
+				refX="0"
 				refY="5"
-				markerWidth="6.5"
-				markerHeight="6.5"
-				orient="auto-start-reverse"
+				markerWidth="5.5"
+				markerHeight="5.5"
+				markerUnits="userSpaceOnUse"
+				orient="auto"
 			>
-				<path d="M 0 1.5 L 9 5 L 0 8.5" fill="none" class="arrowhead-link" />
+				<path d="M 0 0 L 10 5 L 0 10 Z" class="arrowhead-link" />
 			</marker>
 			<filter id={`${uid}-shadow`} x="-20%" y="-20%" width="140%" height="150%">
 				<feDropShadow dx="0" dy="2.5" stdDeviation="3" flood-color="#000" flood-opacity="0.28" />
@@ -230,7 +234,7 @@
 				fill="none"
 				marker-end={`url(#${uid}-arrow${e.link ? '-link' : ''})`}
 			/>
-			{#if !e.link}
+			{#if animated && !e.link}
 				<circle r="3.1" class="token">
 					<animateMotion path={d} dur="2.8s" begin={`${i * 0.45}s`} repeatCount="indefinite" />
 				</circle>
@@ -251,7 +255,11 @@
 			{@const iconCy = hasSub ? g.cy - 16 : g.cy - 12}
 			{@const labelY = hasIcon ? (hasSub ? g.cy + 7 : g.cy + 13) : hasSub ? g.cy - 7 : g.cy}
 			{@const subY = hasIcon ? g.cy + 21 : g.cy + 10}
-			<g class="node" data-kind={n.kind ?? 'default'} style:animation-delay={`${i * 55}ms`}>
+			<g
+				class="node"
+				data-kind={n.kind ?? 'default'}
+				style:animation-delay={animated ? `${i * 55}ms` : undefined}
+			>
 				<rect
 					x={g.x}
 					y={g.y}
@@ -348,18 +356,12 @@
 		opacity: 0.44;
 	}
 	.arrowhead {
-		stroke: var(--color-fg-muted, #8a8a8a);
-		stroke-width: 1.7;
-		stroke-linecap: round;
-		stroke-linejoin: round;
-		opacity: 0.7;
+		fill: var(--color-fg-muted, #8a8a8a);
+		opacity: 0.58;
 	}
 	.arrowhead-link {
-		stroke: var(--color-fg-muted, #8a8a8a);
-		stroke-width: 1.6;
-		stroke-linecap: round;
-		stroke-linejoin: round;
-		opacity: 0.5;
+		fill: var(--color-fg-muted, #8a8a8a);
+		opacity: 0.44;
 	}
 	.edge-label text {
 		fill: var(--color-fg-muted, #cfcfcf);
@@ -486,7 +488,7 @@
 	}
 
 	@media (prefers-reduced-motion: no-preference) {
-		.node {
+		.diagram:not(.static) .node {
 			opacity: 0;
 			transform: translateY(7px);
 			transform-box: fill-box;

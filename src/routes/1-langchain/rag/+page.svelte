@@ -357,16 +357,7 @@ console.log('Answer:', answer);
 		font-family: var(--font-mono);
 	}
 	input {
-		background: var(--color-bg);
-		border: 1px solid var(--color-rule);
-		border-radius: 0.4rem;
-		padding: 0.45rem 0.6rem;
-		font-size: 0.88rem;
-		color: var(--color-ink-100);
-	}
-	input:focus {
-		outline: none;
-		border-color: var(--accent-ink);
+		width: 100%;
 	}
 
 	.hits {
@@ -541,12 +532,7 @@ console.log('Answer:', answer);
 		color: var(--color-ink-300);
 	}
 	select {
-		background: var(--color-bg);
-		border: 1px solid var(--color-rule);
-		border-radius: 0.4rem;
-		padding: 0.4rem 0.5rem;
-		font-size: 0.82rem;
-		color: var(--color-ink-100);
+		width: 100%;
 	}
 
 	.answer {

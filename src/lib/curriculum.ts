@@ -62,7 +62,7 @@ export const chapters: Chapter[] = [
 		number: 2,
 		title: 'LangGraph',
 		tagline: 'Stateful runtimes: graphs, loops, checkpoints, interrupts.',
-		accent: 'var(--color-accent-langgraph)',
+		accent: 'var(--color-accent-langchain)',
 		base: '/2-langgraph',
 		intro: { slug: '', title: 'Phase 2 — LangGraph', subtitle: 'The orchestration layer.' },
 		lessons: [
@@ -108,7 +108,7 @@ export const chapters: Chapter[] = [
 		number: 3,
 		title: 'Deep Agents',
 		tagline: 'Cognitive harness: planning, virtual FS, subagents, memory.',
-		accent: 'var(--color-accent-deepagents)',
+		accent: 'var(--color-accent-langchain)',
 		base: '/3-deepagents',
 		intro: {
 			slug: '',

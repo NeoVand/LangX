@@ -3,8 +3,10 @@
 ## Pipeline
 
 1. The user picks a prompt and runs it through their image model.
-2. Save the resulting WEBP into `static/heroes/<id>.webp` (or `static/banners/<id>.webp`).
-3. Components like `<HeroImage id="..." />` automatically pick the file up; if no file exists, a tinted placeholder shows instead so lessons never look broken.
+2. Save the resulting WEBP (or PNG) into `static/images/<id>.png` (preferred) or `static/heroes/<id>.webp`.
+3. Components like `<HeroImage id="..." />` automatically pick the file up from `static/images/` first; if no file exists, a tinted placeholder shows instead so lessons never look broken.
+
+**Chapter intro pages** use the `chapter-*-hero` banner IDs (`chapter-langchain-hero`, `chapter-langgraph-hero`, `chapter-deepagents-hero`). The `intro-*` IDs are alternate intro artwork variants.
 
 ---
 

@@ -221,7 +221,7 @@ const result = await agent.invoke({ input: 'Brief me on LangGraph.' });`;
 		</Panel>
 
 		<Panel title="Assembled system prompt" subtitle="BASE → MIDDLEWARE → USER">
-			<pre class="prompt scrollbar-slim">{composedPreview}</pre>
+			<pre class="prompt code-surface scrollbar-slim">{composedPreview}</pre>
 		</Panel>
 
 		<Panel title="Virtual filesystem (after run)">
@@ -255,18 +255,7 @@ const result = await agent.invoke({ input: 'Brief me on LangGraph.' });`;
 		text-transform: uppercase;
 	}
 	textarea {
-		background: var(--color-bg);
-		border: 1px solid var(--color-rule);
-		border-radius: 0.4rem;
-		padding: 0.55rem 0.7rem;
-		font-family: var(--font-sans);
-		font-size: 0.88rem;
-		color: var(--color-ink-100);
 		resize: vertical;
-	}
-	textarea:focus {
-		outline: none;
-		border-color: var(--accent-ink);
 	}
 
 	.prompt {
@@ -274,9 +263,6 @@ const result = await agent.invoke({ input: 'Brief me on LangGraph.' });`;
 		font-size: 0.78rem;
 		line-height: 1.55;
 		padding: 0.95rem 1.1rem;
-		background: var(--color-bg);
-		border: 1px solid var(--color-rule);
-		border-radius: 0.45rem;
 		max-height: 28rem;
 		overflow: auto;
 		white-space: pre-wrap;
@@ -286,16 +272,30 @@ const result = await agent.invoke({ input: 'Brief me on LangGraph.' });`;
 	.toggles {
 		display: flex;
 		flex-direction: column;
-		gap: 0.4rem;
+		gap: 0.45rem;
 		margin-bottom: 0.85rem;
 	}
 	.toggle {
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
+		gap: 0.6rem;
+		padding: 0.55rem 0.7rem;
+		border: 1px solid var(--color-rule);
+		border-radius: 0.45rem;
+		background: var(--color-bg);
 		font-size: 0.84rem;
 		color: var(--color-ink-100);
 		cursor: pointer;
+		transition:
+			border-color 0.15s ease,
+			box-shadow 0.15s ease;
+	}
+	.toggle:has(input:checked) {
+		border-color: var(--accent-ink);
+		box-shadow: inset 0 0 0 1px var(--accent-ink);
+	}
+	.toggle span {
+		line-height: 1.35;
 	}
 	.final {
 		margin: 0;

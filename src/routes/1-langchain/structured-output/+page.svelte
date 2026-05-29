@@ -215,18 +215,7 @@ const report = await extractor.invoke([
 	}
 	textarea,
 	input {
-		background: var(--color-bg);
-		border: 1px solid var(--color-rule);
-		border-radius: 0.4rem;
-		padding: 0.5rem 0.65rem;
-		font-size: 0.88rem;
-		color: var(--color-ink-100);
 		font-family: var(--font-sans);
 		resize: vertical;
-	}
-	textarea:focus,
-	input:focus {
-		outline: none;
-		border-color: var(--accent-ink);
 	}
 </style>

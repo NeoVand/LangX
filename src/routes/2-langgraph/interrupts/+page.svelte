@@ -297,16 +297,6 @@ if (decision !== 'approve') return { aborted: true };
 <style>
 	input {
 		width: 100%;
-		background: var(--color-bg);
-		border: 1px solid var(--color-rule);
-		border-radius: 0.4rem;
-		padding: 0.5rem 0.6rem;
-		font-size: 0.88rem;
-		color: var(--color-ink-100);
-	}
-	input:focus {
-		outline: none;
-		border-color: var(--accent-ink);
 	}
 	.actions {
 		display: flex;
@@ -338,19 +328,10 @@ if (decision !== 'approve') return { aborted: true };
 		font-family: var(--font-mono);
 	}
 	textarea {
-		background: var(--color-bg);
-		border: 1px solid var(--color-rule);
-		border-radius: 0.4rem;
-		padding: 0.55rem 0.7rem;
 		font-family: var(--font-mono);
 		font-size: 0.82rem;
-		color: var(--color-ink-100);
 		line-height: 1.55;
 		resize: vertical;
-	}
-	textarea:focus {
-		outline: none;
-		border-color: var(--accent-ink);
 	}
 	.cta {
 		display: flex;

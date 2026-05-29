@@ -42,7 +42,7 @@ async function renderPlot(spec: {
 	title?: string;
 }): Promise<string> {
 	const Plot = await import('@observablehq/plot');
-	const fill = 'var(--color-accent-deepagents, #8a6cff)';
+	const fill = 'var(--accent, var(--color-accent-langchain))';
 	const marks =
 		spec.mark === 'line'
 			? [
