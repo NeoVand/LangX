@@ -306,10 +306,6 @@ const graph = new StateGraph(State)
 	}
 	.answer {
 		margin: 0;
-		padding: 0.6rem 0.75rem;
-		background: var(--color-bg);
-		border: 1px solid var(--color-rule);
-		border-radius: 0.4rem;
 		font-family: var(--font-prose);
 		font-size: 0.95rem;
 		line-height: 1.55;

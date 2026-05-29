@@ -266,6 +266,9 @@
 	}
 	/* Flip transition between the live demo and its source. */
 	.face {
+		display: flex;
+		flex-direction: column;
+		gap: 1.25rem;
 		animation: face-in 0.32s cubic-bezier(0.4, 0, 0.2, 1);
 		transform-origin: top center;
 	}

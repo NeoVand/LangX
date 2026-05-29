@@ -265,11 +265,6 @@ const { short, bullets, passthrough } = await fanout.invoke({ topic });`;
 	}
 
 	.output {
-		margin-top: 0.85rem;
-		padding: 0.85rem 0.95rem;
-		background: var(--color-bg);
-		border: 1px solid var(--color-rule);
-		border-radius: 0.45rem;
 		font-family: var(--font-prose);
 		font-size: 1rem;
 		line-height: 1.6;
@@ -279,7 +274,6 @@ const { short, bullets, passthrough } = await fanout.invoke({ topic });`;
 		display: grid;
 		grid-template-columns: 1fr;
 		gap: 0.7rem;
-		margin-top: 0.85rem;
 	}
 
 	.grid .lbl {
@@ -294,10 +288,6 @@ const { short, bullets, passthrough } = await fanout.invoke({ topic });`;
 	.grid p,
 	.grid pre {
 		margin: 0;
-		padding: 0.55rem 0.75rem;
-		background: var(--color-bg);
-		border: 1px solid var(--color-rule);
-		border-radius: 0.4rem;
 		font-size: 0.9rem;
 		white-space: pre-wrap;
 		word-break: break-word;

@@ -436,17 +436,20 @@ code {
 	background: color-mix(in oklch, var(--color-accent-danger) 14%, transparent);
 }
 
-/* Code surface — one continuous gradient, no nested borders or inset frames */
-.code-surface {
+/* Code / read-only surfaces — one continuous gradient, no nested borders */
+.code-surface,
+.text-surface {
 	position: relative;
 	isolation: isolate;
 	border-radius: var(--surface-radius);
 	overflow: hidden;
 	background: var(--surface-fill);
 	box-shadow: var(--surface-shadow);
+	border: none;
 }
 
-.code-surface::before {
+.code-surface::before,
+.text-surface::before {
 	content: '';
 	position: absolute;
 	inset: 0;
@@ -526,6 +529,80 @@ code {
 .demo-pane input::placeholder,
 .demo-pane textarea::placeholder {
 	color: var(--color-fg-faint);
+}
+
+/* Demo read-only outputs — same gradient language as code blocks */
+.demo-pane :is(
+	.output,
+	.answer,
+	.final,
+	.finaltext,
+	.report,
+	.tokens,
+	.event-log,
+	.grid p,
+	.grid pre,
+	.rows li
+) {
+	position: relative;
+	isolation: isolate;
+	border: none;
+	border-radius: var(--surface-radius);
+	overflow: hidden;
+	background: var(--surface-fill);
+	box-shadow: var(--surface-shadow-soft);
+}
+
+.demo-pane :is(
+	.output,
+	.answer,
+	.final,
+	.finaltext,
+	.report,
+	.tokens,
+	.event-log,
+	.grid p,
+	.grid pre,
+	.rows li
+)::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	pointer-events: none;
+	background: var(--surface-wash);
+}
+
+.demo-pane :is(.output, .answer, .final, .finaltext, .report, .tokens) {
+	padding: 0.85rem 0.95rem;
+}
+
+.demo-pane :is(.grid p, .grid pre) {
+	padding: 0.55rem 0.75rem;
+}
+
+.demo-pane .event-log {
+	padding: 0.45rem 0.55rem;
+}
+
+.demo-pane .rows li {
+	padding: 0.35rem 0.55rem;
+}
+
+.demo-pane :is(
+	.output,
+	.answer,
+	.final,
+	.finaltext,
+	.report,
+	.tokens,
+	.event-log,
+	.grid p,
+	.grid pre,
+	.rows li
+) > * {
+	position: relative;
+	z-index: 1;
 }
 
 /* Markdown / standalone Shiki blocks — same gradient, no wrapper figure */

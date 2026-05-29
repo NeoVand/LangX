@@ -27,7 +27,7 @@
 <div class="msgs" class:compact>
 	{#each messages as m, i (i)}
 		{@const role = roleOf(m)}
-		<article class="msg" data-role={role}>
+		<article class="msg text-surface" data-role={role}>
 			<header>
 				<span class="role">{role}</span>
 				{#if m instanceof ToolMessage && m.tool_call_id}
@@ -48,7 +48,7 @@
 		</article>
 	{/each}
 	{#if streaming}
-		<article class="msg streaming" data-role="assistant">
+		<article class="msg streaming text-surface" data-role="assistant">
 			<header>
 				<span class="role">assistant</span>
 				<span class="meta pulse-soft">streaming</span>
@@ -78,22 +78,20 @@
 	}
 
 	.msg {
-		border: 1px solid var(--color-border);
-		border-radius: 0.5rem;
-		background: var(--color-bg-elev);
 		padding: 0.55rem 0.8rem;
+	}
+
+	.msg > * {
+		position: relative;
+		z-index: 1;
 	}
 
 	.compact .msg {
 		font-size: 0.82rem;
 	}
 
-	.msg[data-role='system'] {
-		background: color-mix(in oklch, var(--color-bg-elev-2) 92%, var(--accent) 8%);
-	}
-
 	.msg[data-role='user'] {
-		border-color: color-mix(in oklch, var(--color-border) 60%, var(--accent) 40%);
+		box-shadow: var(--surface-shadow-soft);
 	}
 
 	.msg[data-role='tool'] {
@@ -154,9 +152,9 @@
 		font-family: var(--font-mono);
 		font-size: 0.78rem;
 		padding: 0.25rem 0.5rem;
-		background: var(--color-bg-elev-2);
+		background: color-mix(in oklch, var(--color-fg-muted) 8%, transparent);
 		border-radius: 0.3rem;
-		border: 1px dashed var(--color-border-strong);
+		border: none;
 	}
 
 	.tc-name {

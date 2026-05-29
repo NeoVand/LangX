@@ -229,10 +229,6 @@ for await (const [chunk, meta] of await graph.stream(input, { streamMode: 'messa
 		font-size: 0.78rem;
 	}
 	.rows li {
-		padding: 0.35rem 0.55rem;
-		border: 1px solid var(--color-rule);
-		border-radius: 0.35rem;
-		background: var(--color-bg);
 		color: var(--color-ink-200);
 		word-break: break-word;
 	}
@@ -248,10 +244,6 @@ for await (const [chunk, meta] of await graph.stream(input, { streamMode: 'messa
 	.tokens {
 		font-family: var(--font-prose);
 		line-height: 1.7;
-		padding: 0.6rem 0.85rem;
-		border: 1px solid var(--color-rule);
-		border-radius: 0.4rem;
-		background: var(--color-bg);
 		font-size: 0.95rem;
 		color: var(--color-ink-100);
 	}

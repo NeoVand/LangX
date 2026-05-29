@@ -253,11 +253,6 @@ for await (const chunk of stream) {
 		flex: 1;
 	}
 	.output {
-		margin-top: 0.85rem;
-		padding: 0.85rem 0.95rem;
-		background: var(--color-bg);
-		border: 1px solid var(--color-rule);
-		border-radius: 0.45rem;
 		font-family: var(--font-prose);
 		font-size: 1rem;
 		line-height: 1.6;
@@ -281,7 +276,6 @@ for await (const chunk of stream) {
 	}
 
 	.event-log {
-		margin-top: 0.85rem;
 		max-height: 16rem;
 		overflow-y: auto;
 		display: flex;
@@ -289,10 +283,6 @@ for await (const chunk of stream) {
 		gap: 0.15rem;
 		font-family: var(--font-mono);
 		font-size: 0.78rem;
-		border: 1px solid var(--color-rule);
-		border-radius: 0.4rem;
-		padding: 0.45rem 0.55rem;
-		background: var(--color-bg);
 	}
 	.ev-row {
 		display: grid;

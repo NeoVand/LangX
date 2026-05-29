@@ -404,11 +404,6 @@ const graph = new StateGraph(MessagesAnnotation)
 	}
 
 	.output {
-		margin-top: 0.85rem;
-		padding: 0.85rem 0.95rem;
-		background: var(--color-bg);
-		border: 1px solid var(--color-rule);
-		border-radius: 0.45rem;
 		font-family: var(--font-prose);
 		font-size: 1rem;
 		line-height: 1.6;

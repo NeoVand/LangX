@@ -537,10 +537,6 @@ console.log('Answer:', answer);
 
 	.answer {
 		margin-top: 0.85rem;
-		border: 1px solid var(--accent-ink);
-		border-radius: 0.5rem;
-		padding: 0.7rem 0.85rem;
-		background: color-mix(in oklch, var(--color-bg) 88%, var(--accent-ink) 12%);
 	}
 	.answer-label {
 		font-size: 0.68rem;
