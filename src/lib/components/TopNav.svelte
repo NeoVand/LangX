@@ -3,6 +3,7 @@
 	import { app, togglePresentation, toggleWorkshop, toggleBook } from '$lib/state/app.svelte';
 	import { chapters } from '$lib/curriculum';
 	import ParrotMark from './ParrotMark.svelte';
+	import Icon from './Icon.svelte';
 
 	const path = $derived(page.url.pathname);
 	const hasKey = $derived(
@@ -35,8 +36,12 @@
 	</div>
 
 	<div class="actions">
-		<a class="action" class:active={path === '/glossary'} href="/glossary">Glossary</a>
+		<a class="action" class:active={path === '/glossary'} href="/glossary">
+			<Icon name="list" size={15} />
+			<span>Glossary</span>
+		</a>
 		<a class="action" class:active={path === '/setup'} href="/setup">
+			<Icon name="gauge" size={15} />
 			<span>Setup</span>
 			{#if hasKey}
 				<span class="dot-on" aria-label="model configured"></span>
@@ -52,6 +57,7 @@
 					onclick={toggleBook}
 					title="Toggle the lesson text pane (B)"
 				>
+					<Icon name="book" size={14} />
 					<span>Book</span>
 				</button>
 				<button
@@ -60,6 +66,7 @@
 					onclick={toggleWorkshop}
 					title="Toggle the demo pane (W)"
 				>
+					<Icon name="wrench" size={14} />
 					<span>Workshop</span>
 				</button>
 			{/if}

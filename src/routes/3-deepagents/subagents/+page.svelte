@@ -200,9 +200,7 @@ createDeepAgent({ model, subagents, /* ... */ });
 			<CodeBlock code={code} lang="ts" caption="A researcher–writer–critic team in 30 lines." />
 		</Slide>
 
-		<Slide title="Isolation, drawn" variant="figure">
-			<Diagram spec={subagentIsolation} title="Subagent isolation" />
-		</Slide>
+		<Diagram spec={subagentIsolation} />
 
 		<Slide variant="pull-quote">
 			<p>

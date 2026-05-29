@@ -206,9 +206,7 @@ createDeepAgent({
 			<CodeBlock code={code} lang="ts" />
 		</Slide>
 
-		<Slide title="Shrinking context, drawn" variant="figure">
-			<Diagram spec={compactionDiagram} title="Context compaction" />
-		</Slide>
+		<Diagram spec={compactionDiagram} />
 
 		<Slide variant="pull-quote">
 			<p>

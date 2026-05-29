@@ -2,6 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import HeroImage from './HeroImage.svelte';
 	import DemoSourceView from './DemoSourceView.svelte';
+	import Icon from './Icon.svelte';
 	import { app } from '$lib/state/app.svelte';
 	import { downloadDemo, type DemoManifest } from '$lib/demos/download';
 
@@ -74,16 +75,16 @@
 							onclick={() => (flipped = !flipped)}
 							title="Flip between the live demo and its source code"
 						>
-							<span class="dt-icon" aria-hidden="true">⟲</span>
-							{flipped ? 'Back to demo' : 'View source'}
+						<Icon name={flipped ? 'arrowRight' : 'eye'} size={14} />
+						{flipped ? 'Back to demo' : 'View source'}
 						</button>
 						<button
 							class="dt-btn"
 							onclick={() => source && downloadDemo(source)}
 							title="Download this demo as a standalone, runnable project"
 						>
-							<span class="dt-icon" aria-hidden="true">↓</span>
-							Download
+						<Icon name="download" size={14} />
+						Download
 						</button>
 					</div>
 				</div>
@@ -263,11 +264,6 @@
 		border-color: var(--accent-rule);
 		background: var(--accent-soft);
 	}
-	.dt-icon {
-		font-size: 0.85rem;
-		line-height: 1;
-	}
-
 	/* Flip transition between the live demo and its source. */
 	.face {
 		animation: face-in 0.32s cubic-bezier(0.4, 0, 0.2, 1);

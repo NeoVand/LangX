@@ -268,9 +268,7 @@ const graph = new StateGraph(MessagesAnnotation)
 			</ul>
 		</Slide>
 
-		<Slide title="The triad, drawn" variant="figure">
-			<Diagram spec={stateGraphTriad} title="StateGraph triad" />
-		</Slide>
+		<Diagram spec={stateGraphTriad} />
 
 		<Slide variant="pull-quote">
 			<p>

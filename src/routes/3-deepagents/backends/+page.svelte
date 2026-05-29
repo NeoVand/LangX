@@ -185,9 +185,7 @@ const agent = createDeepAgent({ model, backend });`;
 			<CodeBlock code={code} lang="ts" caption="Routing /memories/ to a Dexie-backed store." />
 		</Slide>
 
-		<Slide title="Routing, drawn" variant="figure">
-			<Diagram spec={backends} title="Backend routing" />
-		</Slide>
+		<Diagram spec={backends} />
 
 		<Slide variant="pull-quote">
 			<p>

@@ -161,9 +161,7 @@ const result = await agent.invoke({ input: 'Brief me on LangGraph.' });`;
 			</ul>
 		</Slide>
 
-		<Slide title="Prompt layers, drawn" variant="figure">
-			<Diagram spec={harnessLayers} title="Harness prompt layers" />
-		</Slide>
+		<Diagram spec={harnessLayers} />
 
 		<Slide variant="pull-quote">
 			<p>

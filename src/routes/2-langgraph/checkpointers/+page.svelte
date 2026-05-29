@@ -263,9 +263,7 @@ await graph.invoke({ messages: [new HumanMessage("What's my name?")] }, cfg);`;
 			</p>
 		</Slide>
 
-		<Slide title="Threaded snapshots, drawn" variant="figure">
-			<Diagram spec={checkpointerDiagram} title="Checkpointer" />
-		</Slide>
+		<Diagram spec={checkpointerDiagram} />
 
 		<Slide variant="pull-quote">
 			<p>

@@ -229,9 +229,7 @@ const { short, bullets, passthrough } = await fanout.invoke({ topic });`;
 			</p>
 		</Slide>
 
-		<Slide title="The pipe, drawn" variant="figure">
-			<Diagram spec={lcelPipeline} title="LCEL pipeline" />
-		</Slide>
+		<Diagram spec={lcelPipeline} />
 
 		<Slide variant="pull-quote">
 			<p>

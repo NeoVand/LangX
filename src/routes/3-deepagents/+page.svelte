@@ -1,5 +1,7 @@
 <script lang="ts">
 	import HeroImage from '$lib/components/HeroImage.svelte';
+	import Diagram from '$lib/components/Diagram.svelte';
+	import { deepagentsOverview } from '$lib/diagrams';
 	import { chapterById } from '$lib/curriculum';
 
 	const chapter = chapterById('deepagents');
@@ -29,6 +31,8 @@
 			<p class="tagline font-prose">{chapter.tagline}</p>
 		</div>
 	</section>
+
+	<Diagram spec={deepagentsOverview} />
 
 	<hr class="ornament" aria-hidden="true" />
 

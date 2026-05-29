@@ -186,9 +186,7 @@ const result = await agent.invoke({
 			</p>
 		</Slide>
 
-		<Slide title="The loop, drawn" variant="figure">
-			<Diagram spec={reactLoop} title="The ReAct loop" />
-		</Slide>
+		<Diagram spec={reactLoop} />
 
 		<Slide variant="pull-quote">
 			<p>

@@ -277,9 +277,7 @@ const chat = new StateGraph(ChatState)
 			/>
 		</Slide>
 
-		<Slide title="Composition, drawn" variant="figure">
-			<Diagram spec={subgraphs} title="Subgraphs" />
-		</Slide>
+		<Diagram spec={subgraphs} />
 
 		<Slide variant="pull-quote">
 			<p>

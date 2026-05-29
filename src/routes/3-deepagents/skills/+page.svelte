@@ -203,9 +203,7 @@ createDeepAgent({ model, skills, /* ... */ });
 			<CodeBlock code={code} lang="ts" caption="The skill protocol." />
 		</Slide>
 
-		<Slide title="Progressive disclosure, drawn" variant="figure">
-			<Diagram spec={skillsDisclosure} title="Skills disclosure" />
-		</Slide>
+		<Diagram spec={skillsDisclosure} />
 
 		<Slide variant="pull-quote">
 			<p>

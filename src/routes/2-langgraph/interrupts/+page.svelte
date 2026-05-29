@@ -242,9 +242,7 @@ if (decision !== 'approve') return { aborted: true };
 			</p>
 		</Slide>
 
-		<Slide title="Pause and resume, drawn" variant="figure">
-			<Diagram spec={interruptResume} title="Interrupt and resume" />
-		</Slide>
+		<Diagram spec={interruptResume} />
 
 		<Slide variant="pull-quote">
 			<p>

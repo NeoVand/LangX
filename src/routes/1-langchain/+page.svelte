@@ -1,5 +1,7 @@
 <script lang="ts">
 	import HeroImage from '$lib/components/HeroImage.svelte';
+	import Diagram from '$lib/components/Diagram.svelte';
+	import { langchainOverview } from '$lib/diagrams';
 	import { chapterById } from '$lib/curriculum';
 
 	const chapter = chapterById('langchain');
@@ -24,6 +26,8 @@
 			</p>
 		</div>
 	</section>
+
+	<Diagram spec={langchainOverview} />
 
 	<hr class="ornament" aria-hidden="true" />
 

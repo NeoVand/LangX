@@ -196,9 +196,7 @@ console.log('Answer:', answer);
 			</p>
 		</Slide>
 
-		<Slide title="The read path, drawn" variant="figure">
-			<Diagram spec={ragFlow} title="RAG read path" />
-		</Slide>
+		<Diagram spec={ragFlow} />
 
 		<Slide variant="pull-quote">
 			<p>

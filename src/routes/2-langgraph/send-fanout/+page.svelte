@@ -200,9 +200,7 @@
 			<CodeBlock code={code} caption="One plan, N research branches, one synthesis." />
 		</Slide>
 
-		<Slide title="Fan-out / fan-in, drawn" variant="figure">
-			<Diagram spec={sendFanout} title="Send fan-out" />
-		</Slide>
+		<Diagram spec={sendFanout} />
 
 		<Slide variant="pull-quote">
 			<p>

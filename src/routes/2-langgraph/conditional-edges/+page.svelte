@@ -309,9 +309,7 @@ const graph = new StateGraph(State)
 			<CodeBlock code={codeRoute} caption="A real-LLM support-ticket triage graph." />
 		</Slide>
 
-		<Slide title="The router, drawn" variant="figure">
-			<Diagram spec={conditionalEdges} title="Conditional edges" />
-		</Slide>
+		<Diagram spec={conditionalEdges} />
 
 		<Slide variant="pull-quote">
 			<p>
