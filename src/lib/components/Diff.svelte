@@ -33,8 +33,8 @@
 	});
 </script>
 
-<figure class="diff">
-	<figcaption>
+<figure class="diff code-surface">
+	<figcaption class="code-surface-footer">
 		<span class="path">{path ?? 'diff'}</span>
 		<span class="stat add">+{stats.add}</span>
 		<span class="stat del">−{stats.del}</span>
@@ -48,18 +48,13 @@
 <style>
 	.diff {
 		margin: 0;
-		border: 1px solid var(--color-border);
-		border-radius: 0.5rem;
-		overflow: hidden;
-		background: var(--color-paper);
 	}
+
 	figcaption {
 		display: flex;
 		gap: 0.6rem;
 		align-items: center;
-		padding: 0.4rem 0.7rem;
-		border-bottom: 1px solid var(--color-border);
-		background: var(--color-bg-elev-2);
+		padding: 0.55rem 1.3rem 0.65rem;
 		font-family: var(--font-mono);
 		font-size: 0.72rem;
 	}
@@ -78,7 +73,7 @@
 	}
 	pre {
 		margin: 0;
-		padding: 0.5rem 0;
+		padding: 1rem 1.3rem 1.15rem;
 		font-family: var(--font-mono);
 		font-size: 0.78rem;
 		line-height: 1.5;
@@ -87,7 +82,7 @@
 	}
 	.line {
 		display: block;
-		padding: 0 0.7rem;
+		padding: 0 0.15rem;
 		white-space: pre-wrap;
 		word-break: break-word;
 	}

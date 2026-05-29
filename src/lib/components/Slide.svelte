@@ -89,13 +89,24 @@
 		margin: 0.3em 0;
 	}
 
-	.slide-body :global(code) {
-		background: var(--color-paper);
+	/* Inline code only — never style Shiki blocks inside CodeBlock figures */
+	.slide-body :global(pre code) {
+		background: transparent;
+		padding: 0;
+		border-radius: 0;
+		font-size: inherit;
+		color: inherit;
+	}
+
+	.slide-body :global(p code),
+	.slide-body :global(li code),
+	.slide-body :global(td code),
+	.slide-body :global(th code) {
+		background: color-mix(in oklch, var(--color-paper) 85%, transparent);
 		padding: 0.1em 0.4em;
 		border-radius: 0.3em;
 		font-size: 0.9em;
 		color: var(--color-ink-100);
-		border: 1px solid var(--color-rule);
 		font-family: var(--font-mono);
 	}
 
