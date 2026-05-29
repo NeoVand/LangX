@@ -38,7 +38,7 @@
 		<p class="lead">
 			Every technical term in the curriculum — from <em>prompt</em> and <em>chain</em> through
 			reducers, checkpointers, and compaction. Hover underlined terms in any lesson for the
-			short definition; search here for the full entry.
+			full definition; search here to browse every entry.
 		</p>
 		<input
 			class="search"

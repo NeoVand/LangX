@@ -20,7 +20,7 @@
 		{/if}
 		<span id="tip-{t}" role="tooltip" class="tip">
 			<strong>{entry.term}</strong>
-			<span>{entry.short}</span>
+			<span class="body">{entry.long}</span>
 		</span>
 	</span>
 {:else}
@@ -52,15 +52,17 @@
 		left: 50%;
 		top: calc(100% + 0.5rem);
 		transform: translate(-50%, -4px);
-		min-width: 14rem;
-		max-width: 22rem;
+		min-width: 16rem;
+		max-width: 26rem;
+		max-height: min(16rem, 50vh);
+		overflow-y: auto;
 		padding: 0.65rem 0.8rem;
 		background: var(--color-bg-elev-2);
 		border: 1px solid var(--color-border-strong);
 		border-radius: 0.5rem;
 		font-family: var(--font-sans);
 		font-size: 0.8rem;
-		line-height: 1.45;
+		line-height: 1.5;
 		color: var(--color-fg-muted);
 		opacity: 0;
 		pointer-events: none;
@@ -70,7 +72,12 @@
 		z-index: 30;
 		display: flex;
 		flex-direction: column;
-		gap: 0.25rem;
+		gap: 0.35rem;
+		box-shadow: 0 8px 24px -8px color-mix(in oklch, black 45%, transparent);
+	}
+
+	.tip .body {
+		color: var(--color-fg-muted);
 	}
 
 	.tip strong {
