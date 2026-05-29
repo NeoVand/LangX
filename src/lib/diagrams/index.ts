@@ -1,13 +1,26 @@
 import type { DiagramSpec } from './types';
 
 /* ────────────────────────────────────────────────────────────────────────
+ * Visual language (one meaning each, used across every diagram):
+ *   • flow edge  (default)      — solid line + one travelling token.
+ *                                 Reads as: execution proceeds A → B.
+ *   • link edge  (link: true)   — dim, thin, static line, no token.
+ *                                 Reads as: A reads / writes / routes-to /
+ *                                 is-composed-of B (a relationship, not a step).
+ *   • node kinds — start/end = terminals, accent = the lesson's protagonist,
+ *                  default = ordinary step, muted = passive data/resource,
+ *                  ghost = an abstract / dynamic element (a function, a call).
+ * ──────────────────────────────────────────────────────────────────────── */
+
+/* ────────────────────────────────────────────────────────────────────────
  * Big-picture chapter overviews — the abstraction to show first.
  * ──────────────────────────────────────────────────────────────────────── */
 
-/** Chapter 1 · LangChain: compose primitives into chains, then into apps. */
+/** Chapter 1 · LangChain: compose primitives into a chain, then into apps. */
 export const langchainOverview: DiagramSpec = {
 	title: 'The big picture',
-	caption: 'LangChain gives you small primitives; you compose them into chains, then into apps.',
+	caption:
+		'Small primitives compose into a chain (a relationship); that chain is what powers agents and RAG.',
 	cols: 3,
 	rows: 3,
 	shape: 'square',
@@ -16,23 +29,32 @@ export const langchainOverview: DiagramSpec = {
 		{ id: 'prompt', label: 'Prompt', icon: 'message', col: 0, row: 0 },
 		{ id: 'model', label: 'Model', icon: 'cpu', kind: 'accent', col: 0, row: 1 },
 		{ id: 'parser', label: 'Parser', icon: 'filter', col: 0, row: 2 },
-		{ id: 'chain', label: 'LCEL chain', sub: 'compose with |', icon: 'link', kind: 'accent', col: 1, row: 1 },
+		{
+			id: 'chain',
+			label: 'LCEL chain',
+			sub: 'composed with |',
+			icon: 'link',
+			kind: 'accent',
+			col: 1,
+			row: 1
+		},
 		{ id: 'agent', label: 'Agent', sub: 'tools in a loop', icon: 'bot', col: 2, row: 0 },
 		{ id: 'rag', label: 'RAG', sub: 'grounded answers', icon: 'search', col: 2, row: 2 }
 	],
 	edges: [
-		{ from: 'prompt', to: 'chain', dashed: true },
-		{ from: 'model', to: 'chain', dashed: true },
-		{ from: 'parser', to: 'chain', dashed: true },
-		{ from: 'chain', to: 'agent', flow: true },
-		{ from: 'chain', to: 'rag', flow: true }
+		{ from: 'prompt', to: 'chain', link: true },
+		{ from: 'model', to: 'chain', link: true },
+		{ from: 'parser', to: 'chain', link: true },
+		{ from: 'chain', to: 'agent' },
+		{ from: 'chain', to: 'rag' }
 	]
 };
 
-/** Chapter 2 · LangGraph: route state through a graph that can branch and loop. */
+/** Chapter 2 · LangGraph: control flows through a graph that branches on state. */
 export const langgraphOverview: DiagramSpec = {
 	title: 'The big picture',
-	caption: 'LangGraph runs your logic as a graph: nodes branch on state and converge again.',
+	caption:
+		'Control flows top to bottom; a router conditionally picks a node (a route), and every node reads and writes one shared state.',
 	cols: 3,
 	rows: 4,
 	shape: 'portrait',
@@ -40,39 +62,60 @@ export const langgraphOverview: DiagramSpec = {
 		{ id: 'start', label: 'START', icon: 'play', kind: 'start', col: 1, row: 0 },
 		{ id: 'router', label: 'router', sub: 'fn(state)', icon: 'branch', kind: 'ghost', col: 1, row: 1 },
 		{ id: 'a', label: 'node A', icon: 'box', kind: 'accent', col: 0, row: 2 },
+		{
+			id: 'state',
+			label: 'shared state',
+			sub: 'reducers merge',
+			icon: 'database',
+			kind: 'muted',
+			col: 1,
+			row: 2
+		},
 		{ id: 'b', label: 'node B', icon: 'box', kind: 'accent', col: 2, row: 2 },
-		{ id: 'state', label: 'shared state', sub: 'reducers merge', icon: 'database', kind: 'muted', col: 1, row: 2 },
 		{ id: 'end', label: 'END', icon: 'flag', kind: 'end', col: 1, row: 3 }
 	],
 	edges: [
-		{ from: 'start', to: 'router', flow: true },
-		{ from: 'router', to: 'a', dashed: true, label: 'path A' },
-		{ from: 'router', to: 'b', dashed: true, label: 'path B' },
-		{ from: 'a', to: 'state' },
-		{ from: 'b', to: 'state' },
-		{ from: 'state', to: 'end', flow: true }
+		{ from: 'start', to: 'router' },
+		{ from: 'router', to: 'a', link: true, label: 'route A' },
+		{ from: 'router', to: 'b', link: true, label: 'route B' },
+		{ from: 'a', to: 'state', link: true },
+		{ from: 'b', to: 'state', link: true },
+		{ from: 'state', to: 'end' }
 	]
 };
 
-/** Chapter 3 · Deep Agents: an agent loop surrounded by harness capabilities. */
+/** Chapter 3 · Deep Agents: a model loop wrapped by six middleware capabilities. */
 export const deepagentsOverview: DiagramSpec = {
 	title: 'The big picture',
-	caption: 'A Deep Agent is a model loop wrapped in middleware: planning, files, skills, subagents.',
+	caption:
+		'A Deep Agent is a model loop the harness wraps with six middleware capabilities — you configure them, you do not implement them.',
 	cols: 3,
 	rows: 3,
 	shape: 'square',
 	nodes: [
-		{ id: 'plan', label: 'Planning', sub: 'write_todos', icon: 'list', col: 1, row: 0 },
+		{
+			id: 'agent',
+			label: 'Agent loop',
+			sub: 'model + tools',
+			icon: 'bot',
+			kind: 'accent',
+			col: 1,
+			row: 1
+		},
+		{ id: 'plan', label: 'Planning', sub: 'write_todos', icon: 'list', col: 0, row: 0 },
 		{ id: 'fs', label: 'Filesystem', sub: 'read · edit · ls', icon: 'folder', col: 0, row: 1 },
-		{ id: 'agent', label: 'Agent loop', sub: 'model + tools', icon: 'bot', kind: 'accent', col: 1, row: 1 },
-		{ id: 'skills', label: 'Skills', sub: 'load on demand', icon: 'sparkle', col: 2, row: 1 },
-		{ id: 'subs', label: 'Subagents', sub: 'isolated context', icon: 'layers', col: 1, row: 2 }
+		{ id: 'memory', label: 'Memory', sub: 'across threads', icon: 'database', col: 0, row: 2 },
+		{ id: 'skills', label: 'Skills', sub: 'load on demand', icon: 'sparkle', col: 2, row: 0 },
+		{ id: 'subs', label: 'Subagents', sub: 'isolated context', icon: 'layers', col: 2, row: 1 },
+		{ id: 'hitl', label: 'Human-in-loop', sub: 'approve · edit', icon: 'user', col: 2, row: 2 }
 	],
 	edges: [
-		{ from: 'agent', to: 'plan', dashed: true },
-		{ from: 'agent', to: 'fs', dashed: true },
-		{ from: 'agent', to: 'skills', dashed: true },
-		{ from: 'agent', to: 'subs', dashed: true }
+		{ from: 'agent', to: 'plan' },
+		{ from: 'agent', to: 'fs' },
+		{ from: 'agent', to: 'memory' },
+		{ from: 'agent', to: 'skills' },
+		{ from: 'agent', to: 'subs' },
+		{ from: 'agent', to: 'hitl' }
 	]
 };
 
@@ -95,10 +138,10 @@ export const lcelPipeline: DiagramSpec = {
 		{ id: 'out', label: 'output', sub: 'string', icon: 'flag', kind: 'end', col: 0, row: 4 }
 	],
 	edges: [
-		{ from: 'in', to: 'prompt', flow: true },
-		{ from: 'prompt', to: 'model', flow: true },
-		{ from: 'model', to: 'parser', flow: true },
-		{ from: 'parser', to: 'out', flow: true }
+		{ from: 'in', to: 'prompt' },
+		{ from: 'prompt', to: 'model' },
+		{ from: 'model', to: 'parser' },
+		{ from: 'parser', to: 'out' }
 	]
 };
 
@@ -116,8 +159,8 @@ export const reactLoop: DiagramSpec = {
 		{ id: 'end', label: 'END', icon: 'flag', kind: 'end', col: 2, row: 1 }
 	],
 	edges: [
-		{ from: 'start', to: 'agent', flow: true },
-		{ from: 'agent', to: 'tools', label: 'tool calls', flow: true },
+		{ from: 'start', to: 'agent' },
+		{ from: 'agent', to: 'tools', label: 'tool calls' },
 		{ from: 'tools', to: 'agent', side: 'left', label: 'results' },
 		{ from: 'agent', to: 'end', label: 'done' }
 	]
@@ -126,22 +169,38 @@ export const reactLoop: DiagramSpec = {
 /** RAG read path. */
 export const ragFlow: DiagramSpec = {
 	title: 'The RAG read path',
-	caption: 'Embed the query, retrieve the nearest chunks, then answer grounded in that context.',
+	caption: 'Embed the query, retrieve the nearest chunks from the store, then answer grounded in them.',
 	cols: 2,
 	rows: 4,
 	shape: 'portrait',
 	nodes: [
 		{ id: 'q', label: 'query', icon: 'message', kind: 'start', col: 0, row: 0 },
-		{ id: 'retrieve', label: 'retrieve', sub: 'embed · top-k', icon: 'search', kind: 'accent', col: 0, row: 1 },
-		{ id: 'store', label: 'vector store', sub: 'indexed chunks', icon: 'database', kind: 'muted', col: 1, row: 1 },
+		{
+			id: 'retrieve',
+			label: 'retrieve',
+			sub: 'embed · top-k',
+			icon: 'search',
+			kind: 'accent',
+			col: 0,
+			row: 1
+		},
+		{
+			id: 'store',
+			label: 'vector store',
+			sub: 'indexed chunks',
+			icon: 'database',
+			kind: 'muted',
+			col: 1,
+			row: 1
+		},
 		{ id: 'gen', label: 'LLM + context', icon: 'cpu', col: 0, row: 2 },
 		{ id: 'a', label: 'answer', icon: 'flag', kind: 'end', col: 0, row: 3 }
 	],
 	edges: [
-		{ from: 'q', to: 'retrieve', flow: true },
-		{ from: 'store', to: 'retrieve', dashed: true, label: 'index' },
-		{ from: 'retrieve', to: 'gen', flow: true, label: 'chunks' },
-		{ from: 'gen', to: 'a', flow: true }
+		{ from: 'q', to: 'retrieve' },
+		{ from: 'store', to: 'retrieve', link: true, label: 'top-k' },
+		{ from: 'retrieve', to: 'gen', label: 'chunks' },
+		{ from: 'gen', to: 'a' }
 	]
 };
 
@@ -152,7 +211,7 @@ export const ragFlow: DiagramSpec = {
 /** StateGraph triad: state, nodes, edges. */
 export const stateGraphTriad: DiagramSpec = {
 	title: 'A StateGraph',
-	caption: 'Nodes read and write one shared state object; reducers decide how updates merge.',
+	caption: 'Nodes run in sequence (flow) and each reads and writes one shared state (a relationship).',
 	cols: 2,
 	rows: 4,
 	shape: 'portrait',
@@ -165,18 +224,18 @@ export const stateGraphTriad: DiagramSpec = {
 		{ id: 'state', label: 'shared state', sub: 'reducers', icon: 'database', kind: 'muted', col: 1, row: 1 }
 	],
 	edges: [
-		{ from: 'start', to: 'n1', flow: true },
-		{ from: 'n1', to: 'n2', flow: true },
-		{ from: 'n2', to: 'end', flow: true },
-		{ from: 'n1', to: 'state', dashed: true },
-		{ from: 'n2', to: 'state', dashed: true }
+		{ from: 'start', to: 'n1' },
+		{ from: 'n1', to: 'n2' },
+		{ from: 'n2', to: 'end' },
+		{ from: 'n1', to: 'state', link: true },
+		{ from: 'n2', to: 'state', link: true }
 	]
 };
 
 /** Conditional edges (router). */
 export const conditionalEdges: DiagramSpec = {
 	title: 'Conditional edges',
-	caption: 'A router function inspects the state and returns the name of the next node.',
+	caption: 'A router inspects the state and returns ONE next node — these are the possible routes.',
 	cols: 2,
 	rows: 3,
 	shape: 'square',
@@ -187,16 +246,16 @@ export const conditionalEdges: DiagramSpec = {
 		{ id: 'general', label: 'general', icon: 'box', col: 1, row: 2 }
 	],
 	edges: [
-		{ from: 'classify', to: 'billing', dashed: true, label: 'billing' },
-		{ from: 'classify', to: 'tech', dashed: true, label: 'tech' },
-		{ from: 'classify', to: 'general', dashed: true, label: 'general' }
+		{ from: 'classify', to: 'billing', link: true, label: 'billing' },
+		{ from: 'classify', to: 'tech', link: true, label: 'tech' },
+		{ from: 'classify', to: 'general', link: true, label: 'general' }
 	]
 };
 
 /** Checkpointer / threads. */
 export const checkpointer: DiagramSpec = {
 	title: 'Checkpointers',
-	caption: 'After every superstep the state is snapshotted, keyed by thread_id — so you can resume.',
+	caption: 'Steps run in sequence; after each one the state is snapshotted to the checkpointer (a write).',
 	cols: 2,
 	rows: 3,
 	shape: 'square',
@@ -207,38 +266,38 @@ export const checkpointer: DiagramSpec = {
 		{ id: 'cp', label: 'checkpointer', sub: 'thread snapshots', icon: 'clock', kind: 'muted', col: 1, row: 1 }
 	],
 	edges: [
-		{ from: 's1', to: 's2', flow: true },
-		{ from: 's2', to: 's3', flow: true },
-		{ from: 's1', to: 'cp', dashed: true },
-		{ from: 's2', to: 'cp', dashed: true },
-		{ from: 's3', to: 'cp', dashed: true }
+		{ from: 's1', to: 's2' },
+		{ from: 's2', to: 's3' },
+		{ from: 's1', to: 'cp', link: true },
+		{ from: 's2', to: 'cp', link: true },
+		{ from: 's3', to: 'cp', link: true }
 	]
 };
 
 /** Interrupt / resume sequence. */
 export const interruptResume: DiagramSpec = {
 	title: 'Interrupt & resume',
-	caption: 'interrupt() pauses the graph and surfaces a payload; Command({ resume }) continues it.',
+	caption: 'interrupt() pauses the run and surfaces a payload to a human; their decision resumes it.',
 	cols: 2,
 	rows: 3,
 	shape: 'square',
 	nodes: [
 		{ id: 'run', label: 'node runs', icon: 'cpu', kind: 'accent', col: 0, row: 0 },
-		{ id: 'pause', label: 'interrupt()', sub: 'graph pauses', icon: 'pause', kind: 'end', col: 0, row: 1 },
+		{ id: 'pause', label: 'interrupt()', sub: 'run pauses', icon: 'pause', kind: 'end', col: 0, row: 1 },
 		{ id: 'human', label: 'human', sub: 'approve / edit', icon: 'user', kind: 'ghost', col: 1, row: 1 },
 		{ id: 'resume', label: 'resume', sub: 'Command()', icon: 'play', kind: 'start', col: 0, row: 2 }
 	],
 	edges: [
-		{ from: 'run', to: 'pause', flow: true },
-		{ from: 'pause', to: 'human', dashed: true, label: 'ask' },
-		{ from: 'human', to: 'resume', dashed: true, label: 'decide' }
+		{ from: 'run', to: 'pause' },
+		{ from: 'pause', to: 'human', link: true, label: 'ask' },
+		{ from: 'human', to: 'resume', link: true, label: 'decide' }
 	]
 };
 
 /** Send fan-out (map-reduce). */
 export const sendFanout: DiagramSpec = {
 	title: 'Send fan-out',
-	caption: 'Send dispatches one worker invocation per item; results fan back into a reducer.',
+	caption: 'One Send per item runs every worker in parallel; their results fan back into a reducer.',
 	cols: 3,
 	rows: 3,
 	shape: 'square',
@@ -250,12 +309,12 @@ export const sendFanout: DiagramSpec = {
 		{ id: 'reduce', label: 'reduce', sub: 'fan-in', icon: 'merge', kind: 'end', col: 2, row: 1 }
 	],
 	edges: [
-		{ from: 'map', to: 'w1', dashed: true, label: 'Send' },
-		{ from: 'map', to: 'w2', dashed: true },
-		{ from: 'map', to: 'w3', dashed: true },
-		{ from: 'w1', to: 'reduce', flow: true },
-		{ from: 'w2', to: 'reduce', flow: true },
-		{ from: 'w3', to: 'reduce', flow: true }
+		{ from: 'map', to: 'w1', label: 'Send' },
+		{ from: 'map', to: 'w2' },
+		{ from: 'map', to: 'w3' },
+		{ from: 'w1', to: 'reduce' },
+		{ from: 'w2', to: 'reduce' },
+		{ from: 'w3', to: 'reduce' }
 	]
 };
 
@@ -274,9 +333,9 @@ export const subgraphs: DiagramSpec = {
 		{ id: 'end', label: 'END', icon: 'flag', kind: 'end', col: 0, row: 3 }
 	],
 	edges: [
-		{ from: 'start', to: 'outer', flow: true },
-		{ from: 'outer', to: 'sub', flow: true },
-		{ from: 'sub', to: 'end', flow: true }
+		{ from: 'start', to: 'outer' },
+		{ from: 'outer', to: 'sub' },
+		{ from: 'sub', to: 'end' }
 	]
 };
 
@@ -287,7 +346,7 @@ export const subgraphs: DiagramSpec = {
 /** Harness layers. */
 export const harnessLayers: DiagramSpec = {
 	title: 'The system prompt',
-	caption: 'The harness layers three sources into one prompt: BASE, then MIDDLEWARE, then USER.',
+	caption: 'The harness concatenates three sources into one prompt: BASE, then MIDDLEWARE, then USER.',
 	cols: 2,
 	rows: 3,
 	shape: 'square',
@@ -298,35 +357,35 @@ export const harnessLayers: DiagramSpec = {
 		{ id: 'user', label: 'USER', sub: 'your instructions', icon: 'user', col: 0, row: 2, cspan: 2 }
 	],
 	edges: [
-		{ from: 'base', to: 'mid', flow: true },
-		{ from: 'mid', to: 'user', flow: true }
+		{ from: 'base', to: 'mid' },
+		{ from: 'mid', to: 'user' }
 	]
 };
 
 /** Backends routing. */
 export const backends: DiagramSpec = {
 	title: 'Composite backend',
-	caption: 'One set of file tools; CompositeBackend routes each path to State or Store by prefix.',
+	caption: 'One set of file tools; CompositeBackend routes each path to State or Store by its prefix.',
 	cols: 3,
 	rows: 3,
 	shape: 'square',
 	nodes: [
 		{ id: 'fs', label: 'file tools', sub: 'read · edit', icon: 'folder', kind: 'accent', col: 0, row: 1 },
 		{ id: 'composite', label: 'Composite', sub: 'prefix match', icon: 'branch', kind: 'ghost', col: 1, row: 1 },
-		{ id: 'state', label: 'State', sub: '/scratch · temp', icon: 'cpu', kind: 'muted', col: 2, row: 0 },
-		{ id: 'store', label: 'Store', sub: '/memories · durable', icon: 'database', kind: 'muted', col: 2, row: 2 }
+		{ id: 'state', label: 'State', sub: 'ephemeral', icon: 'cpu', kind: 'muted', col: 2, row: 0 },
+		{ id: 'store', label: 'Store', sub: 'durable', icon: 'database', kind: 'muted', col: 2, row: 2 }
 	],
 	edges: [
-		{ from: 'fs', to: 'composite', flow: true },
-		{ from: 'composite', to: 'state', dashed: true, label: '/scratch' },
-		{ from: 'composite', to: 'store', dashed: true, label: '/memories' }
+		{ from: 'fs', to: 'composite' },
+		{ from: 'composite', to: 'state', link: true, label: '/scratch' },
+		{ from: 'composite', to: 'store', link: true, label: '/memories' }
 	]
 };
 
 /** Compaction before/after. */
 export const compaction: DiagramSpec = {
 	title: 'Context compaction',
-	caption: 'When the window fills: evict bulky tool results, summarize old turns, keep the tail.',
+	caption: 'When the window fills, two operations run on the history — evict and summarize — to get back under budget.',
 	cols: 3,
 	rows: 3,
 	shape: 'square',
@@ -337,17 +396,17 @@ export const compaction: DiagramSpec = {
 		{ id: 'small', label: 'compact', sub: 'under budget', icon: 'check', kind: 'accent', col: 2, row: 1 }
 	],
 	edges: [
-		{ from: 'big', to: 'evict', dashed: true },
-		{ from: 'big', to: 'summ', dashed: true },
-		{ from: 'evict', to: 'small', flow: true },
-		{ from: 'summ', to: 'small', flow: true }
+		{ from: 'big', to: 'evict' },
+		{ from: 'big', to: 'summ' },
+		{ from: 'evict', to: 'small' },
+		{ from: 'summ', to: 'small' }
 	]
 };
 
 /** Skills progressive disclosure. */
 export const skillsDisclosure: DiagramSpec = {
 	title: 'Progressive disclosure',
-	caption: 'Only skill names and one-line descriptions ship in the prompt; bodies load on demand.',
+	caption: 'Only skill names and one-line descriptions ship in the prompt; the body loads on demand.',
 	cols: 2,
 	rows: 3,
 	shape: 'portrait',
@@ -357,15 +416,15 @@ export const skillsDisclosure: DiagramSpec = {
 		{ id: 'body', label: 'full SKILL.md', sub: 'returned as a tool result', icon: 'book', kind: 'muted', col: 0, row: 2, cspan: 2 }
 	],
 	edges: [
-		{ from: 'prompt', to: 'load', flow: true, label: 'pick' },
-		{ from: 'load', to: 'body', dashed: true, label: 'expand' }
+		{ from: 'prompt', to: 'load', label: 'pick' },
+		{ from: 'load', to: 'body', label: 'expand' }
 	]
 };
 
 /** Subagent isolation. */
 export const subagentIsolation: DiagramSpec = {
 	title: 'Subagent isolation',
-	caption: 'task() spawns a subagent with its own context; only the final report comes back.',
+	caption: 'task() spawns a subagent with its own context; only the final report returns to the parent.',
 	cols: 3,
 	rows: 3,
 	shape: 'square',
@@ -377,9 +436,9 @@ export const subagentIsolation: DiagramSpec = {
 		{ id: 'report', label: 'report', icon: 'file', kind: 'end', col: 2, row: 2 }
 	],
 	edges: [
-		{ from: 'parent', to: 'task', flow: true },
-		{ from: 'task', to: 'sub', dashed: true, label: 'prompt' },
-		{ from: 'sub', to: 'report', flow: true },
+		{ from: 'parent', to: 'task' },
+		{ from: 'task', to: 'sub', label: 'prompt' },
+		{ from: 'sub', to: 'report' },
 		{ from: 'report', to: 'parent', label: 'summary' }
 	]
 };

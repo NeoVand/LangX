@@ -22,14 +22,18 @@ export interface DiagramEdge {
 	from: string;
 	to: string;
 	label?: string;
-	dashed?: boolean;
-	/** Animate a token travelling along the edge. */
-	flow?: boolean;
+	/**
+	 * Structural relationship — "reads / writes / relates-to" rather than a
+	 * sequential step. Rendered as a dimmer, thinner static line with NO
+	 * travelling token. Default (omitted) edges are *flow* edges: a solid line
+	 * carrying one moving token to show the live direction of execution.
+	 */
+	link?: boolean;
 	/** Force a curved route bulging out to one side (for loops / back-edges). */
 	side?: 'left' | 'right';
 }
 
-/** A faint dashed container drawn behind a rectangular block of grid cells. */
+/** A faint solid-hairline container drawn behind a rectangular block of cells. */
 export interface DiagramGroup {
 	label?: string;
 	col: number;

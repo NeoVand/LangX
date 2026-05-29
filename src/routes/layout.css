@@ -13,18 +13,20 @@
 	/* Backwards-compat alias for older code paths still reading --font-serif */
 	--font-serif: 'Fraunces', 'Source Serif 4', Georgia, serif;
 
-	/* Ink + cream base */
-	--color-ink-0: oklch(0.13 0.014 240);
-	--color-ink-1: oklch(0.165 0.014 240);
-	--color-ink-2: oklch(0.205 0.016 240);
-	--color-ink-3: oklch(0.245 0.018 240);
+	/* Ink + cream base — warm-neutral ink so surfaces harmonize with the
+	   cream text and chapter accents instead of reading cold blue-gray. */
+	--color-ink-0: oklch(0.142 0.006 75);
+	--color-ink-1: oklch(0.182 0.007 75);
+	--color-ink-2: oklch(0.222 0.008 75);
+	--color-ink-3: oklch(0.262 0.009 75);
 	--color-cream-0: oklch(0.96 0.02 80);
 	--color-cream-1: oklch(0.9 0.025 78);
 	--color-cream-2: oklch(0.78 0.025 78);
 	--color-cream-3: oklch(0.62 0.018 78);
 	--color-cream-4: oklch(0.45 0.014 78);
 
-	/* Surface tokens (legacy names kept for migration) */
+	/* Surface tokens. Elevation reads top-to-bottom: page < card < raised,
+	   with code/terminals RECESSED below the page so they never blend in. */
 	--color-bg: var(--color-ink-0);
 	--color-bg-elev: var(--color-ink-1);
 	--color-bg-elev-2: var(--color-ink-2);
@@ -32,11 +34,13 @@
 	--color-fg: var(--color-cream-0);
 	--color-fg-muted: var(--color-cream-2);
 	--color-fg-faint: var(--color-cream-3);
-	--color-border: oklch(0.32 0.014 240);
-	--color-border-strong: oklch(0.42 0.018 240);
+	/* Hairline borders: warm-neutral + low chroma so they whisper, not shout. */
+	--color-border: oklch(0.29 0.005 75);
+	--color-border-strong: oklch(0.4 0.007 75);
 
-	--color-paper: oklch(0.205 0.016 80);
-	--color-rule: oklch(0.4 0.04 78);
+	/* Code / terminal surface — recessed (darker than the page). */
+	--color-paper: oklch(0.115 0.008 75);
+	--color-rule: oklch(0.36 0.018 78);
 
 	/* Chapter accents — saturated enough to feel intentional, not neon */
 	--color-accent-langchain: oklch(0.78 0.16 70);
@@ -334,10 +338,10 @@ code {
 	font-variant-numeric: tabular-nums;
 }
 
-/* Shiki — wrap long lines, keep editorial feel */
+/* Shiki — recessed, borderless code surface (wrappers add chrome if needed) */
 :where(.shiki) {
 	background: var(--color-paper) !important;
-	border: 1px solid var(--color-border);
+	border: none;
 	border-radius: 0.55rem;
 	padding: 1rem 1.1rem;
 	overflow-x: auto;

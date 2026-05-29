@@ -54,8 +54,12 @@
 </figure>
 
 <style>
+	/* One recessed unit: code surface + a borderless footer bar. No nested boxes. */
 	.code {
 		margin: 1.25rem 0;
+		border-radius: 0.55rem;
+		overflow: hidden;
+		background: var(--color-paper);
 	}
 
 	.code.dense {
@@ -64,8 +68,8 @@
 
 	.hl :global(pre.shiki) {
 		margin: 0;
-		border-bottom-left-radius: 0;
-		border-bottom-right-radius: 0;
+		background: transparent !important;
+		border-radius: 0;
 	}
 
 	figcaption {
@@ -73,11 +77,7 @@
 		align-items: center;
 		gap: 0.5rem;
 		padding: 0.4rem 0.7rem;
-		border: 1px solid var(--color-border);
-		border-top: none;
-		border-bottom-left-radius: 0.55rem;
-		border-bottom-right-radius: 0.55rem;
-		background: var(--color-bg-elev-2);
+		border-top: 1px solid color-mix(in oklch, var(--color-border) 60%, transparent);
 		font-family: var(--font-mono);
 		font-size: 0.72rem;
 		color: var(--color-fg-faint);
@@ -105,18 +105,21 @@
 	.copy {
 		margin-left: auto;
 		font-size: 0.7rem;
-		padding: 0.15rem 0.5rem;
+		padding: 0.15rem 0.55rem;
 		border-radius: 0.3rem;
-		background: var(--color-bg);
+		background: color-mix(in oklch, var(--color-fg-muted) 8%, transparent);
 		color: var(--color-fg-muted);
-		border: 1px solid var(--color-border);
+		border: none;
 		font-family: var(--font-mono);
 		cursor: pointer;
-		transition: color 0.18s ease;
+		transition:
+			color 0.18s ease,
+			background 0.18s ease;
 	}
 
 	.copy:hover,
 	.copy:focus-visible {
 		color: var(--color-fg);
+		background: color-mix(in oklch, var(--color-fg-muted) 16%, transparent);
 	}
 </style>

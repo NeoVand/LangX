@@ -36,16 +36,21 @@
 	}
 
 	type Pt = { x: number; y: number };
-	function port(g: ReturnType<typeof geom>, side: 'top' | 'bottom' | 'left' | 'right'): Pt {
+	type Side = 'top' | 'bottom' | 'left' | 'right';
+	type Geom = ReturnType<typeof geom>;
+
+	/** A port positioned along a side; frac 0.5 = centre, spread for fan-outs. */
+	function portAt(g: Geom, side: Side, frac: number): Pt {
+		const t = 0.5 + (frac - 0.5) * 0.6; // compress toward centre so fans stay tidy
 		switch (side) {
 			case 'top':
-				return { x: g.cx, y: g.y };
+				return { x: g.x + g.bw * t, y: g.y };
 			case 'bottom':
-				return { x: g.cx, y: g.y + g.bh };
+				return { x: g.x + g.bw * t, y: g.y + g.bh };
 			case 'left':
-				return { x: g.x, y: g.cy };
+				return { x: g.x, y: g.y + g.bh * t };
 			case 'right':
-				return { x: g.x + g.bw, y: g.cy };
+				return { x: g.x + g.bw, y: g.y + g.bh * t };
 		}
 	}
 
@@ -58,36 +63,26 @@
 		return { d, mid };
 	}
 
-	function edgeGeom(e: DiagramEdge) {
-		const a = nodeMap.get(e.from);
-		const b = nodeMap.get(e.to);
-		if (!a || !b) return { d: '', mid: { x: 0, y: 0 } };
-		const A = geom(a);
-		const B = geom(b);
+	function autoSides(A: Geom, B: Geom, e: DiagramEdge): { aSide: Side; bSide: Side } {
+		if (e.side) return { aSide: e.side, bSide: e.side };
 		const dx = B.cx - A.cx;
 		const dy = B.cy - A.cy;
+		if (Math.abs(dy) >= Math.abs(dx)) {
+			return { aSide: dy > 0 ? 'bottom' : 'top', bSide: dy > 0 ? 'top' : 'bottom' };
+		}
+		return { aSide: dx > 0 ? 'right' : 'left', bSide: dx > 0 ? 'left' : 'right' };
+	}
 
+	function route(p1: Pt, aSide: Side, p2: Pt, bSide: Side, e: DiagramEdge) {
 		if (e.side) {
-			const p1 = port(A, e.side);
-			const p2 = port(B, e.side);
-			const off = (e.side === 'right' ? 1 : -1) * Math.max(64, Math.abs(dy) * 0.7);
+			const off = (e.side === 'right' ? 1 : -1) * Math.max(56, Math.abs(p2.y - p1.y) * 0.6);
 			return cubic(p1, { x: p1.x + off, y: p1.y }, { x: p2.x + off, y: p2.y }, p2);
 		}
-
-		let aSide: 'top' | 'bottom' | 'left' | 'right';
-		let bSide: 'top' | 'bottom' | 'left' | 'right';
-		if (Math.abs(dy) >= Math.abs(dx)) {
-			aSide = dy > 0 ? 'bottom' : 'top';
-			bSide = dy > 0 ? 'top' : 'bottom';
-		} else {
-			aSide = dx > 0 ? 'right' : 'left';
-			bSide = dx > 0 ? 'left' : 'right';
-		}
-		const p1 = port(A, aSide);
-		const p2 = port(B, bSide);
+		const dx = p2.x - p1.x;
+		const dy = p2.y - p1.y;
 		const k = 0.3;
 		const c1: Pt =
-			aSide === 'bottom' || aSide === 'top'
+			aSide === 'top' || aSide === 'bottom'
 				? { x: p1.x, y: p1.y + (aSide === 'bottom' ? 1 : -1) * Math.abs(dy) * k }
 				: { x: p1.x + (aSide === 'right' ? 1 : -1) * Math.abs(dx) * k, y: p1.y };
 		const c2: Pt =
@@ -97,7 +92,64 @@
 		return cubic(p1, c1, c2, p2);
 	}
 
-	const edgeData = $derived(spec.edges.map((e) => ({ e, ...edgeGeom(e) })));
+	interface Prepared {
+		e: DiagramEdge;
+		A: Geom;
+		B: Geom;
+		aSide: Side;
+		bSide: Side;
+	}
+
+	// Resolve sides, then fan multiple edges sharing a node-side so they spread
+	// across the border instead of all leaving from the same centre point.
+	const edgeData = $derived.by(() => {
+		const prepared: Prepared[] = [];
+		for (const e of spec.edges) {
+			const a = nodeMap.get(e.from);
+			const b = nodeMap.get(e.to);
+			if (!a || !b) continue;
+			const A = geom(a);
+			const B = geom(b);
+			prepared.push({ e, A, B, ...autoSides(A, B, e) });
+		}
+
+		const groups = new Map<string, { p: Prepared; end: 'a' | 'b' }[]>();
+		const push = (key: string, p: Prepared, end: 'a' | 'b') => {
+			const list = groups.get(key) ?? [];
+			list.push({ p, end });
+			groups.set(key, list);
+		};
+		for (const p of prepared) {
+			push(`${p.e.from}|${p.aSide}`, p, 'a');
+			push(`${p.e.to}|${p.bSide}`, p, 'b');
+		}
+
+		const frac = new Map<Prepared, { a: number; b: number }>();
+		for (const p of prepared) frac.set(p, { a: 0.5, b: 0.5 });
+		for (const [key, members] of groups) {
+			if (members.length <= 1) continue;
+			const side = key.split('|')[1] as Side;
+			const horiz = side === 'top' || side === 'bottom';
+			members.sort((m1, m2) => {
+				const o1 = m1.end === 'a' ? m1.p.B : m1.p.A;
+				const o2 = m2.end === 'a' ? m2.p.B : m2.p.A;
+				return horiz ? o1.cx - o2.cx : o1.cy - o2.cy;
+			});
+			members.forEach((m, i) => {
+				const f = (i + 1) / (members.length + 1);
+				const cur = frac.get(m.p)!;
+				if (m.end === 'a') cur.a = f;
+				else cur.b = f;
+			});
+		}
+
+		return prepared.map((p) => {
+			const f = frac.get(p)!;
+			const p1 = portAt(p.A, p.aSide, f.a);
+			const p2 = portAt(p.B, p.bSide, f.b);
+			return { e: p.e, ...route(p1, p.aSide, p2, p.bSide, p.e) };
+		});
+	});
 
 	function groupRect(g: NonNullable<DiagramSpec['groups']>[number]) {
 		return {
@@ -137,6 +189,17 @@
 			>
 				<path d="M 0 1 L 9 5 L 0 9" fill="none" class="arrowhead" />
 			</marker>
+			<marker
+				id={`${uid}-arrow-link`}
+				viewBox="0 0 10 10"
+				refX="8.5"
+				refY="5"
+				markerWidth="6.5"
+				markerHeight="6.5"
+				orient="auto-start-reverse"
+			>
+				<path d="M 0 1.5 L 9 5 L 0 8.5" fill="none" class="arrowhead-link" />
+			</marker>
 			<filter id={`${uid}-shadow`} x="-20%" y="-20%" width="140%" height="150%">
 				<feDropShadow dx="0" dy="2.5" stdDeviation="3" flood-color="#000" flood-opacity="0.28" />
 			</filter>
@@ -148,25 +211,34 @@
 			<g class="group" data-kind={g.kind ?? 'muted'}>
 				<rect x={r.x} y={r.y} width={r.w} height={r.h} rx="16" />
 				{#if g.label}
-					<rect x={r.x + 10} y={r.y - 8} width={glw} height="16" rx="5" class="group-label-bg" />
-					<text x={r.x + 10 + glw / 2} y={r.y} text-anchor="middle" dominant-baseline="central" class="group-label">
-						{g.label}
-					</text>
+					<rect x={r.x + 12} y={r.y - 8} width={glw} height="16" rx="5" class="group-label-bg" />
+					<text
+						x={r.x + 12 + glw / 2}
+						y={r.y}
+						text-anchor="middle"
+						dominant-baseline="central"
+						class="group-label">{g.label}</text>
 				{/if}
 			</g>
 		{/each}
 
 		{#each edgeData as { e, d, mid }, i (i)}
-			<path d={d} class="edge" class:dashed={e.dashed} fill="none" marker-end={`url(#${uid}-arrow)`} />
-			{#if !e.dashed}
-				<circle r="3.2" class="token">
-					<animateMotion path={d} dur="2.8s" begin={`${i * 0.4}s`} repeatCount="indefinite" />
+			<path
+				d={d}
+				class="edge"
+				class:link={e.link}
+				fill="none"
+				marker-end={`url(#${uid}-arrow${e.link ? '-link' : ''})`}
+			/>
+			{#if !e.link}
+				<circle r="3.1" class="token">
+					<animateMotion path={d} dur="2.8s" begin={`${i * 0.45}s`} repeatCount="indefinite" />
 				</circle>
 			{/if}
 			{#if e.label}
-				{@const lw = Math.max(24, e.label.length * 6 + 14)}
+				{@const lw = Math.max(22, e.label.length * 5.9 + 12)}
 				<g class="edge-label" transform={`translate(${mid.x} ${mid.y})`}>
-					<rect x={-lw / 2} y="-9" width={lw} height="18" rx="9" class="edge-label-bg" />
+					<rect x={-lw / 2} y="-8.5" width={lw} height="17" rx="8.5" class="edge-label-bg" />
 					<text text-anchor="middle" dominant-baseline="central">{e.label}</text>
 				</g>
 			{/if}
@@ -264,58 +336,63 @@
 		stop-color: color-mix(in oklch, var(--accent) 24%, var(--color-bg));
 	}
 
-	/* edges */
+	/* edges — flow (solid + travelling token) vs link (dim static relationship) */
 	.edge {
 		stroke: var(--color-fg-muted, #8a8a8a);
 		stroke-width: 1.7;
-		opacity: 0.6;
+		opacity: 0.58;
 		stroke-linecap: round;
 	}
-	.edge.dashed {
-		stroke-dasharray: 4 5;
-		opacity: 0.5;
+	.edge.link {
+		stroke-width: 1.35;
+		opacity: 0.44;
 	}
 	.arrowhead {
 		stroke: var(--color-fg-muted, #8a8a8a);
 		stroke-width: 1.7;
 		stroke-linecap: round;
 		stroke-linejoin: round;
-		opacity: 0.75;
+		opacity: 0.7;
+	}
+	.arrowhead-link {
+		stroke: var(--color-fg-muted, #8a8a8a);
+		stroke-width: 1.6;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+		opacity: 0.5;
 	}
 	.edge-label text {
-		fill: var(--color-ink-200, #cfcfcf);
+		fill: var(--color-fg-muted, #cfcfcf);
 		font-family: var(--font-mono);
-		font-size: 10.5px;
+		font-size: 10px;
+		letter-spacing: 0.02em;
 	}
 	.edge-label-bg {
 		fill: var(--color-bg);
-		stroke: var(--color-rule, #333);
-		stroke-width: 1;
-		opacity: 0.95;
 	}
 	.token {
 		fill: var(--accent);
 		filter: drop-shadow(0 0 4px color-mix(in oklch, var(--accent) 70%, transparent));
 	}
 
-	/* groups */
+	/* groups — solid hairline frame, faint accent wash */
 	.group rect {
-		fill: color-mix(in oklch, var(--accent) 5%, transparent);
-		stroke: var(--color-rule, #333);
-		stroke-width: 1.4;
-		stroke-dasharray: 6 5;
+		fill: color-mix(in oklch, var(--accent) 4%, transparent);
+		stroke: color-mix(in oklch, var(--accent) 26%, transparent);
+		stroke-width: 1.2;
 	}
 	.group[data-kind='accent'] rect {
-		stroke: color-mix(in oklch, var(--accent) 55%, transparent);
+		stroke: color-mix(in oklch, var(--accent) 52%, transparent);
 		fill: color-mix(in oklch, var(--accent) 7%, transparent);
 	}
 	.group-label-bg {
 		fill: var(--color-bg, #111);
-		stroke: var(--color-rule, #333);
-		stroke-width: 1;
 	}
-	.group[data-kind='accent'] .group-label-bg {
-		stroke: color-mix(in oklch, var(--accent) 50%, transparent);
+	.group-label {
+		fill: var(--color-fg-faint, #9a9a9a);
+	}
+	.group[data-kind='accent'] .group-label {
+		fill: var(--accent-ink, var(--accent));
 	}
 	.group-label {
 		fill: var(--color-fg-faint, #9a9a9a);
@@ -377,24 +454,24 @@
 	}
 
 	.node[data-kind='muted'] .node-box {
-		fill: color-mix(in oklch, var(--color-fg-muted) 8%, transparent);
-		stroke: var(--color-rule, #333);
-		stroke-dasharray: 5 4;
+		fill: color-mix(in oklch, var(--color-fg-muted) 6%, transparent);
+		stroke: color-mix(in oklch, var(--color-fg-muted) 22%, transparent);
+	}
+	.node[data-kind='muted'] .node-icon {
+		color: var(--color-fg-faint, #9a9a9a);
 	}
 	.node[data-kind='muted'] .lbl {
-		fill: var(--color-ink-200, #cfcfcf);
+		fill: var(--color-fg-muted, #cfcfcf);
 		font-weight: 500;
 	}
 	.node[data-kind='ghost'] .node-box {
-		fill: transparent;
-		stroke: var(--color-fg-muted, #8a8a8a);
-		stroke-dasharray: 3 4;
-		opacity: 0.8;
+		fill: color-mix(in oklch, var(--color-fg-muted) 3%, transparent);
+		stroke: color-mix(in oklch, var(--color-fg-muted) 30%, transparent);
 	}
 	.node[data-kind='ghost'] .node-icon,
 	.node[data-kind='ghost'] .lbl {
-		fill: var(--color-fg-muted, #9a9a9a);
-		color: var(--color-fg-muted, #9a9a9a);
+		fill: var(--color-fg-faint, #9a9a9a);
+		color: var(--color-fg-faint, #9a9a9a);
 	}
 
 	figcaption {
@@ -416,18 +493,10 @@
 			transform-origin: center;
 			animation: dgm-in 0.5s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
 		}
-		.edge.dashed {
-			animation: dgm-march 0.7s linear infinite;
-		}
 		@keyframes dgm-in {
 			to {
 				opacity: 1;
 				transform: translateY(0);
-			}
-		}
-		@keyframes dgm-march {
-			to {
-				stroke-dashoffset: -18;
 			}
 		}
 	}

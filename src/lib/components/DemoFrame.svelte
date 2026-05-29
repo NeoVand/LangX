@@ -120,8 +120,8 @@
 <style>
 	.demo-frame {
 		border: 1px solid var(--color-border);
-		border-radius: 0.6rem;
-		background: var(--color-bg-elev-2);
+		border-radius: 0.7rem;
+		background: var(--color-bg-elev);
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
@@ -132,8 +132,8 @@
 		flex-direction: column;
 		gap: 0.55rem;
 		padding: 0.75rem 1rem 0;
-		border-bottom: 1px solid var(--color-border);
-		background: color-mix(in oklch, var(--color-bg-elev-2) 92%, var(--color-bg) 8%);
+		border-bottom: 1px solid color-mix(in oklch, var(--color-border) 55%, transparent);
+		background: transparent;
 	}
 
 	.titles {
@@ -209,9 +209,8 @@
 	}
 
 	.step {
-		border: 1px solid var(--color-border);
-		border-radius: 0.4rem;
-		background: var(--color-bg);
+		border-radius: 0.45rem;
+		background: color-mix(in oklch, var(--color-fg-muted) 5%, transparent);
 		overflow: hidden;
 	}
 

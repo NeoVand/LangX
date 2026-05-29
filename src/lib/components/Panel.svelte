@@ -31,8 +31,8 @@
 <style>
 	.panel {
 		border: 1px solid var(--color-border);
-		border-radius: 0.6rem;
-		background: var(--color-bg-elev-2);
+		border-radius: 0.7rem;
+		background: var(--color-bg-elev);
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
@@ -44,8 +44,8 @@
 		justify-content: space-between;
 		gap: 0.75rem;
 		padding: 0.75rem 1rem 0.55rem;
-		border-bottom: 1px solid var(--color-border);
-		background: color-mix(in oklch, var(--color-bg-elev-2) 92%, var(--color-bg) 8%);
+		border-bottom: 1px solid color-mix(in oklch, var(--color-border) 55%, transparent);
+		background: transparent;
 	}
 
 	.panel-titles {

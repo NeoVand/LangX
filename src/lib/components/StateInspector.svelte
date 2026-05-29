@@ -56,10 +56,9 @@
 
 <style>
 	.inspector {
-		border: 1px solid var(--color-border);
-		border-radius: 0.4rem;
+		border-radius: 0.45rem;
 		overflow: hidden;
-		background: var(--color-bg);
+		background: var(--color-paper);
 	}
 
 	.title {
@@ -68,8 +67,8 @@
 		letter-spacing: 0.08em;
 		color: var(--color-fg-faint);
 		padding: 0.45rem 0.7rem;
-		border-bottom: 1px solid var(--color-border);
-		background: var(--color-bg-elev-2);
+		border-bottom: 1px solid color-mix(in oklch, var(--color-border) 55%, transparent);
+		background: transparent;
 	}
 
 	.hl {
