@@ -50,22 +50,22 @@
 				and no network. Same shape (postMessage in, results out), tighter scope.
 			</p>
 			<ul>
-				<li><strong>Modal</strong> — sandboxes for full-language stacks (Python, Node, etc.).</li>
-				<li><strong>Daytona / Runloop</strong> — dev containers with persistent volumes.</li>
-				<li><strong>QuickJS</strong> — pure-JS evaluation without a process.</li>
+				<li><strong><Term t="Modal">Modal</Term></strong> — sandboxes for full-language stacks (Python, Node, etc.).</li>
+				<li><strong><Term t="Daytona">Daytona</Term> / <Term t="Runloop">Runloop</Term></strong> — dev containers with persistent volumes.</li>
+				<li><strong><Term t="QuickJS">QuickJS</Term></strong> — pure-JS evaluation without a process.</li>
 			</ul>
 		</Slide>
 
 		<Slide title="Persistent backends">
 			<p>
-				In LangX, <code>StoreBackend</code> is Dexie/IndexedDB. In production, it is
-				typically Postgres (via the LangGraph Postgres checkpointer) or a managed store.
-				The <code>BackendProtocol</code> does not change — only the implementation does.
+				In LangX, <Term t="StoreBackend"><code>StoreBackend</code></Term> is <Term t="Dexie">Dexie</Term>/<Term t="IndexedDB">IndexedDB</Term>. In production, it is
+				typically Postgres (via the LangGraph <Term t="PostgresSaver">Postgres</Term> checkpointer) or a managed store.
+				The <Term t="BackendProtocol"><code>BackendProtocol</code></Term> does not change — only the implementation does.
 			</p>
 			<ul>
 				<li><strong>Postgres checkpoints</strong> — durable graph state across processes.</li>
-				<li><strong>FilesystemBackend</strong> — root the virtual FS on a real disk for code agents.</li>
-				<li><strong>LocalShellBackend</strong> — let the agent talk to a real shell, gated by permissions.</li>
+				<li><strong><Term t="FilesystemBackend">FilesystemBackend</Term></strong> — root the virtual FS on a real disk for code agents.</li>
+				<li><strong><Term t="LocalShellBackend">LocalShellBackend</Term></strong> — let the agent talk to a real shell, gated by permissions.</li>
 			</ul>
 		</Slide>
 
@@ -78,9 +78,9 @@
 
 		<Slide title="Managed Deep Agents (private preview)">
 			<p>
-				LangSmith's <code>/v1/deepagents</code> hosts the harness as a service: you ship an
-				agent file tree (<code>AGENTS.md</code>, <code>skills/</code>,
-				<code>subagents/</code>, <code>tools.json</code>), point at an MCP server, and the
+				<Term t="LangSmith">LangSmith</Term>'s <code>/v1/deepagents</code> hosts the harness as a service: you ship an
+				agent file tree (<Term t="AGENTS.md"><code>AGENTS.md</code></Term>, <code>skills/</code>,
+				<code>subagents/</code>, <Term t="tools.json"><code>tools.json</code></Term>), point at an <Term t="MCP">MCP</Term> server, and the
 				platform runs threads with interrupts and streaming over HTTP. The harness shape is
 				identical; only the deploy target differs.
 			</p>
@@ -98,7 +98,7 @@
 
 		<Slide title="Tool ecosystem">
 			<p>
-				Real agents use <Term t="MCP" /> servers and integrations (Tavily, Browserbase,
+				Real agents use <Term t="MCP" /> servers and integrations (<Term t="Tavily">Tavily</Term>, <Term t="Browserbase">Browserbase</Term>,
 				Linear, Slack, Datadog, GitHub). LangX includes deterministic stand-ins so the
 				lessons stay reproducible. Drop a real client in behind the same <code>tool()</code>
 				wrapper and the lesson code keeps working.

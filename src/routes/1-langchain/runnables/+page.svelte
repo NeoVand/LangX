@@ -130,9 +130,9 @@ const { short, bullets, passthrough } = await fanout.invoke({ topic });`;
 >
 	{#snippet intro()}
 		<p>
-			Everything in LangChain is a <Term t="Runnable" />. A prompt template, a chat model, a
-			parser, a retriever — they all implement the same four methods, and they compose using a
-			pipe.
+			Everything in LangChain is a <Term t="Runnable" />. A <Term t="Prompt template" />, a
+			<Term t="Model" />, a <Term t="Parser" />, a <Term t="Retriever" /> — they all implement
+			the same four methods, and they compose using a <Term t="Chain" /> (the pipe).
 		</p>
 	{/snippet}
 
@@ -153,29 +153,33 @@ const { short, bullets, passthrough } = await fanout.invoke({ topic });`;
 
 		<Slide title="The Runnable protocol">
 			<p>
-				A <Term t="Runnable" /> is anything that exposes <code>invoke</code>,
-				<code>batch</code>, <code>stream</code>, and their async cousins. Once your component
-				speaks that protocol, it can be composed with everything else in the ecosystem.
+				A <Term t="Runnable" /> is anything that exposes <Term t="invoke" />,
+				<Term t="batch" />, <Term t="stream" />, and their async cousins (<Term
+					t="ainvoke"
+				/>, <Term t="abatch" />, <Term t="astream" />). Once your component speaks that
+				protocol, it can be composed with everything else in the ecosystem.
 			</p>
 			<p>The four core methods:</p>
 			<ul>
-				<li><code>invoke(input)</code> — single run.</li>
-				<li><code>batch([...])</code> — many inputs in parallel.</li>
-				<li><code>stream(input)</code> — yield chunks as they're produced.</li>
-				<li><code>streamEvents(input)</code> — fine-grained event log.</li>
+				<li><Term t="invoke"><code>invoke(input)</code></Term> — single run.</li>
+				<li><Term t="batch"><code>batch([...])</code></Term> — many inputs in parallel.</li>
+				<li><Term t="stream"><code>stream(input)</code></Term> — yield chunks as they're produced.</li>
+				<li>
+					<Term t="streamEvents"><code>streamEvents(input)</code></Term> — fine-grained event log.
+				</li>
 			</ul>
 		</Slide>
 
 		<Slide title="LCEL — the pipe operator" variant="code-first">
 			<p>
-				<Term t="LCEL" /> uses the pipe (<code>.pipe(...)</code> in TypeScript) to chain
+				<Term t="LCEL" /> uses the <Term t="pipe"><code>.pipe(...)</code></Term> operator to chain
 				Runnables. The output of the left side becomes the input of the right side. The chain is
-				lazy — nothing runs until you call <code>invoke</code>.
+				lazy — nothing runs until you call <Term t="invoke">invoke</Term>.
 			</p>
 			<CodeBlock code={codeA} lang="ts" caption="A prompt → model → parser chain (Demo 1)." />
 			<p>
 				Run Demo 1 on the right and watch the value's shape change at each stop:
-				<code>{'{ topic }'}</code> → <code>ChatPromptValue</code> → <code>AIMessage</code> →
+				<code>{'{ topic }'}</code> → <Term t="ChatPromptValue"><code>ChatPromptValue</code></Term> → <Term t="AIMessage"><code>AIMessage</code></Term> →
 				<code>string</code>.
 			</p>
 		</Slide>
@@ -192,8 +196,8 @@ const { short, bullets, passthrough } = await fanout.invoke({ topic });`;
 		<Slide title="Branching: RunnableParallel" variant="code-first">
 			<p>
 				Sometimes you want one input to fan out to several Runnables, gather their outputs into
-				a single object, and continue. That's <code>RunnableParallel</code>. Pair it with
-				<code>RunnablePassthrough</code> when you want to keep the original input alongside
+				a single object, and continue. That's <Term t="RunnableParallel"><code>RunnableParallel</code></Term>. Pair it with
+				<Term t="RunnablePassthrough"><code>RunnablePassthrough</code></Term> when you want to keep the original input alongside
 				derived values.
 			</p>
 			<CodeBlock code={codeB} lang="ts" caption="A 3-way fan-out (Demo 2)." />

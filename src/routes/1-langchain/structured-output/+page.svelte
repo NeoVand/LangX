@@ -141,7 +141,8 @@ const report = await extractor.invoke([
 		<Slide title="withStructuredOutput" variant="code-first">
 			<CodeBlock code={code} lang="ts" caption="Define once, get a typed function." />
 			<p>
-				LangChain's <code>withStructuredOutput</code> wraps a chat model so it returns a typed
+				LangChain's <Term t="withStructuredOutput"><code>withStructuredOutput</code></Term> wraps
+				a chat model so it returns a typed
 				value instead of an <code>AIMessage</code>. Under the hood it registers your Zod
 				schema as a tool and asks the model to fill it.
 			</p>
@@ -166,7 +167,8 @@ const report = await extractor.invoke([
 			<p>
 				Use schemas for: ticket extraction, classification, function arguments, evaluator
 				rubrics, structured agent plans, and any handoff between an LLM and the rest of your
-				system. Pair with retries (<code>withRetry</code>) for robustness, and prefer narrow
+				system. Pair with retries (<Term t="withRetry"><code>withRetry</code></Term>) for
+				robustness, and prefer narrow
 				enums over open strings whenever you can.
 			</p>
 		</Slide>

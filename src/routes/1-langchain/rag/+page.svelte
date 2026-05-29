@@ -172,15 +172,15 @@ console.log('Answer:', answer);
 			<ul>
 				<li>
 					<strong>Embed</strong> each document chunk into a fixed-length vector with a
-					small encoder model. We use <code>Xenova/all-MiniLM-L6-v2</code>, 384-dim, ~25 MB.
+					small encoder model. We use <Term t="MiniLM"><code>Xenova/all-MiniLM-L6-v2</code></Term>, 384-dim, ~25 MB.
 				</li>
 				<li>
 					<strong>Index</strong> those vectors. For tiny corpora a plain array works; in
-					production you would reach for pgvector, Pinecone, or Chroma.
+					production you would reach for <Term t="pgvector">pgvector</Term>, <Term t="Pinecone">Pinecone</Term>, or <Term t="Chroma">Chroma</Term>.
 				</li>
 				<li>
 					<strong>Search</strong> by embedding the query and returning the nearest
-					neighbours by cosine similarity.
+					neighbours by <Term t="Cosine similarity">cosine similarity</Term>.
 				</li>
 				<li>
 					<strong>Generate</strong> by passing the top hits to an LLM as context.
@@ -217,7 +217,7 @@ console.log('Answer:', answer);
 		<Slide title="Caveats">
 			<p>
 				In a real system: chunk before you embed, deduplicate, store metadata for
-				citations, watch for context-window inflation, and consider hybrid search (BM25 +
+				<Term t="citation">citations</Term>, watch for <Term t="Context window">context-window</Term> inflation, and consider <Term t="hybrid search">hybrid search</Term> (<Term t="BM25">BM25</Term> +
 				vectors). The machinery is small but the operational details determine whether it
 				is actually useful.
 			</p>

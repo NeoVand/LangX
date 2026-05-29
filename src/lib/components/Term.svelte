@@ -20,7 +20,7 @@
 		{/if}
 		<span id="tip-{t}" role="tooltip" class="tip">
 			<strong>{entry.term}</strong>
-			<span>{entry.long}</span>
+			<span>{entry.short}</span>
 		</span>
 	</span>
 {:else}

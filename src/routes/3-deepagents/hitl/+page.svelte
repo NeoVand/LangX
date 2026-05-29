@@ -127,10 +127,10 @@ while (res.status === 'interrupted') {
 >
 	{#snippet intro()}
 		<p>
-			<code>interruptOn: ['write_file']</code> is enough to put any tool behind a
+			<Term t="interruptOn"><code>interruptOn: ['write_file']</code></Term> is enough to put any tool behind a
 			<Term t="HITL" /> gate. The harness pauses the graph at the named tool, surfaces the
-			proposed call to the host, and resumes only on a Command. Built directly on Phase 2's
-			interrupt primitive.
+			proposed call to the host, and resumes only on a <Term t="Command">Command</Term>. Built directly on Phase 2's
+			<Term t="Interrupt">interrupt</Term> primitive.
 		</p>
 	{/snippet}
 
@@ -139,7 +139,7 @@ while (res.status === 'interrupted') {
 			<p>
 				Some tools cannot be entrusted to a model alone — sending email, calling a mutating
 				API, deleting files, running a shell. The right primitive is not a longer prompt
-				asking nicely; it is a pause. The harness's <code>interruptOn</code> turns any
+				asking nicely; it is a pause. The harness's <Term t="interruptOn"><code>interruptOn</code></Term> turns any
 				named tool into one that halts the graph and surfaces a request for human approval,
 				with the proposed arguments visible.
 			</p>
@@ -155,14 +155,14 @@ while (res.status === 'interrupted') {
 			<p>
 				When the agent calls a guarded tool, the harness throws an interrupt with the tool
 				name, its arguments, and the call ID. The host shows this to a human and resumes
-				with <code>Command(&#123; resume: &#123; decision &#125; &#125;)</code>.
+				with <Term t="Command"><code>Command(&#123; resume: &#123; decision &#125; &#125;)</code></Term>.
 			</p>
 			<CodeBlock code={code} lang="ts" caption="The host loop for an interrupting harness." />
 		</Slide>
 
 		<Slide variant="pull-quote">
 			<p>
-				Trust is a UX problem before it is a model problem. <code>interruptOn</code> is the
+				Trust is a UX problem before it is a model problem. <Term t="interruptOn"><code>interruptOn</code></Term> is the
 				clearest way the harness makes that UX a one-liner.
 			</p>
 		</Slide>
@@ -170,7 +170,7 @@ while (res.status === 'interrupted') {
 		<Slide title="This demo is live">
 			<p>
 				Click <strong>Run</strong> and the harness will pause at the first
-				<code>write_file</code>. An approval card appears with the proposed path and
+				<Term t="write_file"><code>write_file</code></Term>. An approval card appears with the proposed path and
 				content. <strong>Approve</strong> to commit, <strong>Reject</strong> to skip it,
 				or <strong>Edit</strong> the arguments before they run — then the harness resumes
 				to the next gated call. No write touches the filesystem until you approve it.

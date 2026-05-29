@@ -151,16 +151,16 @@ for await (const chunk of stream) {
 			<p>Pick the one that matches what you want to render:</p>
 			<ul>
 				<li>
-					<code>invoke</code> — wait for the final value. Easiest, but the user sees nothing
-					until the full response is ready.
+					<Term t="invoke"><code>invoke</code></Term> — wait for the final value. Easiest, but the
+					user sees nothing until the full response is ready.
 				</li>
 				<li>
-					<code>stream</code> — yield chunks of the final output as they arrive. Best for
-					chat UIs and live text.
+					<Term t="stream"><code>stream</code></Term> — yield chunks of the final output as they
+					arrive. Best for chat UIs and live text.
 				</li>
 				<li>
-					<code>streamEvents</code> — yield typed events for every internal step (chain,
-					model, tool, parser). Best for inspectors and audit trails.
+					<Term t="streamEvents"><code>streamEvents</code></Term> — yield typed events for every
+					internal step (chain, model, tool, parser). Best for inspectors and audit trails.
 				</li>
 			</ul>
 		</Slide>
@@ -169,7 +169,7 @@ for await (const chunk of stream) {
 			<CodeBlock code={codeA} lang="ts" caption="A chain stream — Demo 1." />
 			<p>
 				Press <em>Run</em> on the right. The chain is a real LangChain pipeline; only the
-				model behind <code>getModel()</code> changes depending on which provider you have
+				model behind <Term t="getModel"><code>getModel()</code></Term> changes depending on which provider you have
 				configured.
 			</p>
 		</Slide>
@@ -184,9 +184,9 @@ for await (const chunk of stream) {
 		<Slide title="streamEvents v2" variant="code-first">
 			<CodeBlock code={codeB} lang="ts" caption="streamEvents emits one event per Runnable boundary." />
 			<p>
-				Use <code>withConfig({'{ runName }'})</code> to label each Runnable so the events
-				have stable, human-readable names. Demo 2 prints the chronological event log,
-				including each token as it streams.
+				Use <Term t="withConfig"><code>withConfig({'{ runName }'})</code></Term> to label each
+				Runnable so the events have stable, human-readable names. Demo 2 prints the
+				chronological event log, including each token as it streams.
 			</p>
 		</Slide>
 

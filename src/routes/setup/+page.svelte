@@ -8,6 +8,7 @@
 		type ModelProvider
 	} from '$lib/state/app.svelte';
 	import ParrotMark from '$lib/components/ParrotMark.svelte';
+	import Term from '$lib/components/Term.svelte';
 	import { onMount } from 'svelte';
 
 	let provider: ModelProvider = $state(app.preferredProvider);
@@ -71,8 +72,8 @@
 			<h1>Bring your own model.</h1>
 			<p class="lead">
 				Every demo in LangX runs against a real model. Paste a hosted-API key for the fastest
-				path, or pick a Transformers.js model that downloads once and runs locally on WebGPU. Keys
-				stay in <code>localStorage</code> on this device — they never leave your browser.
+				path, or pick a <Term t="Transformers.js">Transformers.js</Term> model that downloads once and runs locally on <Term t="WebGPU">WebGPU</Term>. <Term t="API key">API keys</Term>
+				stay in <Term t="localStorage"><code>localStorage</code></Term> on this device — they never leave your browser.
 			</p>
 		</div>
 	</header>

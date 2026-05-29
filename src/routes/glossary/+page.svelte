@@ -34,10 +34,11 @@
 <main class="glossary">
 	<header>
 		<div class="eyebrow">Glossary</div>
-		<h1>Terms you'll meet across the curriculum.</h1>
+		<h1>Every term in the curriculum.</h1>
 		<p class="lead">
-			Words that frequently confuse newcomers — sandbox, harness, reducer, eviction. Hover any
-			underlined term inside a lesson to see the short version; come here for the longer one.
+			Every technical term in the curriculum — from <em>prompt</em> and <em>chain</em> through
+			reducers, checkpointers, and compaction. Hover underlined terms in any lesson for the
+			short definition; search here for the full entry.
 		</p>
 		<input
 			class="search"

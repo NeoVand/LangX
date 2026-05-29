@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Lesson from '$lib/components/Lesson.svelte';
 	import Slide from '$lib/components/Slide.svelte';
+	import Term from '$lib/components/Term.svelte';
 	import Panel from '$lib/components/Panel.svelte';
 	import CodeBlock from '$lib/components/CodeBlock.svelte';
 	import RunButton from '$lib/components/RunButton.svelte';
@@ -99,8 +100,8 @@ console.log('Final:', out.finalText);
 >
 	{#snippet intro()}
 		<p>
-			Permissions are declarative: a list of <code>{'{ operations, paths, mode }'}</code>
-			rules evaluated first-match-wins. Order matters — put deny rules at the top, then
+			<Term t="Permissions">Permissions</Term> are declarative: a list of <code>{'{ operations, paths, mode }'}</code>
+			rules evaluated <Term t="first-match-wins">first-match-wins</Term>. Order matters — put deny rules at the top, then
 			specific allows, and end with a catch-all.
 		</p>
 	{/snippet}
@@ -125,7 +126,7 @@ console.log('Final:', out.finalText);
 			<CodeBlock code={code} lang="ts" caption="The exact rules used in this demo." />
 			<p>
 				A failed check throws, and the model sees the error message in the next
-				ToolMessage — so it knows what was blocked and can adapt.
+				<Term t="ToolMessage">ToolMessage</Term> — so it knows what was blocked and can adapt.
 			</p>
 		</Slide>
 

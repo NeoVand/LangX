@@ -173,14 +173,14 @@ const ai = await model.invoke('What is the weather in Tokyo?');
 			variant="dropcap"
 		>
 			<p>
-				Early language models were oracles. You asked a question, you got a paragraph back,
+				Early language models were <Term t="oracle">oracles</Term>. You asked a question, you got a paragraph back,
 				and any real-world side-effect happened somewhere else, written by you, plumbed by
 				you, debugged by you. The model never touched the world.
 			</p>
 			<p>
 				Tool calling inverts that. You hand the model a small toolbox — typed functions with
 				descriptions — and the model decides, turn by turn, which one to reach for. The
-				oracle becomes a colleague. Every agent in this course is, at its heart, a
+				oracle becomes a <Term t="participant">participant</Term>. Every agent in this course is, at its heart, a
 				well-designed toolbox plus a loop that lets the model use it.
 			</p>
 		</Slide>
@@ -196,9 +196,10 @@ const ai = await model.invoke('What is the weather in Tokyo?');
 
 		<Slide title="bindTools, then invoke">
 			<p>
-				Call <code>model.bindTools([...])</code> to attach tools to a chat model. The model
-				can now respond with either content or a list of <code>tool_calls</code>. Your job
-				is to execute each call, return its output as a <code>ToolMessage</code>, and ask
+				Call <Term t="bindTools"><code>model.bindTools([...])</code></Term> to attach tools to a
+				chat model. The model
+				can now respond with either content or a list of <Term t="tool_calls"><code>tool_calls</code></Term>. Your job
+				is to execute each call, return its output as a <Term t="ToolMessage"><code>ToolMessage</code></Term>, and ask
 				the model to continue.
 			</p>
 		</Slide>

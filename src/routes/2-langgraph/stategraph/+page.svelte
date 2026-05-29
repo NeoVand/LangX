@@ -218,8 +218,9 @@ const graph = new StateGraph(MessagesAnnotation)
 	{#snippet intro()}
 		<p>
 			Phase 2 starts here: instead of declaring a chain, you declare a state machine. A
-			<Term t="StateGraph" /> is built from three primitives — a state schema, named nodes that
-			produce partial state updates, and edges that route between them.
+			<Term t="StateGraph" /> is built from three primitives — a <Term t="State schema" />, named
+			<Term t="Node" />s that produce <Term t="Partial state update" />s, and <Term t="Edge" />s
+			that route between them.
 		</p>
 	{/snippet}
 
@@ -251,8 +252,10 @@ const graph = new StateGraph(MessagesAnnotation)
 					Anything you return is merged into the next state via the schema's reducer.
 				</li>
 				<li>
-					<strong>Edges</strong> — <code>addEdge('a', 'b')</code> for a fixed transition,
-					<code>addConditionalEdges('a', router)</code> when the next node depends on state.
+					<strong>Edges</strong> — <Term t="addEdge"><code>addEdge('a', 'b')</code></Term> for
+					a fixed transition, <Term t="addConditionalEdges"
+						><code>addConditionalEdges('a', router)</code></Term
+					> when the next node depends on state.
 				</li>
 			</ul>
 		</Slide>
@@ -281,9 +284,10 @@ const graph = new StateGraph(MessagesAnnotation)
 
 		<Slide title="Stream the values">
 			<p>
-				When you compile a graph you get back a Runnable. Calling <code>stream</code> with
-				<code>streamMode: 'values'</code> yields the <em>full state after every superstep</em>
-				— that's how the right pane keeps the message log and the highlighted graph in sync as
+				When you compile a graph you get back a Runnable. Calling <Term t="stream">stream</Term>
+				with <Term t="streamMode: values"><code>streamMode: 'values'</code></Term> yields the
+				<em>full state after every superstep</em> — that's how the right pane keeps the message
+				log and the highlighted graph in sync as
 				the agent loops.
 			</p>
 		</Slide>

@@ -90,7 +90,7 @@ console.log(out.report);
 		<p>
 			A conditional edge can return one node name, an array of node names, or an array of
 			<Term t="Send" /> objects. The last one is map-reduce inside a graph: every
-			<code>Send</code> spawns a parallel branch with its own state payload, and the runtime
+			<Term t="Send"><code>Send</code></Term> spawns a parallel branch with its own state payload, and the runtime
 			merges results back via your reducers next superstep.
 		</p>
 	{/snippet}

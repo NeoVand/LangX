@@ -148,8 +148,8 @@ const result = await agent.invoke({
 		<p>
 			A standard tool-using agent is a tiny graph: <em>agent</em> → <em>tools</em> →
 			<em>agent</em>
-			→ … → <em>end</em>. LangChain v1 wraps this as <code>create_agent</code>; in JS the
-			equivalent prebuilt is <code>createReactAgent</code> from LangGraph. This lesson is the
+			→ … → <em>end</em>. LangChain v1 wraps this as <Term t="create_agent"><code>create_agent</code></Term>; in JS the
+			equivalent prebuilt is <Term t="createReactAgent"><code>createReactAgent</code></Term> from LangGraph. This lesson is the
 			bridge from Phase 1 into Phase 2.
 		</p>
 	{/snippet}
@@ -165,7 +165,7 @@ const result = await agent.invoke({
 			<p>
 				What is striking is how little code it takes. A model, a list of tools, and a graph
 				with two nodes — agent and tools — joined by a conditional edge. The prebuilt
-				<code>create_agent</code> is exactly that loop, compiled and ready to run.
+				<Term t="create_agent"><code>create_agent</code></Term> is exactly that loop, compiled and ready to run.
 			</p>
 		</Slide>
 
@@ -173,7 +173,7 @@ const result = await agent.invoke({
 			<CodeBlock code={code} lang="ts" caption="Two lines and a list of tools — that's it." />
 			<p>
 				The agent calls the model, looks at the response. If there are tool calls, it
-				executes them and appends the results as <code>ToolMessage</code>s. Then it calls
+				executes them and appends the results as <Term t="ToolMessage"><code>ToolMessage</code></Term>s. Then it calls
 				the model again with the longer history. The model decides whether to keep going.
 			</p>
 		</Slide>

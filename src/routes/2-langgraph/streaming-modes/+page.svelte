@@ -94,9 +94,9 @@ for await (const [chunk, meta] of await graph.stream(input, { streamMode: 'messa
 >
 	{#snippet intro()}
 		<p>
-			LangGraph offers three streaming projections of the same run. Use <code>values</code> to
-			keep a UI in sync with the full state, <code>updates</code> for compact deltas, and
-			<code>messages</code> to render real-time tokens.
+			LangGraph offers three streaming projections of the same run. Use <Term t="streamMode: values"><code>values</code></Term> to
+			keep a UI in sync with the full state, <Term t="streamMode: updates"><code>updates</code></Term> for compact deltas, and
+			<Term t="streamMode: messages"><code>messages</code></Term> to render real-time tokens.
 		</p>
 	{/snippet}
 
@@ -152,10 +152,10 @@ for await (const [chunk, meta] of await graph.stream(input, { streamMode: 'messa
 
 		<Slide title="What you'll notice">
 			<p>
-				<code>values</code> grows the message list one step at a time.
-				<code>updates</code> shows you exactly which node added what.
-				<code>messages</code> emits tokens as they're generated, with
-				<code>metadata.langgraph_node</code> telling you whether the chunk came from
+				<Term t="streamMode: values"><code>values</code></Term> grows the message list one step at a time.
+				<Term t="streamMode: updates"><code>updates</code></Term> shows you exactly which node added what.
+				<Term t="streamMode: messages"><code>messages</code></Term> emits tokens as they're generated, with
+				<Term t="langgraph_node"><code>metadata.langgraph_node</code></Term> telling you whether the chunk came from
 				<code>agent</code> or <code>tools</code> — useful when you want to highlight only
 				model-spoken text.
 			</p>
@@ -163,8 +163,8 @@ for await (const [chunk, meta] of await graph.stream(input, { streamMode: 'messa
 
 		<Slide title="When you'd use each" ornament>
 			<p>
-				A debugger panel? <code>values</code>. A server-pushed log? <code>updates</code>. A
-				chat bubble that animates? <code>messages</code>. Three primitives, three pleasant
+				A debugger panel? <Term t="streamMode: values"><code>values</code></Term>. A server-pushed log? <Term t="streamMode: updates"><code>updates</code></Term>. A
+				chat bubble that animates? <Term t="streamMode: messages"><code>messages</code></Term>. Three primitives, three pleasant
 				UIs.
 			</p>
 		</Slide>
@@ -208,7 +208,7 @@ for await (const [chunk, meta] of await graph.stream(input, { streamMode: 'messa
 				</div>
 				<div class="legend">
 					Tokens highlighted by source node. The runtime tags each chunk with
-					<code>metadata.langgraph_node</code> so the UI knows where it came from.
+					<Term t="langgraph_node"><code>metadata.langgraph_node</code></Term> so the UI knows where it came from.
 				</div>
 			{:else}
 				<p class="empty">No tokens yet.</p>

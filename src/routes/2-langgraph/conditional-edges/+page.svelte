@@ -186,9 +186,9 @@ const graph = new StateGraph(State)
 
 		<Slide title="Conditional edges" variant="code-first">
 			<p>
-				<code>addConditionalEdges('source', router, mapping)</code> calls the router with
+				<Term t="addConditionalEdges"><code>addConditionalEdges('source', router, mapping)</code></Term> calls the router with
 				the current state and uses the returned key to look up the next node. You can return
-				any string, an array of strings (run multiple branches), or an array of <code>Send</code>
+				any string, an array of strings (run multiple branches), or an array of <Term t="Send"><code>Send</code></Term>
 				objects (covered in lesson 06).
 			</p>
 			<CodeBlock code={codeRoute} caption="A real-LLM support-ticket triage graph." />
@@ -212,8 +212,8 @@ const graph = new StateGraph(State)
 			<CodeBlock code={codeMerge} caption="Three reducer styles in one schema." />
 			<p>
 				The most common reducer is <code>messages</code> with the built-in
-				<code>add_messages</code> reducer (you used it implicitly via
-				<code>MessagesAnnotation</code> in lesson 01).
+				<Term t="add_messages"><code>add_messages</code></Term> reducer (you used it implicitly via
+				<Term t="MessagesAnnotation"><code>MessagesAnnotation</code></Term> in lesson 01).
 			</p>
 		</Slide>
 
