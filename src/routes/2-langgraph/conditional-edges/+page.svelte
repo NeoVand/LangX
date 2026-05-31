@@ -152,7 +152,7 @@ const graph = new StateGraph(State)
 
 <Lesson
 	title="Conditional edges & reducers"
-	eyebrow="Phase 2 · Lesson 02"
+	eyebrow="Level 2 · Lesson 02"
 	hero={{
 		id: 'l2-conditional-edges',
 		alt: 'A railway switch viewed from above with two tracks merging into one'
@@ -214,15 +214,15 @@ const graph = new StateGraph(State)
 		<Slide title="Why reducers exist" variant="code-first">
 			<p>
 				When two <Term t="Node">nodes</Term> run in parallel and both write to
-				<code>messages</code>, who wins? With default
-				<Term t="Last-write-wins">last-write-wins</Term> semantics, you'd silently lose data.
+				<code>messages</code>, who wins? The default channel
+				rejects two writes in one superstep — LangGraph raises <code>INVALID_CONCURRENT_GRAPH_UPDATE</code> rather than silently picking one. (<Term t="Last-write-wins">Last-write-wins</Term> only describes writes in <em>separate</em> supersteps.)
 				<Term t="Reducer">Reducers</Term> tell the runtime how to merge writes — concatenate, sum,
 				dedupe, whatever your domain wants.
 			</p>
 			<CodeBlock code={codeMerge} caption="Three reducer styles in one schema." />
 			<p>
 				The most common reducer is <code>messages</code> with the built-in
-				<Term t="add_messages"><code>add_messages</code></Term> reducer (you used it implicitly via
+				<Term t="add_messages"><code>messagesStateReducer</code></Term> reducer (you used it implicitly via
 				<Term t="MessagesAnnotation"><code>MessagesAnnotation</code></Term> in lesson 01).
 			</p>
 		</Slide>

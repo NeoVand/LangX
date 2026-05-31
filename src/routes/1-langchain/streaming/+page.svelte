@@ -114,7 +114,7 @@ for await (const chunk of stream) {
 
 <Lesson
 	title="Streaming"
-	eyebrow="Phase 1 · Lesson 02"
+	eyebrow="Level 1 · Lesson 02"
 	hero={{
 		id: 'l1-streaming',
 		alt: 'A copper-basin water clock with cascading droplets'

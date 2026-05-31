@@ -6,19 +6,24 @@
 <ChapterIntro
 	id="langchain"
 	heroId="chapter-langchain-hero"
-	heroAlt="Cross-section of a brass pipe organ — LangChain, the pipeline"
-	heroFocal="28% 50%"
+	heroAlt="Brass steampunk pipework with glowing fluid recombining — LangChain, the pipeline"
+	heroFocal="50% 42%"
+	tagline="Six small primitives, one protocol — the vocabulary every agent in this course is written in."
 >
 	{#snippet intro()}
 		<p>
-			<Term t="LangChain" /> is the foundation layer: small, composable primitives —
-			<Term t="Prompt">prompts</Term>, <Term t="Model">models</Term>,
-			<Term t="Parser">parsers</Term>, <Term t="tool">tools</Term>,
-			<Term t="Retriever">retrievers</Term> — that all speak the same
-			<Term t="Runnable" /> protocol (<Term t="LCEL" />). Master these six lessons and every
-			later chapter — <Term t="LangGraph" />, <Term t="Deep Agent">Deep Agents</Term> — is a
-			recombination of <Term t="Chain">chains</Term>, <Term t="RAG" />, and
-			<Term t="Agent">agents</Term>.
+			<Term t="LangChain" /> is the foundation layer — a small set of composable building blocks
+			(<Term t="Prompt">prompts</Term>, <Term t="Model">models</Term>,
+			<Term t="Parser">parsers</Term>, <Term t="tool">tools</Term>, and
+			<Term t="Retriever">retrievers</Term>) that all speak one interface, the
+			<Term t="Runnable" />. Snap them together with a pipe (<Term t="LCEL" />) and you get
+			<Term t="Chain">chains</Term>, <Term t="RAG" />, and <Term t="Agent">agents</Term>.
+		</p>
+		<p>
+			Master these pieces and the rest of the course is just recombination:
+			<Term t="LangGraph" /> (Level 2) wraps them in state and loops, and
+			<Term t="Deep Agent">Deep Agents</Term> (Level 3) bundle the whole thing into a harness. We
+			open with a bird's-eye demo, then take each part apart.
 		</p>
 	{/snippet}
 </ChapterIntro>

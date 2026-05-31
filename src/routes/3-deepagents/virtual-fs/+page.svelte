@@ -111,7 +111,7 @@ console.log('\\nSummary:', finalText);
 
 <Lesson
 	title="Virtual filesystem"
-	eyebrow="Phase 3 · Lesson 02"
+	eyebrow="Level 3 · Lesson 02"
 	hero={{
 		id: 'l3-virtual-fs',
 		alt: 'A wall of small wooden file drawers with abstract glyph labels'

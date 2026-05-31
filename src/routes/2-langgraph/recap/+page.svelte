@@ -7,7 +7,7 @@
 <ChapterRecap
 	chapterId="langgraph"
 	diagram={langgraphOverview}
-	next={{ href: '/3-deepagents', label: 'Continue to Phase 3 · Deep Agents' }}
+	next={{ href: '/3-deepagents', label: 'Continue to Level 3 · Deep Agents' }}
 >
 	{#snippet blurb()}
 		You took control of the runtime: <Term t="StateGraph" /> <Term t="Node">nodes</Term> and

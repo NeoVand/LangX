@@ -106,7 +106,7 @@ createDeepAgent({ model, skills, /* ... */ });
 
 <Lesson
 	title="Skills (progressive disclosure)"
-	eyebrow="Phase 3 · Lesson 07"
+	eyebrow="Level 3 · Lesson 07"
 	hero={{
 		id: 'l3-skills',
 		alt: 'A three-tiered apothecary cabinet with progressively expanded labels'

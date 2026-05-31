@@ -118,7 +118,7 @@ console.log('Final:', out.finalText);
 
 <Lesson
 	title="Capstone — Deep Research"
-	eyebrow="Phase 3 · Capstone 1"
+	eyebrow="Level 3 · Capstone 1"
 	hero={{
 		id: 'l3-capstone-research',
 		alt: "A grand reading room with three subagents sending findings via pneumatic tubes to an editor's desk"

@@ -107,7 +107,7 @@ const chat = new StateGraph(ChatState)
 
 <Lesson
 	title="Subgraphs"
-	eyebrow="Phase 2 · Lesson 07"
+	eyebrow="Level 2 · Lesson 07"
 	hero={{
 		id: 'l2-subgraphs',
 		alt: 'Nested architectural floor plans where one room zooms into its own complete plan'
@@ -191,7 +191,7 @@ const chat = new StateGraph(ChatState)
 
 		<Slide title="From here to harness" ornament>
 			<p>
-				That's Phase 2. Next chapter swaps "you wire the <Term t="StateGraph" />" for "the
+				That's Level 2. Next chapter swaps "you wire the <Term t="StateGraph" />" for "the
 				<Term t="Harness">harness</Term> wires it, you declare policy" — and every
 				<Term t="Subgraph">subgraph</Term> technique here keeps working underneath.
 			</p>

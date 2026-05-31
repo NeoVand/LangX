@@ -1,20 +1,21 @@
+import { createAgent } from 'langchain';
 import { AIMessage, HumanMessage, ToolMessage, type BaseMessage } from '@langchain/core/messages';
 import { getModel } from '$lib/runtime/llm';
 import { weatherTool, calculatorTool } from '$lib/runtime/tools';
 import { displayContent } from '$lib/runtime/messages';
 import type { OnStep } from './types';
 
-type LooseTool = { name: string; invoke: (args: unknown) => Promise<unknown> };
-
-// Registry so the tools node can dispatch by name without a switch per tool.
-const allTools = [weatherTool, calculatorTool] as unknown as LooseTool[];
-const toolByName = Object.fromEntries(allTools.map((t) => [t.name, t]));
+const SYSTEM_PROMPT =
+	'You are a concise assistant. Use the get_weather and calculator tools when they help, ' +
+	'then give a short final answer in plain prose.';
 
 /**
- * The ReAct loop that powers create_agent: call the model, run any tool calls,
- * feed the results back, repeat until the model stops requesting tools. We track
- * the node path (agent ↔ tools ↔ end) so the live graph can highlight it.
- * This is the exact source shown in the demo's Code tab.
+ * The real LangChain v1 agent. `createAgent({ model, tools })` compiles a ReAct
+ * loop — the `model_request` node calls the model, the `tools` node runs any tool
+ * calls, and an edge loops back until the model answers without calling a tool —
+ * onto a LangGraph. We stream it with `streamMode: 'updates'`, so every chunk is
+ * one node firing; that's how the live graph highlights `model_request -> tools
+ * -> model_request -> end`. This file is exactly what the demo runs.
  */
 export async function runAgentScenario(
 	mode: 'weather' | 'multi',
@@ -22,74 +23,71 @@ export async function runAgentScenario(
 	onPath: (path: string[], active: string) => void,
 	onStep: OnStep
 ): Promise<{ messages: BaseMessage[]; path: string[] }> {
-	// ── Model + multi-tool binding ──────────────────────────────────────────
-	const baseModel = await getModel({ temperature: 0, maxTokens: 320 });
-	const model = baseModel.bindTools!(allTools as unknown as never[]);
+	// getModel() returns a configured chat model; createAgent also accepts a
+	// "provider:model" string (e.g. "anthropic:claude-haiku-4-5") and builds one.
+	const model = await getModel({ temperature: 0, maxTokens: 1024 });
 
-	const live: BaseMessage[] = [];
-	const log: string[] = [];
-	// Mirrors LangGraph node names so the UI can highlight agent → tools → end.
-	const push = (node: 'agent' | 'tools' | 'end') => {
-		log.push(node === 'end' ? '__end__' : node);
-		onPath([...log], node === 'end' ? '__end__' : node);
-	};
+	const agent = createAgent({
+		model,
+		tools: [weatherTool, calculatorTool],
+		systemPrompt: SYSTEM_PROMPT
+	});
 
-	// ── Conversation seed ───────────────────────────────────────────────────
-	live.push(
-		new HumanMessage(
-			mode === 'weather'
-				? "What's the weather like in San Francisco today?"
-				: "Compare today's weather in Tokyo and London, and tell me the temperature difference in °C."
-		)
+	const prompt =
+		mode === 'weather'
+			? "What's the weather like in San Francisco today?"
+			: "Compare today's weather in Tokyo and London, and tell me the temperature difference in °C.";
+
+	const messages: BaseMessage[] = [new HumanMessage(prompt)];
+	onMessages([...messages]);
+
+	const path: string[] = [];
+	// `updates` yields { <nodeName>: { messages: [...newMessages] } } per node run.
+	const stream = await agent.stream(
+		{ messages: [new HumanMessage(prompt)] },
+		{ streamMode: 'updates' }
 	);
-	onMessages([...live]);
-
-	// ── ReAct loop (agent ↔ tools) ──────────────────────────────────────────
-	let safety = 0;
-	while (safety++ < 6) {
-		push('agent');
-		const ai = (await model.invoke(live)) as AIMessage;
-		live.push(ai);
-		onMessages([...live]);
-
-		if (!ai.tool_calls?.length) {
-			push('end');
-			onStep({
-				label: 'Agent · final answer',
-				kind: 'model',
-				detail: displayContent(ai.content).slice(0, 80),
-				payload: displayContent(ai.content)
-			});
-			break;
-		}
-
-		onStep({
-			label: 'Agent · tool calls',
-			kind: 'model',
-			detail: ai.tool_calls.map((t) => t.name).join(', '),
-			payload: ai.tool_calls
-		});
-
-		push('tools');
-		for (const tc of ai.tool_calls) {
-			const t = toolByName[tc.name];
-			let content: string;
-			if (!t) {
-				content = `Error: unknown tool "${tc.name}"`;
-			} else {
-				const result = await t.invoke(tc.args);
-				content = typeof result === 'string' ? result : JSON.stringify(result);
+	for await (const chunk of stream) {
+		for (const [node, update] of Object.entries(
+			chunk as Record<string, { messages?: BaseMessage[] }>
+		)) {
+			path.push(node);
+			onPath([...path], node);
+			for (const m of update?.messages ?? []) {
+				messages.push(m);
+				onMessages([...messages]);
+				if (m instanceof ToolMessage) {
+					const content = displayContent(m.content);
+					onStep({
+						label: `Tool · ${m.name ?? 'tool'}`,
+						kind: 'tool',
+						detail: content.slice(0, 80),
+						payload: content
+					});
+				} else if (m instanceof AIMessage) {
+					if (m.tool_calls?.length) {
+						onStep({
+							label: 'Model · tool calls',
+							kind: 'model',
+							detail: m.tool_calls.map((t) => t.name).join(', '),
+							payload: m.tool_calls
+						});
+					} else {
+						const text = displayContent(m.content);
+						onStep({
+							label: 'Model · final answer',
+							kind: 'model',
+							detail: text.slice(0, 80),
+							payload: text
+						});
+					}
+				}
 			}
-			live.push(new ToolMessage({ tool_call_id: tc.id ?? '', content }));
-			onMessages([...live]);
-			onStep({
-				label: `Tool · ${tc.name}`,
-				kind: 'tool',
-				detail: content.slice(0, 80),
-				payload: { args: tc.args, result: content }
-			});
 		}
 	}
+	// Mark the terminal node so the graph view lights up the END state too.
+	path.push('__end__');
+	onPath([...path], '__end__');
 
-	return { messages: live, path: [...log] };
+	return { messages, path };
 }

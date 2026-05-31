@@ -60,6 +60,9 @@ const aliases: Record<string, string> = {
 	addedge: 'addEdge',
 	addconditionaledges: 'addConditionalEdges',
 	createreactagent: 'createReactAgent',
+	createagent: 'create_agent',
+	add_messages: 'messagesStateReducer',
+	messagesstatereducer: 'messagesStateReducer',
 	createdeepagent: 'createDeepAgent',
 	getgraphasync: 'getGraphAsync',
 	drawmermaid: 'drawMermaid',
@@ -141,6 +144,17 @@ const aliases: Record<string, string> = {
 	localshellbackend: 'LocalShellBackend',
 	'hybrid search': 'hybrid search',
 	'embedding model': 'embedding model',
+	'chat memory': 'Conversation memory',
+	'conversation memory': 'Conversation memory',
+	hooks: 'Hooks',
+	hook: 'Hooks',
+	middleware: 'Middleware',
+	multimodal: 'Multimodal',
+	'extended thinking': 'Extended thinking',
+	thinking: 'Extended thinking',
+	reasoning: 'Extended thinking',
+	'thinking tokens': 'Extended thinking',
+	'reasoning tokens': 'Extended thinking',
 	'agentic grade': 'Agentic grade',
 	'context quarantine': 'context quarantine',
 	'checkpoint values': 'checkpoint values',
@@ -218,7 +232,7 @@ export const glossary: GlossaryEntry[] = [
 		term: 'Long-horizon',
 		chapter: 'general',
 		short: 'Tasks spanning many steps and large accumulated context.',
-		long: 'Research reports, multi-file edits, or pipelines running minutes with dozens of tool calls. Phase 3 exists because short chat loops break here without planning, files, compaction, and delegation.'
+		long: 'Research reports, multi-file edits, or pipelines running minutes with dozens of tool calls. Level 3 exists because short chat loops break here without planning, files, compaction, and delegation.'
 	},
 	{
 		term: 'Message',
@@ -255,8 +269,8 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'Agent',
 		chapter: 'langchain',
-		short: 'Model plus tools in a loop until it stops calling tools.',
-		long: 'Repeatedly: call model → execute tool_calls → append ToolMessages → call model again. create_agent / createReactAgent compiles this to a LangGraph with agent and tools nodes.'
+		short: 'A model that decides which tools to call, in a loop, until the task is done.',
+		long: 'An agent puts a model in a loop: it looks at the goal, decides whether to call a tool, reads the result, and repeats — stopping once it has an answer. That simple loop is what lets a model break a task into steps and use abilities beyond text. LangGraph and Deep Agents are progressively more capable versions of this idea.'
 	},
 	{
 		term: 'bindTools',
@@ -267,8 +281,8 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'Chain',
 		chapter: 'langchain',
-		short: 'Composed sequence of Runnables wired with .pipe().',
-		long: 'Typically prompt → model → parser. Lazy: nothing runs until invoke, stream, or batch. The pipe operator (LCEL) is syntactic sugar for RunnableSequence.'
+		short: 'Several pieces wired in sequence so output flows from one to the next.',
+		long: 'A chain is what you get when you pipe Runnables together — classically prompt → model → parser. Nothing happens while you build it; only when you invoke (or stream) the chain does data actually flow through each step. Chains are the simplest way to turn raw model calls into a reusable mini-program.'
 	},
 	{
 		term: 'Chunk',
@@ -285,8 +299,8 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'create_agent',
 		chapter: 'langchain',
-		short: 'LangChain v1 factory for a ReAct agent graph.',
-		long: 'Wraps model + tools into a compiled LangGraph. In JS the prebuilt equivalent is createReactAgent from @langchain/langgraph/prebuilt.'
+		short: 'LangChain v1 factory for a ReAct agent graph (JS: createAgent).',
+		long: 'Wraps model + tools into a compiled LangGraph agent/tools loop. Exposed as createAgent in the langchain package — the same factory in Python (create_agent) and JS. The older createReactAgent prebuilt (@langchain/langgraph/prebuilt) is deprecated in v1.'
 	},
 	{
 		term: 'Embedding',
@@ -309,8 +323,8 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'LCEL',
 		chapter: 'langchain',
-		short: 'LangChain Expression Language — pipe-based composition.',
-		long: 'a.pipe(b).pipe(c) or prompt | model | parser builds a RunnableSequence declaratively. Lazy until invoke/stream/batch; every Runnable in the chain shares the same protocol.'
+		short: 'LangChain’s way of snapping pieces together with a pipe.',
+		long: 'LCEL (LangChain Expression Language) lets you connect Runnables with a pipe — prompt.pipe(model).pipe(parser) — so the output of one becomes the input of the next. It reads top-to-bottom like a recipe, builds the whole pipeline before running anything, and gives you streaming and batching for free.'
 	},
 	{
 		term: 'Lazy evaluation',
@@ -321,20 +335,20 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'Model',
 		chapter: 'langchain',
-		short: 'LLM wrapper: messages in, AIMessage out.',
-		long: 'Chat models (ChatAnthropic, ChatOpenAI) accept message lists and return completions. Bind tools, structured-output schemas, retries, or config (temperature, maxTokens) via Runnable helpers.'
+		short: 'The large language model that actually reads the prompt and writes the reply.',
+		long: 'The brain behind every demo: a large language model that takes a list of messages and returns an answer. Models differ in how smart, fast, and expensive they are, and many can also call tools or return strictly-formatted output. Whatever model you choose in Setup is what each lesson sends its prompt to.'
 	},
 	{
 		term: 'Parser',
 		chapter: 'langchain',
-		short: 'Converts raw model output to a typed value.',
-		long: 'StringOutputParser extracts text from an AIMessage. Structured parsers use withStructuredOutput to force Zod-typed JSON instead of free-form prose.'
+		short: 'A step that turns the model’s raw reply into a clean, usable value.',
+		long: 'Models hand back a message object, often wrapped in extra structure. A parser pulls out what you actually want — plain text, or a typed object checked against a schema — so the next step in your program receives a predictable value instead of free-form prose you have to scrape apart.'
 	},
 	{
 		term: 'Prompt',
 		chapter: 'langchain',
-		short: 'Text or template fed to the model before generation.',
-		long: 'System instruction, user question, or templated string with {variables}. ChatPromptTemplate turns structured inputs into role-tagged message lists the model understands.'
+		short: 'The text instructions you send the model to steer its answer.',
+		long: 'A prompt is what you actually ask the model — an instruction, a question, or a template with fill-in-the-blank slots. Good prompts set the role (“you are a careful tutor”), give context, and state the task clearly. In LangChain a prompt template keeps the wording fixed while you swap in different inputs at run time.'
 	},
 	{
 		term: 'Prompt template',
@@ -345,8 +359,8 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'RAG',
 		chapter: 'langchain',
-		short: 'Retrieval-augmented generation.',
-		long: 'Embed query → search vector store → inject top-k chunks into prompt → generate grounded answer. Most RAG failures are retrieval failures, not generation failures.'
+		short: 'Letting the model answer from your documents, not just its training.',
+		long: 'RAG (retrieval-augmented generation) grounds answers in your own data: you split documents into chunks and embed them, then at question time you retrieve the most relevant chunks and paste them into the prompt so the model answers from real sources instead of guessing. It’s how you give a model private or up-to-date knowledge — and most RAG mistakes come from bad retrieval, not the model.'
 	},
 	{
 		term: 'ReAct',
@@ -357,14 +371,14 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'Retriever',
 		chapter: 'langchain',
-		short: 'Fetches relevant documents for a query.',
-		long: 'Embeds the query, searches the vector index, returns top-k chunks. Deterministic and testable — tune chunking and embeddings here before touching the LLM.'
+		short: 'A component that fetches the most relevant documents for a query.',
+		long: 'Given a question, a retriever searches a collection (usually by comparing embeddings) and returns the handful of passages most likely to help answer it. It’s the “retrieval” half of RAG — and because it’s deterministic and testable, it’s usually where you fix bad answers before blaming the model.'
 	},
 	{
 		term: 'Runnable',
 		chapter: 'langchain',
-		short: 'Anything with invoke / stream / batch.',
-		long: 'Unified protocol wrapping prompts, models, parsers, retrievers, and tools. Composable with pipe; the substrate LangGraph nodes and Deep Agent middleware both sit on.'
+		short: 'The common interface every LangChain piece shares so they all connect.',
+		long: 'A Runnable is anything you can call with invoke (run once), stream (get output as it’s produced), or batch (run many inputs at once). Because prompts, models, parsers, and tools all follow this one interface, you can pipe any of them together and they just fit — the idea that makes LangChain composable.'
 	},
 	{
 		term: 'RunnableParallel',
@@ -405,8 +419,8 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'tool',
 		chapter: 'langchain',
-		short: 'Typed function the model may call by name.',
-		long: 'tool(fn, { name, description, schema }) exposes JSON schema to the model. Runtime executes fn(args) and returns a ToolMessage so the model can continue reasoning.'
+		short: 'A function you let the model call to do something it can’t do alone.',
+		long: 'A model can only produce text; a tool lets it act — look up the weather, run a calculation, search your files. You describe the function and its inputs, and when the model decides it needs it, it emits a structured call; your code runs the function and hands the result back so the model can keep going. Tools are what turn a chatbot into an agent.'
 	},
 	{
 		term: 'Top-k',
@@ -435,10 +449,10 @@ export const glossary: GlossaryEntry[] = [
 
 	// ── LangGraph ───────────────────────────────────────────────────────────
 	{
-		term: 'add_messages',
+		term: 'messagesStateReducer',
 		chapter: 'langgraph',
 		short: 'Reducer that appends messages instead of replacing.',
-		long: 'When two nodes return { messages: [msg] }, add_messages concatenates both. Without it, default last-write-wins drops chat history on concurrent updates.'
+		long: 'The reducer MessagesAnnotation uses (helper: addMessages): when two nodes return { messages: [msg] } it appends/merges instead of replacing. Without a reducer the default channel rejects two writes to one field in a single superstep (INVALID_CONCURRENT_GRAPH_UPDATE). add_messages is the Python name; JS uses messagesStateReducer.'
 	},
 	{
 		term: 'Annotation',
@@ -504,7 +518,7 @@ export const glossary: GlossaryEntry[] = [
 		term: 'Last-write-wins',
 		chapter: 'langgraph',
 		short: 'Default reducer: newest value overwrites field.',
-		long: 'Without explicit reducer, concurrent writes to the same field keep only the last one — wrong for lists. Reducer lesson contrasts this with add_messages and custom merges.'
+		long: 'Without a reducer, concurrent writes to the same field in one superstep are rejected by the default LastValue channel (INVALID_CONCURRENT_GRAPH_UPDATE). Reducer lesson contrasts this with messagesStateReducer and custom merges.'
 	},
 	{
 		term: 'Map-reduce',
@@ -521,7 +535,7 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'MessagesAnnotation',
 		chapter: 'langgraph',
-		short: 'Prebuilt chat state with add_messages reducer.',
+		short: 'Prebuilt chat state with the messagesStateReducer reducer.',
 		long: 'Standard { messages: BaseMessage[] } schema used in every ReAct loop. Import instead of hand-rolling message list merge logic.'
 	},
 	{
@@ -546,7 +560,7 @@ export const glossary: GlossaryEntry[] = [
 		term: 'Reducer',
 		chapter: 'langgraph',
 		short: 'Merges concurrent updates into one state field.',
-		long: 'Default: last-write-wins. Lists usually need concatenation (add_messages). Custom reducers power fan-out merge and concurrent-write demos.'
+		long: 'Default channel keeps the last write across supersteps but rejects two writes to one field in a single superstep. Lists usually need a concatenating reducer (messagesStateReducer). Custom reducers power fan-out merge and concurrent-write demos.'
 	},
 	{
 		term: 'Router',
@@ -667,8 +681,8 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'Deep Agent',
 		chapter: 'deepagents',
-		short: 'LangGraph agent with pre-wired harness middleware.',
-		long: 'createDeepAgent output: planning, virtual FS, subagents, skills, compaction, HITL as config — not hand-wired graph plumbing. Phase 3 is policy over this stack.'
+		short: 'An agent given planning, memory, files, and helpers for long, complex tasks.',
+		long: 'A basic agent is just a model calling tools in a loop. A deep agent adds what is needed for large, multi-step jobs: it can plan, write notes and files it reads back later, delegate to helper sub-agents, and shrink its own context when it gets too big. It is the pattern behind deep-research assistants and coding agents.'
 	},
 	{
 		term: 'Dexie',
@@ -691,8 +705,8 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'Harness',
 		chapter: 'deepagents',
-		short: 'Opinionated bundle around a bare agent loop.',
-		long: 'Pre-wired prompt (BASE + middleware + user), default FS tools, planning, subagents, compaction. You configure policy; you do not rebuild the graph from nodes.'
+		short: 'The scaffolding wrapped around a raw model so it can do real work.',
+		long: 'On its own a model can only chat. A harness is everything built around it that turns it into a capable agent: a system prompt, a set of tools, a way to plan, memory and files, and safety limits. “Deep Agents” is essentially a well-designed harness — you set the policy and it handles the wiring.'
 	},
 	{
 		term: 'interruptOn',
@@ -714,9 +728,9 @@ export const glossary: GlossaryEntry[] = [
 	},
 	{
 		term: 'Middleware',
-		chapter: 'deepagents',
-		short: 'Pluggable hooks wrapping the agent loop.',
-		long: 'Mutate prompts, register tools, intercept results, summarize history, pause for approval — without rewriting core graph nodes. Harness assembles middleware stack from config.'
+		chapter: 'langchain',
+		short: 'A reusable layer you slot into the model loop to change its behavior.',
+		long: 'Middleware wraps each turn of a chain or agent so you can adjust what happens without rewriting the core loop: rewrite the prompt before the model sees it, add tools, inspect or transform the reply, trim history, or pause for approval. You stack the behaviors you want as configuration instead of hand-editing the loop — and LangGraph and Deep Agents lean on this heavily.'
 	},
 	{
 		term: 'Needle-in-a-haystack',
@@ -856,7 +870,7 @@ export const glossary: GlossaryEntry[] = [
 		term: 'HumanMessage',
 		chapter: 'langchain',
 		short: 'Message representing user/human input.',
-		long: 'new HumanMessage("text") — role "human" in chat history. Passed to model.invoke([...]) or accumulated in graph state messages[] via add_messages.'
+		long: 'new HumanMessage("text") — role "human" in chat history. Passed to model.invoke([...]) or accumulated in graph state messages[] via messagesStateReducer.'
 	},
 	{
 		term: 'AIMessage',
@@ -879,8 +893,8 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'createReactAgent',
 		chapter: 'langchain',
-		short: 'LangGraph prebuilt ReAct agent factory.',
-		long: 'createReactAgent({ llm, tools }) from @langchain/langgraph/prebuilt — compiles agent ↔ tools loop graph. Agent lesson uses this; equivalent to create_agent in Python v1.'
+		short: 'Deprecated LangGraph prebuilt ReAct agent factory.',
+		long: 'createReactAgent({ llm, tools }) from @langchain/langgraph/prebuilt compiles an agent/tools loop graph. Deprecated in v1 — use createAgent from the langchain package (Python and JS). The agent lesson hand-rolls this loop instead of calling either factory.'
 	},
 
 	// ── API keywords · LangGraph builder surface ─────────────────────────────
@@ -1035,14 +1049,14 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'API key',
 		chapter: 'general',
-		short: 'Secret credential for a hosted model or embeddings API.',
-		long: 'Setup stores anthropic/openai/google/voyage keys in localStorage (browser-only); NoConfiguredProviderError directs learners to /setup when a hosted path is selected without a key.'
+		short: 'A secret key that authorizes — and bills — your calls to a hosted model.',
+		long: 'Hosted models like Claude, GPT, and Gemini run on the provider’s own servers, so every request has to prove who is calling and whose account to charge. An API key is the long secret string you copy from the provider’s dashboard to do exactly that. Treat it like a password: anyone who has it can run up your bill. In LangX the key lives only in your own browser and is sent straight to the provider — never to us.'
 	},
 	{
 		term: 'localStorage',
 		chapter: 'general',
-		short: 'Browser key-value store for LangX settings and keys.',
-		long: 'API keys and provider preference persist in localStorage on this device only — never sent to a LangX backend. Setup writes keys; app.svelte.ts hydrates state on load.'
+		short: 'A small storage box every browser keeps for each website, on your device.',
+		long: 'Browsers give each site a private little key-value store that survives reloads and stays on your machine. LangX keeps your model choice and API keys here — that is why they are remembered between visits yet never reach any server. Clearing your browser’s site data erases them.'
 	},
 	{
 		term: 'NoConfiguredProviderError',
@@ -1053,20 +1067,20 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'WebGPU',
 		chapter: 'general',
-		short: 'Browser GPU API for fast local inference and embeddings.',
-		long: 'detectWebGpu() on layout load; Transformers.js and MiniLM prefer WebGPU with WASM fallback (~5× slower) per setup status copy.'
+		short: 'A browser feature that lets a web page use your graphics card.',
+		long: 'AI models do enormous amounts of parallel math — exactly what a GPU (graphics card) is built for. WebGPU is the modern browser API that hands a web page access to that GPU. It is what makes running a model locally in the browser fast enough to be practical; without it the page falls back to the CPU and runs much slower.'
 	},
 	{
 		term: 'WebAssembly',
 		chapter: 'general',
-		short: 'WASM fallback when WebGPU is unavailable.',
-		long: 'Transformers.js runs on WASM when WebGPU is missing or flaky — setup warns local models are slower without GPU acceleration.'
+		short: 'A way for browsers to run fast, compiled code — the fallback when WebGPU is missing.',
+		long: 'WebAssembly (WASM) lets a browser execute pre-compiled, near-native-speed code instead of only JavaScript. When your device has no WebGPU, LangX runs local models on WebAssembly instead. It works everywhere — just several times slower than the GPU path.'
 	},
 	{
 		term: 'Transformers.js',
 		chapter: 'general',
-		short: 'Run Hugging Face models in-browser via WebGPU/WASM.',
-		long: 'TransformersJsChatModel loads cached models from TJS_MODELS — no API key at runtime after download; setup warns harness needs good+ Agentic grade.'
+		short: 'A library that runs real AI models inside your browser — no server needed.',
+		long: 'Normally a model lives on a company’s servers and you reach it over the internet. Transformers.js (from Hugging Face) instead downloads an open model into your browser and runs it right on your machine, using your GPU when it can. No API key, nothing sent over the network at run time, and your data never leaves the page — in exchange for a one-time download and slower speed.'
 	},
 	{
 		term: 'Voyage',
@@ -1077,8 +1091,8 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'Agentic grade',
 		chapter: 'general',
-		short: 'Setup label for local model tool-loop reliability.',
-		long: 'TJS_MODELS.agenticGrade ranks browser models weak→excellent for Deep Agents fitness — setup copy says harness behavior needs at least good tool-calling for Phase 3.'
+		short: 'A rough rating of how reliably a model can run a tool-using loop on its own.',
+		long: 'Being a good chatbot is not the same as being a good agent. To act on its own, a model has to decide when to use a tool, format the call correctly, read the result, and keep going without losing the thread. Agentic grade is LangX’s plain rating of that skill, from weak to excellent. It matters most in the Deep Agents level, where the model drives long, unattended tool loops.'
 	},
 	{
 		term: 'TTFT',
@@ -1157,14 +1171,14 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'embedding model',
 		chapter: 'langchain',
-		short: 'Model that maps text to fixed-length vectors for similarity search.',
-		long: 'RAG indexes with Xenova/all-MiniLM-L6-v2 locally or OpenAI/Voyage APIs via makeEmbeddings; query and documents embed at different times, then rank by distance at search time.'
+		short: 'A model that turns text into a list of numbers capturing its meaning.',
+		long: 'An embedding model reads a piece of text and outputs a vector — a long list of numbers — that stands for its meaning. Text with similar meaning gets similar numbers, so you can measure how related two passages are by comparing their vectors. This is the engine behind semantic search and RAG: embed your documents and your question, then find the documents whose vectors sit closest to it.'
 	},
 	{
 		term: 'MiniLM',
 		chapter: 'langchain',
-		short: 'Small sentence embedding model (384-dim) bundled for browser RAG.',
-		long: 'LangX uses Xenova/all-MiniLM-L6-v2 (~25 MB, WebGPU/WASM) in MiniLmEmbeddings for offline chunk indexing — the RAG lesson default local embeddings provider.'
+		short: 'A tiny embedding model small enough to run free in your browser.',
+		long: 'MiniLM (all-MiniLM-L6-v2) is a small, fast embedding model that turns text into 384-number vectors. Being tiny, it ships with LangX and runs entirely in your browser with no API key — the default for the RAG lesson. Larger hosted embedding models are more accurate, but they cost money and need a key.'
 	},
 	{
 		term: 'OpenAIEmbeddings',
@@ -1707,16 +1721,40 @@ export const glossary: GlossaryEntry[] = [
 
 	// ── Cross-cutting product names & harness concepts ───────────────────────
 	{
+		term: 'Hooks',
+		chapter: 'langchain',
+		short: 'Points in the loop where your code runs — before or after a step.',
+		long: 'A hook is a function the framework calls at a specific moment: before the model is called, after it replies, or before/after a tool runs. Where middleware is a whole layer wrapped around a step, a hook is a single tap-in point you attach a function to — for logging, validation, metrics, or last-minute edits to inputs and outputs.'
+	},
+	{
+		term: 'Multimodal',
+		chapter: 'general',
+		short: 'A model that understands more than text — images alongside words.',
+		long: 'A multimodal model can take in (and sometimes produce) more than one kind of data. In this course it means you can hand the model an image together with your question and it reasons about both at once. Claude, GPT, and Gemini are all multimodal, so a single chat call can mix text and pictures.'
+	},
+	{
+		term: 'Conversation memory',
+		chapter: 'langchain',
+		short: 'Keeping past turns so the model remembers the conversation.',
+		long: 'A model is stateless — each call only knows what you send it. “Memory” is simply the running list of previous messages that you pass back in on every turn, so the assistant can refer to what was said earlier. Grow it deliberately: more history means more context spent and higher cost, which is exactly the problem later levels solve.'
+	},
+	{
+		term: 'Extended thinking',
+		chapter: 'general',
+		short: 'Letting a model reason step-by-step before it answers — and showing that work.',
+		long: 'Some models can take a separate “thinking” pass before the final reply: they work through the problem in a private scratchpad, then answer. Turning it on tends to improve hard reasoning, at the cost of extra time and output tokens. Claude and Gemini can stream that thinking so you can read it; OpenAI’s GPT-5.x models reason internally and don’t expose the tokens. In this demo the brain toggle switches it on, and the reasoning streams into the “Thought” panel and the Reasoning inspector tab.'
+	},
+	{
 		term: 'LangChain',
 		chapter: 'general',
-		short: 'Composable LLM framework — prompts, models, tools, agents.',
-		long: 'Phase 1 foundation: everything is a Runnable (invoke/stream/batch). create_agent and LCEL live here; LangGraph and Deep Agents build on the same message and tool types.'
+		short: 'The toolkit of building blocks for apps powered by language models.',
+		long: 'LangChain is an open-source framework that hands you small, reusable pieces — prompts, model wrappers, output parsers, tools, retrievers — and one consistent way to snap them together. Instead of hand-writing the glue around a model’s API, you compose these pieces into pipelines and agents. It’s the foundation the rest of this course (LangGraph, Deep Agents) builds on.'
 	},
 	{
 		term: 'LangGraph',
 		chapter: 'general',
-		short: 'Stateful agent runtime — graphs, checkpoints, interrupts.',
-		long: 'Phase 2 substrate: StateGraph + reducers + checkpointers. Every create_agent and createDeepAgent compiles to a LangGraph; Phase 2 teaches the machinery underneath those factories.'
+		short: 'A framework for building stateful, multi-step agent workflows as a graph.',
+		long: 'Where a simple chain runs start-to-finish once, LangGraph lets you build loops, branches, and pauses by wiring named steps (nodes) together around a shared state. It’s what makes agents that call tools repeatedly, wait for a human, or resume after a crash possible — and modern LangChain agents run on top of it. Level 2 teaches it directly.'
 	},
 	{
 		term: 'System prompt',

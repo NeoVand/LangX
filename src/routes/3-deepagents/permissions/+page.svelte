@@ -90,7 +90,7 @@ console.log('Final:', out.finalText);
 
 <Lesson
 	title="Filesystem permissions"
-	eyebrow="Phase 3 · Lesson 05"
+	eyebrow="Level 3 · Lesson 05"
 	hero={{
 		id: 'l3-permissions',
 		alt: 'Ornate doors with unique glyphs and tiny padlocks set into a stone wall'

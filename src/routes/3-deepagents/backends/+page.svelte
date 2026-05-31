@@ -109,7 +109,7 @@ const agent = createDeepAgent({ model, backend });`;
 
 <Lesson
 	title="Backends"
-	eyebrow="Phase 3 · Lesson 04"
+	eyebrow="Level 3 · Lesson 04"
 	hero={{
 		id: 'l3-backends',
 		alt: "Two-room cutaway: a chalkboard 'State' and a stone vault 'Store'"

@@ -27,7 +27,7 @@
 	</p>
 	<div class="actions">
 		<a class="btn" href="/">← Back to landing</a>
-		<a class="btn primary" href="/1-langchain">Start Phase 1</a>
+		<a class="btn primary" href="/1-langchain">Start Level 1</a>
 	</div>
 </main>
 

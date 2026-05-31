@@ -95,7 +95,7 @@ console.log('\\nSummary:', finalText);
 
 <Lesson
 	title="Planning with write_todos"
-	eyebrow="Phase 3 · Lesson 03"
+	eyebrow="Level 3 · Lesson 03"
 	hero={{
 		id: 'l3-todos',
 		alt: 'A clipboard checklist of pictographs with one item checked, two pending'

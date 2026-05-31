@@ -78,13 +78,13 @@ for await (const v of await graph.stream(input, { streamMode: 'values' })) { ...
 // updates: just the delta from each node
 for await (const u of await graph.stream(input, { streamMode: 'updates' })) { ... }
 
-// messages: per-token chunks (ChatGenerationChunk, metadata)
+// messages: per-token message chunks ([AIMessageChunk, metadata])
 for await (const [chunk, meta] of await graph.stream(input, { streamMode: 'messages' })) { ... }`;
 </script>
 
 <Lesson
 	title="Streaming modes"
-	eyebrow="Phase 2 · Lesson 05"
+	eyebrow="Level 2 · Lesson 05"
 	hero={{
 		id: 'l2-streaming-modes',
 		alt: 'A three-channel printing press emitting different paper ribbons'
@@ -102,7 +102,7 @@ for await (const [chunk, meta] of await graph.stream(input, { streamMode: 'messa
 			<Term t="State" />, <Term t="streamMode: updates"><code>updates</code></Term> for compact
 			<Term t="Partial state update">deltas</Term>, and
 			<Term t="streamMode: messages"><code>messages</code></Term> to render real-time
-			<Term t="ChatGenerationChunk">tokens</Term>.
+			<Term t="AIMessageChunk">tokens</Term>.
 		</p>
 	{/snippet}
 
@@ -163,8 +163,8 @@ for await (const [chunk, meta] of await graph.stream(input, { streamMode: 'messa
 				<Term t="streamMode: values"><code>values</code></Term> grows the message list one step at a time.
 				<Term t="streamMode: updates"><code>updates</code></Term> shows you exactly which node added what.
 				<Term t="streamMode: messages"><code>messages</code></Term> emits tokens as they're generated, with
-				<Term t="langgraph_node"><code>metadata.langgraph_node</code></Term> telling you whether the chunk came from
-				<code>agent</code> or <code>tools</code> — useful when you want to highlight only
+				<Term t="langgraph_node"><code>metadata.langgraph_node</code></Term> telling you which node produced it. Here the streamed tokens come from the
+				<code>agent</code> node's model call; the <code>tools</code> node runs a tool and emits a message rather than streaming tokens. Useful when you want to highlight only
 				model-spoken text.
 			</p>
 		</Slide>

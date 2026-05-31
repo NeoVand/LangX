@@ -103,7 +103,7 @@ const result = await agent.invoke({ input: 'Brief me on LangGraph.' });`;
 
 <Lesson
 	title="The harness"
-	eyebrow="Phase 3 · Lesson 01"
+	eyebrow="Level 3 · Lesson 01"
 	hero={{
 		id: 'l3-harness',
 		alt: 'An exploded diagram of a leather harness with brass fittings labeled by glyph'

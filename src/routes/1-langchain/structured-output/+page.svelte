@@ -92,7 +92,7 @@ const BugReport = z.object({
   actual: z.string()
 });
 
-// withStructuredOutput uses tool calling under the hood
+// withStructuredOutput usually uses tool/function calling under the hood
 // to force the model into the schema's shape.
 const extractor = model.withStructuredOutput(BugReport, { name: 'extract' });
 
@@ -106,7 +106,7 @@ const report = await extractor.invoke([
 
 <Lesson
 	title="Structured output"
-	eyebrow="Phase 1 · Lesson 03"
+	eyebrow="Level 1 · Lesson 03"
 	hero={{
 		id: 'l1-structured-output',
 		alt: "A printer's typecase with hand-set metal type"

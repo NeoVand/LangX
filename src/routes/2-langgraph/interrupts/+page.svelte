@@ -170,7 +170,7 @@ if (decision !== 'approve') return { aborted: true };
 
 <Lesson
 	title="Interrupts & HITL"
-	eyebrow="Phase 2 · Lesson 04"
+	eyebrow="Level 2 · Lesson 04"
 	hero={{
 		id: 'l2-interrupts',
 		alt: 'A scholar pauses mid-stride as a human steps out with a sealed envelope'
@@ -180,7 +180,7 @@ if (decision !== 'approve') return { aborted: true };
 	{#snippet motivation()}
 		Some decisions belong to humans. <Term t="Interrupt">Interrupts</Term> make "pause and ask" a
 		first-class language feature, not a gluey hack — the same primitive behind
-		<Term t="HITL">human-in-the-loop</Term> in Phase 3.
+		<Term t="HITL">human-in-the-loop</Term> in Level 3.
 	{/snippet}
 	{#snippet intro()}
 		<p>
@@ -202,7 +202,7 @@ if (decision !== 'approve') return { aborted: true };
 			</p>
 			<p>
 				This is the same primitive the <Term t="Deep Agent">Deep Agents</Term> harness uses for its
-				<Term t="HITL">HITL</Term> middleware in Phase 3. Wrapping a
+				<Term t="HITL">HITL</Term> middleware in Level 3. Wrapping a
 				<Term t="tool">tool</Term> call in <Term t="interruptOn"><code>interruptOn</code></Term>
 				compiles down to a <Term t="Node" /> that calls <Term t="Interrupt"
 					><code>interrupt(...)</code></Term

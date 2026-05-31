@@ -2,6 +2,8 @@ export interface LessonLink {
 	slug: string;
 	title: string;
 	subtitle: string;
+	/** Listed on the chapter intro but the lesson page isn't built yet (no link). */
+	comingSoon?: boolean;
 }
 
 export interface Chapter {
@@ -23,8 +25,13 @@ export const chapters: Chapter[] = [
 		tagline: 'Foundations: Runnables, prompts, models, tools, RAG.',
 		accent: 'var(--color-accent-langchain)',
 		base: '/1-langchain',
-		intro: { slug: '', title: 'Phase 1 — LangChain', subtitle: 'The foundation layer.' },
+		intro: { slug: '', title: 'Level 1 — LangChain', subtitle: 'The foundation layer.' },
 		lessons: [
+			{
+				slug: 'overview',
+				title: 'Overview — the whole picture',
+				subtitle: 'One hand-built chatbot: memory, documents, and images.'
+			},
 			{
 				slug: 'runnables',
 				title: 'Runnables & LCEL',
@@ -52,8 +59,13 @@ export const chapters: Chapter[] = [
 			},
 			{
 				slug: 'agent',
-				title: 'create_agent',
+				title: 'createAgent',
 				subtitle: 'A standard ReAct loop on top of a graph.'
+			},
+			{
+				slug: 'middleware-hooks',
+				title: 'Middleware & hooks',
+				subtitle: 'Slotting behavior into the loop — before, around, and after.'
 			}
 		]
 	},
@@ -64,7 +76,7 @@ export const chapters: Chapter[] = [
 		tagline: 'Stateful runtimes: graphs, loops, checkpoints, interrupts.',
 		accent: 'var(--color-accent-langchain)',
 		base: '/2-langgraph',
-		intro: { slug: '', title: 'Phase 2 — LangGraph', subtitle: 'The orchestration layer.' },
+		intro: { slug: '', title: 'Level 2 — LangGraph', subtitle: 'The orchestration layer.' },
 		lessons: [
 			{
 				slug: 'stategraph',
@@ -112,7 +124,7 @@ export const chapters: Chapter[] = [
 		base: '/3-deepagents',
 		intro: {
 			slug: '',
-			title: 'Phase 3 — Deep Agents',
+			title: 'Level 3 — Deep Agents',
 			subtitle: 'Where the harness takes over.'
 		},
 		lessons: [

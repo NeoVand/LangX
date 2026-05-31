@@ -141,7 +141,7 @@ console.log('Answer:', answer);
 
 <Lesson
 	title="RAG"
-	eyebrow="Phase 1 · Lesson 05"
+	eyebrow="Level 1 · Lesson 05"
 	hero={{
 		id: 'l1-rag',
 		alt: 'A library reading room with index cards floating between books'
@@ -209,11 +209,11 @@ console.log('Answer:', answer);
 			</ul>
 		</Slide>
 
-		<Slide title="In your browser, on WebGPU" variant="code-first">
+		<Slide title="In your browser, locally" variant="code-first">
 			<CodeBlock code={code} lang="ts" caption="Indexing and searching three documents." />
 			<p>
 				The first run downloads the <Term t="embedding model">embedding model</Term> (small,
-				cacheable) via <Term t="WebGPU" /> or <Term t="WebAssembly">WASM</Term>. After that,
+				cacheable) and embeds with <Term t="WebAssembly">WebAssembly</Term>. After that,
 				<Term t="Embedding">embedding</Term> is fast — run the demo on the right.
 			</p>
 		</Slide>

@@ -25,9 +25,9 @@
 	let flipped = $state(false);
 
 	const hasDemo = $derived(!!(demo || inspect));
-	// Present mode always renders the narrative (slides); otherwise honor toggles.
-	const showBook = $derived(app.presentationMode || app.viewMode.book);
-	const showWorkshop = $derived(hasDemo && !app.presentationMode && app.viewMode.workshop);
+	// Narrative ("book") and demo ("workshop") panes, toggled from the top nav.
+	const showBook = $derived(app.viewMode.book);
+	const showWorkshop = $derived(hasDemo && app.viewMode.workshop);
 	const single = $derived(!(showBook && showWorkshop));
 
 	$effect(() => {
@@ -41,11 +41,11 @@
 		<section class="narrative-pane scrollbar-slim">
 			<div class="narrative-inner">
 			{#if eyebrow}
-				<div class="eyebrow hide-in-presentation font-display">{eyebrow}</div>
+				<div class="eyebrow font-display">{eyebrow}</div>
 			{/if}
 			<section data-slide class="title-slide">
 				{#if hero}
-					<div class="hero-frame hide-in-presentation">
+					<div class="hero-frame">
 						<HeroImage id={hero.id} alt={hero.alt} />
 					</div>
 				{/if}
@@ -62,7 +62,6 @@
 				{#if intro}
 					<div class="intro font-prose">{@render intro()}</div>
 				{/if}
-				<hr class="ornament" aria-hidden="true" />
 			</section>
 			{@render narrative()}
 			</div>
@@ -70,7 +69,7 @@
 	{/if}
 
 	{#if showWorkshop}
-		<aside class="demo-pane hide-in-presentation">
+		<aside class="demo-pane">
 			{#if source}
 				<div class="demo-toolbar">
 					<span class="dt-label">{flipped ? 'Source · what the demo runs' : 'Live demo'}</span>
@@ -118,8 +117,10 @@
 <style>
 	.lesson-shell {
 		display: grid;
-		grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
-		min-height: calc(100vh - 56px);
+		/* Exactly 50/50 so the divide sits at the viewport centre — where the footer
+		   toggle is centred too. */
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+		height: 100%;
 		gap: 0;
 	}
 
@@ -139,9 +140,8 @@
 	}
 
 	.narrative-pane {
-		border-right: 1px solid var(--color-rule);
 		overflow-y: auto;
-		max-height: calc(100vh - 56px);
+		height: 100%;
 	}
 
 	.narrative-inner {
@@ -173,8 +173,17 @@
 		margin: 0 0 2rem;
 		border-radius: 0.7rem;
 		overflow: hidden;
-		aspect-ratio: 16 / 9;
 		background: var(--color-paper);
+	}
+	/* Show the hero at its natural aspect ratio — no cropping, whatever the image's
+	   proportions (the HeroImage img normally fills a fixed-aspect box with cover). */
+	.hero-frame :global(.hero) {
+		height: auto;
+	}
+	.hero-frame :global(.hero img) {
+		position: static;
+		width: 100%;
+		height: auto;
 	}
 
 	.motivation {
@@ -212,13 +221,9 @@
 		margin-bottom: 3rem;
 	}
 
-	.title-slide hr.ornament {
-		margin-top: 2.25rem;
-	}
-
 	.demo-pane {
 		background: var(--color-bg-elev);
-		max-height: calc(100vh - 56px);
+		height: 100%;
 		overflow: hidden;
 		display: flex;
 		flex-direction: column;
@@ -230,8 +235,7 @@
 		justify-content: space-between;
 		gap: 0.75rem;
 		padding: 0.6rem 1.85rem;
-		border-bottom: 1px solid var(--color-rule);
-		background: color-mix(in oklch, var(--color-paper) 80%, var(--color-bg) 20%);
+		background: transparent;
 		flex-shrink: 0;
 	}
 	.dt-label {
@@ -315,14 +319,12 @@
 	@media (max-width: 960px) {
 		.lesson-shell {
 			grid-template-columns: 1fr;
+			height: auto;
 		}
 		.narrative-pane,
 		.demo-pane {
+			height: auto;
 			max-height: none;
-			border-right: none;
-		}
-		.demo-pane {
-			border-top: 1px solid var(--color-rule);
 		}
 	}
 

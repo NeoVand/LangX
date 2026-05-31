@@ -24,8 +24,8 @@
 
 	const demoSource: DemoManifest = {
 		id: 'agent',
-		title: 'create_agent (ReAct loop)',
-		summary: 'The model ↔ tools loop that powers create_agent, with two scenarios.',
+		title: 'createAgent (real ReAct agent)',
+		summary: 'A real createAgent loop, streamed node-by-node, with two scenarios.',
 		entries: [{ path: 'lib/demos/agent-react.ts', code: agentSrc }],
 		runner: `import { runAgentScenario } from './lib/demos/agent-react';
 
@@ -61,11 +61,11 @@ console.log('Final:', messages.at(-1)?.content);
 
 	// Viz-only graph: same shape as createReactAgent compiles (agent ↔ tools loop).
 	const vizGraph = new StateGraph(MessagesAnnotation)
-		.addNode('agent', async () => ({ messages: [] }))
+		.addNode('model_request', async () => ({ messages: [] }))
 		.addNode('tools', async () => ({ messages: [] }))
-		.addEdge(START, 'agent')
-		.addConditionalEdges('agent', () => END, { tools: 'tools', [END]: END })
-		.addEdge('tools', 'agent')
+		.addEdge(START, 'model_request')
+		.addConditionalEdges('model_request', () => END, { tools: 'tools', [END]: END })
+		.addEdge('tools', 'model_request')
 		.compile();
 
 	async function runScenario() {
@@ -73,7 +73,7 @@ console.log('Final:', messages.at(-1)?.content);
 		messages = [];
 		path = [];
 		steps = [];
-		active = 'agent';
+		active = 'model_request';
 		const modeForRun = mode;
 		try {
 			const out = await withRunCache<ScenarioPayload>(
@@ -121,22 +121,28 @@ console.log('Final:', messages.at(-1)?.content);
 		}
 	});
 
-	const code = `import { createReactAgent } from '@langchain/langgraph/prebuilt';
+	const code = `import { createAgent } from 'langchain';
 import { ChatOpenAI } from '@langchain/openai';
 
-const agent = createReactAgent({
-  llm: new ChatOpenAI({ model: 'gpt-4o-mini' }),
+// v1's standard agent (Python: create_agent). It compiles a ReAct loop —
+// the model_request node and the tools node — onto a LangGraph.
+const agent = createAgent({
+  model: new ChatOpenAI({ model: 'gpt-4o-mini' }),
   tools: [weatherTool, calculatorTool]
 });
 
-const result = await agent.invoke({
-  messages: [{ role: 'user', content: 'Compare Tokyo and London weather.' }]
-});`;
+// Stream it: each chunk is one node firing, so you can watch the loop.
+for await (const step of await agent.stream(
+  { messages: [{ role: 'user', content: 'Compare Tokyo and London weather.' }] },
+  { streamMode: 'updates' }
+)) {
+  console.log(Object.keys(step)); // ['model_request'] ... ['tools'] ... ['model_request']
+}`;
 </script>
 
 <Lesson
-	title="create_agent"
-	eyebrow="Phase 1 · Lesson 06"
+	title="createAgent"
+	eyebrow="Level 1 · Lesson 06"
 	hero={{
 		id: 'l1-agent',
 		alt: 'A mechanical homunculus deciding among a row of tools at a desk'
@@ -144,7 +150,7 @@ const result = await agent.invoke({
 	source={demoSource}
 >
 	{#snippet motivation()}
-		<Term t="create_agent"><code>create_agent</code></Term> is the smallest real
+		<Term t="create_agent"><code>createAgent</code></Term> is the smallest real
 		<Term t="Agent">agent</Term>: a <Term t="Model">model</Term>, some <Term t="tool">tools</Term>, and a
 		<Term t="LangGraph">LangGraph</Term> that loops until the model stops calling tools.
 	{/snippet}
@@ -153,9 +159,10 @@ const result = await agent.invoke({
 		<p>
 			A standard tool-using <Term t="Agent">agent</Term> is a tiny graph:
 			<em>agent</em> → <em>tools</em> → <em>agent</em> → … → <Term t="END">end</Term>.
-			<Term t="LangChain" /> v1 wraps this as <Term t="create_agent"><code>create_agent</code></Term>; in JS the
-			equivalent prebuilt is <Term t="createReactAgent"><code>createReactAgent</code></Term> from
-			<Term t="LangGraph" />. This lesson is the bridge from Phase 1 into Phase 2.
+			<Term t="LangChain" /> v1 wraps this as <Term t="create_agent"><code>createAgent</code></Term> (package
+			<code>langchain</code>) — the same factory in Python (<code>create_agent</code>) and JS. The older
+			<Term t="createReactAgent"><code>createReactAgent</code></Term> prebuilt from <Term t="LangGraph" /> still
+			works but is deprecated in v1. This lesson is the bridge from Level 1 into Level 2.
 		</p>
 	{/snippet}
 
@@ -170,32 +177,34 @@ const result = await agent.invoke({
 			<p>
 				What is striking is how little code it takes. A <Term t="Model">model</Term>, a list of
 				<Term t="tool">tools</Term>, and a <Term t="StateGraph">StateGraph</Term> with two
-				<Term t="Node">nodes</Term> — agent and <Term t="ToolNode">tools</Term> — joined by a
-				<Term t="Conditional edge">conditional edge</Term>. The prebuilt
-				<Term t="createReactAgent"><code>createReactAgent</code></Term> is exactly that loop, compiled and
-				ready to <Term t="invoke">invoke</Term>.
+				<Term t="Node">nodes</Term> — a model node and a <Term t="ToolNode">tools</Term> node — joined by a
+				<Term t="Conditional edge">conditional edge</Term>.
+				<Term t="create_agent"><code>createAgent</code></Term> packages exactly that loop, compiled and
+				ready to <Term t="invoke">invoke</Term> or <Term t="stream">stream</Term>.
 			</p>
 		</Slide>
 
 		<Slide title="The ReAct loop" variant="code-first">
-			<CodeBlock code={code} lang="ts" caption="Two lines and a list of tools — that's it." />
+			<CodeBlock code={code} lang="ts" caption="A model and a list of tools — then stream the loop." />
 			<p>
 				The <Term t="Agent">agent</Term> <Term t="Node">node</Term> calls the <Term t="Model">model</Term>.
 				If there are <Term t="tool_calls">tool_calls</Term>, the <Term t="ToolNode">tools</Term> node
 				executes them and appends <Term t="ToolMessage"><code>ToolMessage</code></Term>s. Then the agent
 				<Term t="invoke">invokes</Term> the model again with the longer <Term t="Message">message</Term>
-				history. The model decides whether to keep going.
+				history. When the model finally answers with no tool call, the loop ends. The demo on the right
+				runs <em>this</em> agent and streams it with <code>streamMode: 'updates'</code>, so each step you
+				see — model call, parallel tool calls, final answer — is one real node firing.
 			</p>
 		</Slide>
 
 		<Slide title="It's already a graph">
 			<p>
-				Notice that the prebuilt <Term t="Agent">agent</Term> comes from
-				<code>@langchain/langgraph</code>. That is not an accident — every
+				Notice that <code>createAgent</code> compiles down to <Term t="LangGraph">LangGraph</Term>.
+				That is not an accident — every
 				<Term t="Agent">agent</Term> in <Term t="LangChain" /> v1 compiles to a
 				<Term t="LangGraph" /> <Term t="StateGraph">state machine</Term> with
 				<Term t="MessagesAnnotation">MessagesAnnotation</Term>. The next chapter is what lives underneath
-				this prebuilt.
+				<code>createAgent</code> — and how to build that graph yourself.
 			</p>
 		</Slide>
 

@@ -1,8 +1,6 @@
 <script lang="ts">
 	import './layout.css';
-	import favicon from '$lib/assets/favicon.svg';
 	import TopNav from '$lib/components/TopNav.svelte';
-	import PresentationShell from '$lib/components/PresentationShell.svelte';
 	import { detectWebGpu, markVisited } from '$lib/state/app.svelte';
 	import { page } from '$app/state';
 
@@ -16,6 +14,8 @@
 		markVisited(page.url.pathname);
 	});
 
+	// Favicon is set once in app.html (the parrot mark) — no per-route override here,
+	// otherwise it overwrites the parrot with the imported default after hydration.
 	const chapter = $derived(
 		page.url.pathname.startsWith('/1-langchain')
 			? 'langchain'
@@ -27,11 +27,7 @@
 	);
 </script>
 
-<svelte:head><link rel="icon" href={favicon} /></svelte:head>
-
 <div data-chapter={chapter}>
-	<PresentationShell>
-		<TopNav />
-		{@render children?.()}
-	</PresentationShell>
+	<TopNav />
+	{@render children?.()}
 </div>

@@ -150,7 +150,7 @@ const ai = await model.invoke('What is the weather in Tokyo?');
 
 <Lesson
 	title="Tools"
-	eyebrow="Phase 1 · Lesson 04"
+	eyebrow="Level 1 · Lesson 04"
 	hero={{
 		id: 'l1-tools',
 		alt: 'A scholar reaches for a wall of pegboard tools'
@@ -235,7 +235,7 @@ const ai = await model.invoke('What is the weather in Tokyo?');
 		<Slide title="Why small in-browser models flake here">
 			<p>
 				<Term t="Tool calling">Tool calling</Term> depends on the <Term t="Model">model</Term> emitting
-				precisely-formatted JSON. Smaller models (under ~1B parameters) often hallucinate field names,
+				precisely-formatted JSON. Smaller local models often hallucinate field names,
 				miss required args, or skip the call entirely. That is why LangX setup recommends models with
 				good <Term t="Agentic grade">Agentic grade</Term> for tool demos, or a hosted
 				<Term t="provider">provider</Term> via your <Term t="API key">API key</Term>.

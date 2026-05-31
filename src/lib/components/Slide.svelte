@@ -8,16 +8,11 @@
 		title?: string;
 		eyebrow?: string;
 		variant?: Variant;
+		/** Accepted for back-compat; dividers were removed app-wide. */
 		ornament?: boolean;
 	}
 
-	let {
-		children,
-		title,
-		eyebrow,
-		variant = 'default',
-		ornament = false
-	}: Props = $props();
+	let { children, title, eyebrow, variant = 'default' }: Props = $props();
 </script>
 
 <section data-slide data-variant={variant} class="slide variant-{variant}">
@@ -30,9 +25,6 @@
 	<div class="slide-body">
 		{@render children?.()}
 	</div>
-	{#if ornament}
-		<hr class="ornament" aria-hidden="true" />
-	{/if}
 </section>
 
 <style>

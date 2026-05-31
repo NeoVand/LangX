@@ -28,11 +28,43 @@
 	<path
 		d="M288.13,162.38c0-9.26-7.5-16.76-16.76-16.76s-16.76,7.5-16.76,16.76,7.5,16.76,16.76,16.76,16.76-7.5,16.76-16.76Z"
 	/>
+	<path
+		class="wing"
+		d="M438.32,535.34c-88.95-5.98-159.49-80.25-159.49-170.69,0-43.97,35.77-79.74,79.74-79.74s79.74,35.77,79.74,79.74v170.69Z"
+	/>
 </svg>
 
 <style>
 	svg {
 		display: block;
 		flex-shrink: 0;
+	}
+
+	/* The wing overlays the body's wing exactly; on hover it flaps. The body path
+	   is left intact so the rest of the mark never changes. */
+	.wing {
+		transform-box: fill-box;
+		transform-origin: 78% 6%;
+		transition: transform 0.25s ease;
+	}
+
+	svg:hover .wing {
+		animation: flap 0.42s ease-in-out infinite;
+	}
+
+	@keyframes flap {
+		0%,
+		100% {
+			transform: rotate(0deg);
+		}
+		50% {
+			transform: rotate(-42deg);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		svg:hover .wing {
+			animation: none;
+		}
 	}
 </style>

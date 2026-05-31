@@ -150,7 +150,6 @@ export interface AppState {
 	embeddingModels: { openai: string; voyage: string };
 	keys: ApiKeys;
 	preferredProvider: ModelProvider;
-	presentationMode: boolean;
 	viewMode: ViewMode;
 	theme: 'dark' | 'light';
 	visited: Record<string, boolean>;
@@ -170,7 +169,6 @@ const defaultState = (): AppState => ({
 	},
 	keys: { openai: '', anthropic: '', google: '', voyage: '' },
 	preferredProvider: 'anthropic',
-	presentationMode: false,
 	viewMode: { workshop: true, book: true },
 	theme: 'dark',
 	visited: {},
@@ -260,10 +258,6 @@ export function setApiKey(provider: keyof ApiKeys, value: string) {
 export function setPreferredProvider(p: ModelProvider) {
 	app.preferredProvider = p;
 	persist();
-}
-
-export function togglePresentation() {
-	app.presentationMode = !app.presentationMode;
 }
 
 /** Toggle the workshop (demo) pane, never allowing both panes to be hidden. */

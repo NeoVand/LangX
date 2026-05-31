@@ -200,7 +200,7 @@ await graph.invoke({ messages: [new HumanMessage("What's my name?")] }, cfg);`;
 
 <Lesson
 	title="Checkpointers & time travel"
-	eyebrow="Phase 2 · Lesson 03"
+	eyebrow="Level 2 · Lesson 03"
 	hero={{
 		id: 'l2-checkpointers',
 		alt: 'A grandfather clock with gears whose dots align like saved checkpoints'

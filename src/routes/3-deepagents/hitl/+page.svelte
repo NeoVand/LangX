@@ -117,7 +117,7 @@ while (res.status === 'interrupted') {
 
 <Lesson
 	title="Human-in-the-loop"
-	eyebrow="Phase 3 · Lesson 09"
+	eyebrow="Level 3 · Lesson 09"
 	hero={{
 		id: 'l3-hitl',
 		alt: "A judge's bench: a small mechanical agent awaits an approve/deny stamp"
@@ -132,7 +132,7 @@ while (res.status === 'interrupted') {
 		<p>
 			<Term t="interruptOn"><code>interruptOn: ['write_file']</code></Term> is enough to put any tool behind a
 			<Term t="HITL" /> gate. The harness pauses the graph at the named tool, surfaces the
-			proposed call to the host, and resumes only on a <Term t="Command">Command</Term>. Built directly on Phase 2's
+			proposed call to the host, and resumes only on a <Term t="Command">Command</Term>. Built directly on Level 2's
 			<Term t="Interrupt">interrupt</Term> primitive.
 		</p>
 	{/snippet}

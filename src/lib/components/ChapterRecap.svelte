@@ -18,7 +18,7 @@
 
 <main class="recap" data-chapter={chapter.id}>
 	<div class="inner">
-		<div class="eyebrow font-mono">Phase {chapter.number} · Recap</div>
+		<div class="eyebrow font-mono">Level {chapter.number} · Recap</div>
 		<h1 class="font-display">{chapter.title} — what you learned</h1>
 		<p class="blurb font-prose">
 			{#if typeof blurb === 'string'}

@@ -221,6 +221,22 @@ export function defaultModelFor(provider: HostedProvider): string {
 	return (list.find((m) => m.recommended) ?? list[0]).id;
 }
 
+/**
+ * How a model handles "thinking":
+ *  - 'optional' — extended thinking you can toggle on/off AND see (Claude 4.x, Gemini 2.5+)
+ *  - 'hidden'   — reasons internally; tokens are not exposed (OpenAI GPT-5.x)
+ *  - 'none'     — no separate reasoning step (gpt-4o-mini, local models)
+ */
+export type ThinkingMode = 'optional' | 'hidden' | 'none';
+
+export function thinkingMode(model: HostedModel | undefined): ThinkingMode {
+	if (!model) return 'none';
+	if (model.provider === 'anthropic') return 'optional'; // Claude 4.x extended thinking
+	if (model.provider === 'google') return 'optional'; // Gemini 2.5+ thinkingConfig
+	if (model.provider === 'openai') return model.reasoning ? 'hidden' : 'none';
+	return 'none';
+}
+
 /** Human-friendly context-window label, e.g. 200_000 → "200K", 1_000_000 → "1M". */
 export function formatContext(tokens: number): string {
 	if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(tokens % 1_000_000 ? 1 : 0)}M`;

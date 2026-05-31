@@ -207,7 +207,7 @@ const graph = new StateGraph(MessagesAnnotation)
 
 <Lesson
 	title="StateGraph"
-	eyebrow="Phase 2 · Lesson 01"
+	eyebrow="Level 2 · Lesson 01"
 	hero={{
 		id: 'l2-stategraph',
 		alt: 'A garden-maze with gazebos as nodes and a glass jar of state at the center'
@@ -221,7 +221,7 @@ const graph = new StateGraph(MessagesAnnotation)
 	{/snippet}
 	{#snippet intro()}
 		<p>
-			Phase 2 starts here: instead of declaring a chain, you declare a state machine. A
+			Level 2 starts here: instead of declaring a chain, you declare a state machine. A
 			<Term t="StateGraph" /> is built from three primitives — a <Term t="State schema" />, named
 			<Term t="Node" />s that produce <Term t="Partial state update" />s, and <Term t="Edge" />s
 			that route between them.
@@ -254,7 +254,7 @@ const graph = new StateGraph(MessagesAnnotation)
 					<Term t="Node" />. We'll use the prebuilt
 					<Term t="MessagesAnnotation"><code>MessagesAnnotation</code></Term> here, which is a
 					state with a single <code>messages</code> field and an
-					<Term t="add_messages"><code>add_messages</code></Term>
+					<Term t="add_messages"><code>messagesStateReducer</code></Term>
 					<Term t="Reducer">reducer</Term>.
 				</li>
 				<li>
@@ -291,7 +291,7 @@ const graph = new StateGraph(MessagesAnnotation)
 			</p>
 			<CodeBlock code={code} caption="The classic ReAct loop, hand-built from primitives." />
 			<p>
-				Phase 1's <Term t="create_agent"><code>create_agent</code></Term> compiles to almost exactly
+				Level 1's <Term t="create_agent"><code>create_agent</code></Term> compiles to almost exactly
 				this. Now you own the wiring — the same wiring you'll keep extending in every later lesson.
 			</p>
 		</Slide>
@@ -312,7 +312,7 @@ const graph = new StateGraph(MessagesAnnotation)
 				<Term t="Reducer">reducers</Term>, <Term t="Checkpointer">checkpointers</Term>,
 				<Term t="Interrupt">interrupts</Term>, <Term t="streamMode">streaming modes</Term>,
 				<Term t="Fan-out">fan-out</Term>, <Term t="Subgraph">subgraphs</Term> — is a property of
-				<em>this</em> shape. Once you see the graph, the rest of Phase 2 reads as a series of
+				<em>this</em> shape. Once you see the graph, the rest of Level 2 reads as a series of
 				features bolted onto the same skeleton.
 			</p>
 		</Slide>

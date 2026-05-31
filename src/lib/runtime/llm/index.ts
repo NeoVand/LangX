@@ -9,6 +9,8 @@ export interface GetModelOptions {
 	provider?: ProviderHint;
 	temperature?: number;
 	maxTokens?: number;
+	/** Enable extended thinking where the model supports it (Anthropic, Gemini). */
+	thinking?: boolean;
 	/** Called for Transformers.js download progress events. */
 	onProgress?: (p: TjsProgress) => void;
 }
@@ -74,6 +76,18 @@ export async function getModel(opts: GetModelOptions = {}): Promise<BaseChatMode
 	if (provider === 'anthropic') {
 		if (!app.keys.anthropic) throw new NoConfiguredProviderError('anthropic');
 		const { ChatAnthropic } = await import('@langchain/anthropic');
+		if (opts.thinking) {
+			// Extended thinking: Anthropic requires temperature 1 and max_tokens > budget.
+			const budget = 1600;
+			return new ChatAnthropic({
+				apiKey: app.keys.anthropic,
+				model: app.models.anthropic,
+				temperature: 1,
+				maxTokens: Math.max(opts.maxTokens ?? 1024, budget + 1600),
+				thinking: { type: 'enabled', budget_tokens: budget },
+				clientOptions: { dangerouslyAllowBrowser: true }
+			});
+		}
 		return new ChatAnthropic({
 			apiKey: app.keys.anthropic,
 			model: app.models.anthropic,
@@ -93,7 +107,11 @@ export async function getModel(opts: GetModelOptions = {}): Promise<BaseChatMode
 			model: app.models.google,
 			temperature: opts.temperature ?? 0,
 			// Google's SDK names the output cap maxOutputTokens (not maxTokens).
-			maxOutputTokens: opts.maxTokens
+			maxOutputTokens: opts.maxTokens,
+			// Gemini 2.5+ thinking: -1 lets the model size its own budget; surface thoughts.
+			...(opts.thinking
+				? { thinkingConfig: { includeThoughts: true, thinkingBudget: -1 } }
+				: {})
 		});
 	}
 

@@ -20,6 +20,14 @@
 	} from '$lib/models/catalog';
 	import ParrotMark from '$lib/components/ParrotMark.svelte';
 	import Term from '$lib/components/Term.svelte';
+	import { Link2, Cpu } from '@lucide/svelte';
+
+	/** Provider brand marks (under static/images/brands). */
+	const brandLogo: Record<string, string> = {
+		anthropic: '/images/brands/claude.svg',
+		openai: '/images/brands/openai.svg',
+		google: '/images/brands/gemini.svg'
+	};
 	import { onMount } from 'svelte';
 
 	let provider: ModelProvider = $state(app.preferredProvider);
@@ -145,7 +153,7 @@
 				Every demo in LangX runs against a real model you choose. Pick one below — hosted models
 				need an <Term t="API key">API key</Term>, local <Term t="Transformers.js">Transformers.js</Term>
 				models download once and run on <Term t="WebGPU">WebGPU</Term>. <Term t="API key">Keys</Term> stay
-				in <Term t="localStorage"><code>localStorage</code></Term> on this device — they never leave your
+				in <Term t="localStorage">localStorage</Term> on this device — they never leave your
 				browser.
 			</p>
 		</div>
@@ -168,7 +176,12 @@
 					class:active={provider === pc.id}
 					onclick={() => (provider = pc.id)}
 				>
-					{pc.title}
+					{#if brandLogo[pc.id]}
+						<img class="ptab-logo" src={brandLogo[pc.id]} alt="" aria-hidden="true" />
+					{:else}
+						<Cpu size={16} strokeWidth={2} />
+					{/if}
+					<span>{pc.title}</span>
 				</button>
 			{/each}
 		</div>
@@ -277,7 +290,7 @@
 				<h2>Step 2 · Connect {PROVIDER_META[hostedProvider].label}</h2>
 				<p class="muted">
 					Paste your {PROVIDER_META[hostedProvider].label} key — it stays in
-					<Term t="localStorage"><code>localStorage</code></Term> on this device. Get one from
+					<Term t="localStorage">localStorage</Term> on this device. Get one from
 					<a href={PROVIDER_META[hostedProvider].keysUrl} target="_blank" rel="noopener noreferrer"
 						>{PROVIDER_META[hostedProvider].label} ↗</a
 					>.
@@ -403,8 +416,14 @@
 	</section>
 
 	<section class="block end">
-		<a class="btn primary" href="/1-langchain">Begin · LangChain →</a>
-		<a class="btn ghost" href="/">Back to home</a>
+		<a class="btn primary" href="/1-langchain">
+			<Link2 size={17} strokeWidth={2} />
+			Begin · LangChain →
+		</a>
+		<a class="btn ghost" href="/">
+			<ParrotMark size={17} />
+			Back to home
+		</a>
 	</section>
 </main>
 
@@ -426,7 +445,7 @@
 
 	.parrot {
 		flex: 0 0 auto;
-		color: var(--accent-ink);
+		color: var(--accent);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -483,7 +502,7 @@
 		color: var(--color-ink-300);
 	}
 	.status-val.ok {
-		color: var(--accent-ink);
+		color: var(--accent);
 	}
 	.status-val.bad {
 		color: var(--color-accent-warning);
@@ -509,6 +528,19 @@
 		line-height: 1.55;
 	}
 
+	/* Inline links (get-your-key, RAG lesson) read as accent so they're easy to spot. */
+	.muted a {
+		color: var(--accent);
+		font-weight: 500;
+		text-decoration: underline;
+		text-underline-offset: 0.2em;
+		text-decoration-color: color-mix(in oklch, var(--accent) 45%, transparent);
+		transition: text-decoration-color 0.15s ease;
+	}
+	.muted a:hover {
+		text-decoration-color: var(--accent);
+	}
+
 	.gate {
 		display: grid;
 		grid-template-columns: 1fr;
@@ -520,7 +552,7 @@
 	}
 
 	.gate.ok {
-		border-color: color-mix(in oklch, var(--accent-ink) 30%, var(--color-rule));
+		border-color: color-mix(in oklch, var(--accent) 30%, var(--color-rule));
 		background: color-mix(in oklch, var(--accent-soft) 30%, var(--color-paper));
 	}
 
@@ -538,7 +570,7 @@
 		width: 1.25rem;
 		height: 1.25rem;
 		border-radius: 50%;
-		background: var(--accent-ink);
+		background: var(--accent);
 		color: var(--color-paper);
 		font-size: 0.75rem;
 		font-weight: 700;
@@ -564,6 +596,9 @@
 	}
 
 	.ptab {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
 		font-family: var(--font-display);
 		font-weight: 500;
 		font-size: 0.95rem;
@@ -581,14 +616,20 @@
 
 	.ptab:hover {
 		color: var(--color-ink-100);
-		border-color: color-mix(in oklch, var(--accent-ink) 40%, var(--color-rule));
+		border-color: color-mix(in oklch, var(--accent) 40%, var(--color-rule));
 	}
 
 	.ptab.active {
-		border-color: var(--accent-ink);
-		color: var(--accent-ink);
-		box-shadow: inset 0 0 0 1px var(--accent-ink);
+		border-color: var(--accent);
+		color: var(--accent);
 		background: color-mix(in oklch, var(--accent-soft) 30%, var(--color-paper));
+	}
+
+	.ptab-logo {
+		width: 18px;
+		height: 18px;
+		display: block;
+		flex: 0 0 auto;
 	}
 
 	.provider-blurb {
@@ -614,23 +655,44 @@
 	}
 
 	.model {
-		border: 1px solid var(--color-rule);
-		border-radius: 0.55rem;
+		--card-accent: var(--accent);
+		border: 1px solid transparent;
+		border-radius: 0.7rem;
 		padding: 1rem;
-		background: var(--color-paper);
+		/* Same treatment as the home level cards: corner accent glows over a tinted fill
+		   that keeps colour through the middle, sized to border-box so no edge artifact. */
+		background:
+			radial-gradient(
+				115% 80% at 0% 0%,
+				color-mix(in oklch, var(--card-accent) 18%, transparent),
+				transparent 52%
+			),
+			radial-gradient(
+				115% 80% at 100% 100%,
+				color-mix(in oklch, var(--card-accent) 11%, transparent),
+				transparent 52%
+			),
+			linear-gradient(150deg, var(--color-paper), color-mix(in oklch, var(--color-paper) 60%, #000));
+		background-origin: border-box;
+		background-clip: border-box;
 		cursor: pointer;
 		display: flex;
 		flex-direction: column;
 		gap: 0.55rem;
+		transition: border-color 0.18s ease;
 	}
 
 	.model input {
 		display: none;
 	}
 
+	.model:hover {
+		border-color: color-mix(in oklch, var(--card-accent) 38%, var(--color-rule));
+	}
+
+	/* Selected: a single thin accent border — no inset ring, so it stays subtle. */
 	.model.selected {
-		border-color: var(--accent-ink);
-		box-shadow: inset 0 0 0 1px var(--accent-ink);
+		border-color: var(--accent);
 	}
 
 	.m-head {
@@ -676,14 +738,14 @@
 		background: color-mix(in oklch, var(--accent-soft) 70%, transparent);
 	}
 	.tier-m {
-		background: color-mix(in oklch, var(--accent-ink) 14%, transparent);
-		color: var(--accent-ink);
-		border-color: color-mix(in oklch, var(--accent-ink) 30%, var(--color-rule));
+		background: color-mix(in oklch, var(--accent) 14%, transparent);
+		color: var(--accent);
+		border-color: color-mix(in oklch, var(--accent) 30%, var(--color-rule));
 	}
 	.tier-l {
-		background: color-mix(in oklch, var(--accent-ink) 22%, transparent);
-		color: var(--accent-ink);
-		border-color: color-mix(in oklch, var(--accent-ink) 50%, var(--color-rule));
+		background: color-mix(in oklch, var(--accent) 22%, transparent);
+		color: var(--accent);
+		border-color: color-mix(in oklch, var(--accent) 50%, var(--color-rule));
 	}
 
 	.m-stats {
@@ -716,10 +778,10 @@
 		color: var(--color-accent-warning);
 	}
 	.grade-good {
-		color: var(--accent-ink);
+		color: var(--accent);
 	}
 	.grade-excellent {
-		color: var(--accent-ink);
+		color: var(--accent);
 		font-weight: 600;
 	}
 
@@ -736,14 +798,14 @@
 		text-transform: uppercase;
 		padding: 0.15rem 0.45rem;
 		border-radius: 999px;
-		background: color-mix(in oklch, var(--accent-ink) 16%, transparent);
-		color: var(--accent-ink);
-		border: 1px solid color-mix(in oklch, var(--accent-ink) 30%, var(--color-rule));
+		background: color-mix(in oklch, var(--accent) 16%, transparent);
+		color: var(--accent);
+		border: 1px solid color-mix(in oklch, var(--accent) 30%, var(--color-rule));
 		white-space: nowrap;
 	}
 
 	.cost-low {
-		color: var(--accent-ink);
+		color: var(--accent);
 	}
 	.cost-medium {
 		color: var(--color-ink-100);
@@ -752,7 +814,7 @@
 		color: var(--color-accent-warning);
 	}
 	.cost-free {
-		color: var(--accent-ink);
+		color: var(--accent);
 	}
 
 	.embed-group {
@@ -779,7 +841,7 @@
 		color: var(--color-accent-warning);
 	}
 	.embed-key.ok {
-		color: var(--accent-ink);
+		color: var(--accent);
 	}
 	.local-note {
 		margin-top: 1.1rem;
@@ -825,8 +887,8 @@
 
 	.keys input:focus {
 		outline: none;
-		border-color: var(--accent-ink);
-		box-shadow: 0 0 0 2px color-mix(in oklch, var(--accent-ink) 35%, transparent);
+		border-color: var(--accent);
+		box-shadow: 0 0 0 2px color-mix(in oklch, var(--accent) 35%, transparent);
 	}
 
 	.ping {
@@ -844,7 +906,7 @@
 		font-family: var(--font-mono);
 	}
 	.ping-msg.ok {
-		color: var(--accent-ink);
+		color: var(--accent);
 	}
 	.ping-msg.bad {
 		color: var(--color-accent-warning);
@@ -860,37 +922,46 @@
 	.btn {
 		display: inline-flex;
 		align-items: center;
+		justify-content: center;
+		gap: 0.5rem;
 		font-family: var(--font-display);
-		font-weight: 500;
-		padding: 0.7rem 1.2rem;
-		border-radius: 0.5rem;
+		font-weight: 600;
+		padding: 0.8rem 1.4rem;
+		border-radius: 0.55rem;
 		text-decoration: none;
 		font-size: 0.95rem;
 		border: 1px solid transparent;
 		cursor: pointer;
+		transition:
+			background 0.18s ease,
+			border-color 0.18s ease,
+			color 0.18s ease;
 	}
 
 	.btn.primary {
-		background: var(--accent-ink);
-		color: var(--color-paper);
+		background: var(--color-fg);
+		color: #000;
+	}
+	.btn.primary:hover {
+		background: color-mix(in oklch, var(--color-fg) 90%, var(--accent));
 	}
 
 	.btn.ghost {
-		background: transparent;
-		color: var(--color-ink-100);
-		border-color: var(--color-rule);
+		background: color-mix(in oklch, var(--color-bg-elev) 60%, transparent);
+		color: var(--color-fg);
+		border-color: var(--color-border);
+	}
+	.btn.ghost:hover {
+		border-color: var(--color-border-strong);
+		background: var(--color-bg-elev);
 	}
 	.btn.ghost:disabled {
 		opacity: 0.5;
 		cursor: not-allowed;
 	}
-
-	code {
-		font-family: var(--font-mono);
-		background: var(--color-paper);
-		padding: 0.1em 0.35em;
-		border-radius: 0.3em;
-		border: 1px solid var(--color-rule);
-		font-size: 0.85em;
+	.btn.ghost:disabled:hover {
+		border-color: var(--color-border);
+		background: color-mix(in oklch, var(--color-bg-elev) 60%, transparent);
 	}
+
 </style>

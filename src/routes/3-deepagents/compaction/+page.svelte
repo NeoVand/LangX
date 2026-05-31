@@ -117,7 +117,7 @@ createDeepAgent({
 
 <Lesson
 	title="Context compaction"
-	eyebrow="Phase 3 · Lesson 08"
+	eyebrow="Level 3 · Lesson 08"
 	hero={{
 		id: 'l3-compaction',
 		alt: 'Long pages distilled in a printing press into a single summary card'

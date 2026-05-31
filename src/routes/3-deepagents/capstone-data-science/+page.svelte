@@ -202,7 +202,7 @@ createDeepAgent({ model, backend, tools: [computeTool, plotTool] });`;
 
 <Lesson
 	title="Capstone — Data Science"
-	eyebrow="Phase 3 · Capstone 2"
+	eyebrow="Level 3 · Capstone 2"
 	hero={{
 		id: 'l3-capstone-data-science',
 		alt: "A scholar's lab with beakers labeled by glyph and a chart-press etching plots"

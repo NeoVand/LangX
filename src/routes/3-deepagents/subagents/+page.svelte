@@ -96,7 +96,7 @@ createDeepAgent({ model, subagents, /* ... */ });
 
 <Lesson
 	title="Subagents"
-	eyebrow="Phase 3 · Lesson 06"
+	eyebrow="Level 3 · Lesson 06"
 	hero={{
 		id: 'l3-subagents',
 		alt: 'A central scholar gestures to three smaller assistants at flanking desks'

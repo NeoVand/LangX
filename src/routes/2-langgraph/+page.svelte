@@ -12,7 +12,7 @@
 	{#snippet intro()}
 		<p>
 			A <Term t="StateGraph" /> is a small state machine you can read like a diagram and step
-			through like a debugger. Phase 2 swaps the linear pipe of <Term t="LangChain" /> for explicit
+			through like a debugger. Level 2 swaps the linear pipe of <Term t="LangChain" /> for explicit
 			<Term t="Node">nodes</Term>, explicit <Term t="Edge">edges</Term>, and explicit shared
 			<Term t="State">state</Term> — the substrate every serious agent eventually grows into.
 		</p>

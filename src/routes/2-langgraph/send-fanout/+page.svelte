@@ -78,7 +78,7 @@ console.log(out.report);
 
 <Lesson
 	title="Send & fan-out"
-	eyebrow="Phase 2 · Lesson 06"
+	eyebrow="Level 2 · Lesson 06"
 	hero={{
 		id: 'l2-send-fanout',
 		alt: "A postmaster's desk fans out envelopes to several waiting messengers"

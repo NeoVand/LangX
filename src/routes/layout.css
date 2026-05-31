@@ -12,6 +12,8 @@
 	--font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 	/* Backwards-compat alias for older code paths still reading --font-serif */
 	--font-serif: 'Fraunces', 'Source Serif 4', Georgia, serif;
+	/* Friendly, rounded wordmark font for the LangX brand. */
+	--font-brand: 'Fredoka', 'Baloo 2', system-ui, sans-serif;
 
 	/* Ink + cream base — warm-neutral ink so surfaces harmonize with the
 	   cream text and chapter accents instead of reading cold blue-gray. */
@@ -93,6 +95,19 @@ body {
 	font-feature-settings: 'cv11', 'ss01', 'ss03', 'ss04';
 	-webkit-font-smoothing: antialiased;
 	letter-spacing: -0.005em;
+	/* Off-screen glossary tooltips (absolutely positioned) must not widen the page and
+	   create a horizontal scrollbar. clip kills the scroll without breaking sticky nav. */
+	overflow-x: clip;
+}
+
+/* Scrolling stays, scrollbars don't — hidden app-wide for a cleaner surface. */
+* {
+	scrollbar-width: none;
+}
+*::-webkit-scrollbar {
+	width: 0;
+	height: 0;
+	display: none;
 }
 
 ::selection {

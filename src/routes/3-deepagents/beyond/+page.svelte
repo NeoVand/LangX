@@ -11,7 +11,7 @@
 
 <Lesson
 	title="Beyond V1"
-	eyebrow="Phase 3 · what's next"
+	eyebrow="Level 3 · what's next"
 	hero={{
 		id: 'l3-beyond',
 		alt: 'A horizon view: finished workshop, half-built bridge, mountain peaks beyond'

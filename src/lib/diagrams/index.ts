@@ -120,7 +120,7 @@ export const deepagentsOverview: DiagramSpec = {
 };
 
 /* ────────────────────────────────────────────────────────────────────────
- * Phase 1 · LangChain
+ * Level 1 · LangChain
  * ──────────────────────────────────────────────────────────────────────── */
 
 /** LCEL pipeline: prompt | model | parser. */
@@ -205,7 +205,7 @@ export const ragFlow: DiagramSpec = {
 };
 
 /* ────────────────────────────────────────────────────────────────────────
- * Phase 2 · LangGraph
+ * Level 2 · LangGraph
  * ──────────────────────────────────────────────────────────────────────── */
 
 /** StateGraph triad: state, nodes, edges. */
@@ -340,7 +340,7 @@ export const subgraphs: DiagramSpec = {
 };
 
 /* ────────────────────────────────────────────────────────────────────────
- * Phase 3 · Deep Agents
+ * Level 3 · Deep Agents
  * ──────────────────────────────────────────────────────────────────────── */
 
 /** Harness layers. */
