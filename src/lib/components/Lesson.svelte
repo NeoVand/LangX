@@ -38,11 +38,28 @@
 			dlOpen = false;
 		}
 	});
+
+	// Reveal the scrollbar only while actively scrolling; hide it ~800ms after.
+	function revealScrollbar(node: HTMLElement) {
+		let t: ReturnType<typeof setTimeout> | undefined;
+		const onScroll = () => {
+			node.setAttribute('data-scrolling', '');
+			if (t) clearTimeout(t);
+			t = setTimeout(() => node.removeAttribute('data-scrolling'), 800);
+		};
+		node.addEventListener('scroll', onScroll, { passive: true });
+		return {
+			destroy() {
+				if (t) clearTimeout(t);
+				node.removeEventListener('scroll', onScroll);
+			}
+		};
+	}
 </script>
 
 <main class="lesson-shell" class:single>
 	{#if showBook}
-		<section class="narrative-pane scrollbar-slim">
+		<section class="narrative-pane reveal-scrollbar" use:revealScrollbar>
 			<div class="narrative-inner">
 			{#if eyebrow}
 				<div class="eyebrow font-display">{eyebrow}</div>
@@ -74,7 +91,8 @@
 
 	{#if showWorkshop}
 		<aside class="demo-pane">
-			{#if source}
+			<div class="demo-inner reveal-scrollbar" class:flipped use:revealScrollbar>
+				{#if source}
 				<div class="demo-toolbar">
 					<span class="dt-label">{flipped ? 'Source · what the demo runs' : 'Live demo'}</span>
 					<div class="dt-actions">
@@ -136,8 +154,7 @@
 						</div>
 					</div>
 				</div>
-			{/if}
-			<div class="demo-inner scrollbar-slim" class:flipped>
+				{/if}
 				{#if source && flipped}
 					<div class="face source-face">
 						<DemoSourceView manifest={source} />
@@ -190,7 +207,8 @@
 	.narrative-inner {
 		max-width: 40rem;
 		margin: 0 auto;
-		padding: 4rem 2.75rem 8rem;
+		/* Top padding clears the 60px frosted nav; content scrolls under it. */
+		padding: 4.75rem 2.75rem 8rem;
 		min-width: 0;
 	}
 
@@ -268,18 +286,16 @@
 		background: var(--color-bg-elev);
 		height: 100%;
 		overflow: hidden;
-		display: flex;
-		flex-direction: column;
 	}
 
+	/* Scrolls with the content now (not pinned); demo-inner supplies the side padding. */
 	.demo-toolbar {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
 		gap: 0.75rem;
-		padding: 0.6rem 1.85rem;
+		margin-bottom: 0.4rem;
 		background: transparent;
-		flex-shrink: 0;
 	}
 	.dt-label {
 		font-size: 0.72rem;
@@ -410,8 +426,11 @@
 	}
 
 	.demo-inner {
+		height: 100%;
 		overflow-y: auto;
-		padding: 2.25rem 1.85rem 4rem;
+		/* Top padding clears the 60px frosted nav (toolbar sharp at rest, scrolls under
+		   it); bottom padding clears the 52px frosted footer the content scrolls under. */
+		padding: 4.25rem 1.85rem 5.5rem;
 		display: flex;
 		flex-direction: column;
 		gap: 1.5rem;

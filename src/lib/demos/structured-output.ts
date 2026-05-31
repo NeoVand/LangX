@@ -1,52 +1,123 @@
 import { z } from 'zod';
+import type { AIMessage } from '@langchain/core/messages';
 import { getModel } from '$lib/runtime/llm';
 
-// ── Zod schemas: shape + field descriptions become tool parameters ──────────
-export const bugReportSchema = z.object({
-	title: z.string().describe('Short, action-oriented summary.'),
-	severity: z.enum(['low', 'medium', 'high', 'critical']),
-	component: z.string().describe('Page, module, or component that misbehaves.'),
-	stepsToReproduce: z.array(z.string()).max(5).describe('Up to five short reproduction steps.'),
-	expected: z.string(),
-	actual: z.string()
-});
-export type BugReport = z.infer<typeof bugReportSchema>;
-
-export const sentimentSchema = z.object({
-	sentiment: z.enum(['positive', 'neutral', 'negative']),
-	confidence: z.number().min(0).max(1).describe('Confidence in the chosen label.'),
-	summary: z.string().describe('One short sentence justifying the label.')
-});
-export type Sentiment = z.infer<typeof sentimentSchema>;
-
-/**
- * `withStructuredOutput` registers a Zod schema as a tool and forces the model
- * to fill it, returning a typed value instead of an AIMessage. This is the
- * exact source the demo runs.
- */
-export async function extractBugReport(rawText: string): Promise<BugReport> {
-	const model = await getModel({ temperature: 0, maxTokens: 400 });
-	// The model must call the named tool; invoke returns a parsed object, not text.
-	const extractor = model.withStructuredOutput(bugReportSchema, { name: 'extract' });
-	return (await extractor.invoke([
-		{
-			role: 'system',
-			content:
-				'Extract a bug report from the user message. Be concise. Fill every field. Use at most five reproduction steps.'
-		},
-		{ role: 'user', content: rawText }
-	])) as BugReport;
+export interface Usage {
+	input?: number;
+	output?: number;
+	total?: number;
 }
 
-export async function classifySentiment(comment: string): Promise<Sentiment> {
-	const model = await getModel({ temperature: 0, maxTokens: 200 });
-	const classifier = model.withStructuredOutput(sentimentSchema, { name: 'classify' });
-	return (await classifier.invoke([
+// ── Demo 1 schema: turn a casual message into a typed calendar event ─────────
+// Field .describe() text becomes part of the tool the model is asked to fill.
+export const eventSchema = z.object({
+	title: z.string().describe('Short title for the event.'),
+	date: z.string().describe('ISO date, YYYY-MM-DD.'),
+	startTime: z.string().describe('24-hour start time, e.g. 14:30.'),
+	durationMinutes: z.number().describe('Length in minutes.'),
+	location: z.string().describe('Where it happens.'),
+	attendees: z.array(z.string()).describe('Names of the people involved.')
+});
+export type EventInfo = z.infer<typeof eventSchema>;
+
+/** A plain description of the schema for the SchemaForm inspector (mirrors the Zod above). */
+export const eventFields = [
+	{ key: 'title', type: 'string' },
+	{ key: 'date', type: 'string', note: 'ISO date' },
+	{ key: 'startTime', type: 'string', note: '24-hour' },
+	{ key: 'durationMinutes', type: 'number', note: 'minutes' },
+	{ key: 'location', type: 'string' },
+	{ key: 'attendees', type: 'string[]', note: 'names' }
+];
+
+// ── Demo 2 schema: classify a short product review ───────────────────────────
+export const reviewSchema = z.object({
+	sentiment: z.enum(['positive', 'neutral', 'negative']),
+	recommend: z.boolean().describe('Would the writer recommend it?'),
+	reason: z.string().describe('One short sentence explaining the call.')
+});
+export type Review = z.infer<typeof reviewSchema>;
+
+export const reviewFields = [
+	{ key: 'sentiment', type: 'enum', note: 'positive · neutral · negative' },
+	{ key: 'recommend', type: 'boolean' },
+	{ key: 'reason', type: 'string' }
+];
+
+/**
+ * `withStructuredOutput(schema, { includeRaw: true })` registers the Zod schema as
+ * a tool, forces the model to fill it, and returns BOTH the parsed typed object and
+ * the raw AIMessage — so we can show the tool call + token usage behind the result.
+ * This is the exact source the demo runs.
+ */
+export async function extractEvent(
+	text: string
+): Promise<{ value: EventInfo; usage?: Usage; tool?: { name: string; args: unknown } }> {
+	const model = await getModel({ temperature: 0, maxTokens: 400 });
+	const extractor = model.withStructuredOutput(eventSchema, {
+		name: 'save_event',
+		includeRaw: true
+	});
+	const res = (await extractor.invoke([
 		{
 			role: 'system',
 			content:
-				'Classify the sentiment of the user comment. Confidence is a number between 0 and 1. Summary is one short sentence.'
+				'Extract the event from the message. Use an ISO date (YYYY-MM-DD) and a 24-hour startTime. If a detail is missing, infer a sensible value.'
 		},
-		{ role: 'user', content: comment }
-	])) as Sentiment;
+		{ role: 'user', content: text }
+	])) as { raw: AIMessage; parsed: EventInfo };
+
+	const raw = res.raw;
+	const u = raw?.usage_metadata;
+	const tc = raw?.tool_calls?.[0];
+	return {
+		value: res.parsed,
+		usage: u ? { input: u.input_tokens, output: u.output_tokens, total: u.total_tokens } : undefined,
+		tool: tc ? { name: tc.name, args: tc.args } : undefined
+	};
+}
+
+/**
+ * The contrast that motivates structured output. We classify the SAME review two ways:
+ *  1. The naive way — ask for JSON in the prompt. You get back a *string* you must
+ *     strip of code fences, JSON.parse, and pray the fields/types are right.
+ *  2. withStructuredOutput — you get a validated, typed object. No parsing, no praying.
+ * This is the exact source the demo runs.
+ */
+export async function compareExtraction(text: string): Promise<{
+	plain: { raw: string; parsed: Review | null; error?: string };
+	structured: Review;
+}> {
+	const model = await getModel({ temperature: 0, maxTokens: 250 });
+
+	// 1) Just ask for JSON (what most people try first).
+	const plainMsg = await model.invoke([
+		{
+			role: 'system',
+			content:
+				'Reply with a JSON object describing the review: its sentiment, whether the writer recommends the product, and a one-line reason.'
+		},
+		{ role: 'user', content: text }
+	]);
+	const rawText =
+		typeof plainMsg.content === 'string' ? plainMsg.content : JSON.stringify(plainMsg.content);
+
+	let parsed: Review | null = null;
+	let error: string | undefined;
+	try {
+		// The defensive cleanup you inevitably end up writing by hand.
+		const cleaned = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+		parsed = JSON.parse(cleaned) as Review;
+	} catch (e) {
+		error = e instanceof Error ? e.message : String(e);
+	}
+
+	// 2) Force the schema — get a validated, typed object.
+	const classifier = model.withStructuredOutput(reviewSchema, { name: 'classify_review' });
+	const structured = (await classifier.invoke([
+		{ role: 'system', content: 'Classify the product review.' },
+		{ role: 'user', content: text }
+	])) as Review;
+
+	return { plain: { raw: rawText, parsed, error }, structured };
 }

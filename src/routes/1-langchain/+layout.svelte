@@ -32,16 +32,22 @@
 	/* Lessons: fixed-height shell so the panes scroll internally and the prev/next
 	   footer is always visible — no scrolling to the bottom to advance. */
 	.chapter-shell.lesson {
-		height: calc(100vh - 60px);
+		/* Full-height shell pulled up under the 60px frosted nav so BOTH panes scroll
+		   under it; each pane's content adds top padding to clear the nav at rest.
+		   position:relative anchors the frosted footer that content scrolls under. */
+		height: 100vh;
+		margin-top: -60px;
 		min-height: 0;
+		position: relative;
 	}
 	.chapter-shell.lesson .chapter-content {
 		overflow: hidden;
 	}
 	@media (max-width: 960px) {
-		/* Narrow: panes stack, so let the page scroll naturally. */
+		/* Narrow: panes stack, so let the page scroll naturally under the sticky nav. */
 		.chapter-shell.lesson {
 			height: auto;
+			margin-top: 0;
 			min-height: calc(100vh - 60px);
 		}
 		.chapter-shell.lesson .chapter-content {

@@ -110,6 +110,37 @@ body {
 	display: none;
 }
 
+/* Scrollers tagged .reveal-scrollbar show a thin bar ONLY while actively scrolling
+   (a `data-scrolling` attribute is toggled in JS), then fade out. scrollbar-gutter
+   keeps the space reserved so revealing it never shifts the layout. */
+.reveal-scrollbar {
+	scrollbar-gutter: stable;
+	scrollbar-width: thin;
+	scrollbar-color: transparent transparent;
+	transition: scrollbar-color 0.3s ease;
+}
+.reveal-scrollbar[data-scrolling] {
+	scrollbar-color: color-mix(in oklch, var(--color-fg) 26%, transparent) transparent;
+}
+.reveal-scrollbar::-webkit-scrollbar {
+	display: block;
+	width: 10px;
+	height: 10px;
+}
+.reveal-scrollbar::-webkit-scrollbar-track {
+	background: transparent;
+}
+.reveal-scrollbar::-webkit-scrollbar-thumb {
+	background-color: transparent;
+	border: 3px solid transparent;
+	border-radius: 999px;
+	background-clip: padding-box;
+	transition: background-color 0.3s ease;
+}
+.reveal-scrollbar[data-scrolling]::-webkit-scrollbar-thumb {
+	background-color: color-mix(in oklch, var(--color-fg) 26%, transparent);
+}
+
 ::selection {
 	background: color-mix(in oklch, var(--accent) 35%, transparent);
 	color: var(--color-cream-0);

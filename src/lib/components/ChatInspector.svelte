@@ -272,6 +272,12 @@
 		padding: 0.9rem 1rem 1.1rem;
 		max-height: 24rem;
 		overflow-y: auto;
+		scrollbar-width: thin;
+		scrollbar-color: transparent transparent;
+		transition: scrollbar-color 0.3s ease;
+	}
+	.panel:hover {
+		scrollbar-color: color-mix(in oklch, var(--color-fg) 20%, transparent) transparent;
 	}
 
 	.empty {

@@ -130,8 +130,11 @@
 		align-items: center;
 		height: 60px;
 		padding: 0 1.4rem;
-		background: color-mix(in oklch, var(--color-bg) 90%, transparent);
-		backdrop-filter: blur(10px);
+		/* Translucent so the frosted blur actually reveals content scrolling beneath. */
+		background: color-mix(in oklch, var(--color-bg) 64%, transparent);
+		backdrop-filter: blur(16px) saturate(1.2);
+		-webkit-backdrop-filter: blur(16px) saturate(1.2);
+		border-bottom: 1px solid color-mix(in oklch, var(--color-fg) 8%, transparent);
 		position: sticky;
 		top: 0;
 		z-index: 20;

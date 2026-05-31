@@ -11,11 +11,12 @@
 		ArrowUp,
 		X,
 		FileText,
-		Eraser,
 		Plus,
-		Brain,
+		Pencil,
+		Sparkles,
 		ChevronDown
 	} from '@lucide/svelte';
+	import Markdown from '$lib/components/Markdown.svelte';
 	import { AIMessage, type BaseMessage } from '@langchain/core/messages';
 	import { app } from '$lib/state/app.svelte';
 	import { findHostedModel, thinkingMode, type HostedProvider } from '$lib/models/catalog';
@@ -88,7 +89,7 @@ appendTurn(memory, human, answer);                 // grow memory for the next t
 		thinkingOpen?: boolean;
 	};
 	const GREETING =
-		'Hey! How can I help? Feel free to upload a document or a picture with the + button and ask me about it. Use the eraser icon at the top to clear our chat and start fresh.';
+		'Hey! How can I help? Feel free to upload a document or a picture with the + button and ask me about it. Hit **New** at the top to start a fresh conversation.';
 
 	// ── Chatbot state ─────────────────────────────────────────────────────────
 	let store = $state<InMemoryVectorStore | null>(null);
@@ -359,8 +360,7 @@ memory.push(human, new AIMessage(answer));                 // memory = the messa
 		<Slide title="Thinking — watch it reason">
 			<p>
 				Many models can take an <Term t="Extended thinking">extended-thinking</Term> pass before
-				they answer — working through the problem first, then replying. Flip the brain icon
-				(<span class="inl-icon"><Brain size={14} /></span>) above the chat on a Claude or Gemini
+				they answer — working through the problem first, then replying. Toggle <strong>Thinking</strong> above the chat on a Claude or Gemini
 				<Term t="Model" /> and the reasoning <strong>streams live</strong> into a collapsible
 				<em>Thought</em> panel, and again in the Reasoning tab of the inspector. It costs extra
 				output tokens but pays off on harder questions. OpenAI's GPT-5.x models reason internally
@@ -404,37 +404,28 @@ memory.push(human, new AIMessage(answer));                 // memory = the messa
 				<div class="head-actions">
 					{#if thinkingCap === 'optional'}
 						<button
-							class="head-btn"
+							class="head-btn thinking-toggle"
 							class:on={thinkingOn}
 							onclick={() => (thinkingOn = !thinkingOn)}
 							title="Extended thinking — stream the model's reasoning"
 							aria-pressed={thinkingOn}
 						>
-							<Brain size={16} />
+							<Sparkles size={14} />
+							<span>Thinking</span>
 						</button>
 					{/if}
 					<button
-						class="head-btn"
+						class="head-btn new-chat-btn"
 						onclick={reset}
 						disabled={memory.length === 0}
-						title="Clear chat"
-						aria-label="Clear chat"
+						title="New chat"
+						aria-label="New chat"
 					>
-						<Eraser size={16} />
+						<Pencil size={14} />
+						<span>New</span>
 					</button>
 				</div>
 			</div>
-
-			{#if docName}
-				<div class="chips">
-					<span class="chip">
-						<FileText size={13} />
-						{docName}
-						<em>· {docChunks} chunks</em>
-						<button class="chip-x" onclick={removeDoc} aria-label="Remove document"><X size={12} /></button>
-					</span>
-				</div>
-			{/if}
 
 			<div class="messages" bind:this={msgEl}>
 				{#each turns as turn, i (i)}
@@ -448,16 +439,21 @@ memory.push(human, new AIMessage(answer));                 // memory = the messa
 								onclick={() => (turn.thinkingOpen = !turn.thinkingOpen)}
 								aria-expanded={turn.thinkingOpen}
 							>
-								<Brain size={12} />
 								<span>{turn.text ? 'Thought' : 'Thinking…'}</span>
 								<span class="chev" class:open={turn.thinkingOpen}><ChevronDown size={12} /></span>
 							</button>
 							{#if turn.thinkingOpen}
-								<div class="think-body">{turn.thinking}</div>
+								<div class="think-body"><Markdown source={turn.thinking} /></div>
 							{/if}
 						{/if}
 						{#if turn.text}
-							<div class="bubble">{turn.text}</div>
+							<div class="bubble">
+								{#if turn.role === 'assistant'}
+									<Markdown source={turn.text} />
+								{:else}
+									{turn.text}
+								{/if}
+							</div>
 						{:else if turn.role === 'assistant' && sending && !turn.thinking}
 							<div class="bubble typing"><span></span><span></span><span></span></div>
 						{/if}
@@ -475,14 +471,26 @@ memory.push(human, new AIMessage(answer));                 // memory = the messa
 			<!-- One unified input: a label so clicking anywhere focuses the field; the
 			     + and send float in the bottom corners over the same surface. -->
 			<label class="composer">
-				{#if imageDataUrl}
+				{#if docName || imageDataUrl}
 					<div class="attach-row">
-						<div class="img-preview">
-							<img src={imageDataUrl} alt={imageName} />
-							<button class="img-x" type="button" onclick={clearImage} aria-label="Remove image"
-								><X size={11} /></button
-							>
-						</div>
+						{#if docName}
+							<div class="doc-attach">
+								<FileText size={14} />
+								<div class="doc-attach-info">
+									<span class="doc-attach-name">{docName}</span>
+									<span class="doc-attach-meta">{docChunks} chunks · {(docChars / 1000).toFixed(1)}k chars</span>
+								</div>
+								<button class="attach-x" type="button" onclick={removeDoc} aria-label="Remove document"><X size={12} /></button>
+							</div>
+						{/if}
+						{#if imageDataUrl}
+							<div class="img-preview">
+								<img src={imageDataUrl} alt={imageName} />
+								<button class="img-x" type="button" onclick={clearImage} aria-label="Remove image"
+									><X size={11} /></button
+								>
+							</div>
+						{/if}
 					</div>
 				{/if}
 
@@ -498,7 +506,8 @@ memory.push(human, new AIMessage(answer));                 // memory = the messa
 
 				<div class="plus-wrap">
 					<button
-						class="round-btn"
+						class="plus-btn"
+						class:open={plusOpen}
 						type="button"
 						onclick={() => (plusOpen = !plusOpen)}
 						aria-label="Add a photo or document"
@@ -679,45 +688,28 @@ memory.push(human, new AIMessage(answer));                 // memory = the messa
 		color: var(--accent);
 		background: color-mix(in oklch, var(--accent) 14%, transparent);
 	}
+	.thinking-toggle {
+		width: auto;
+		gap: 0.3rem;
+		padding: 0 0.55rem;
+		font-size: 0.75rem;
+	}
+	.thinking-toggle span {
+		font-family: var(--font-mono);
+	}
+	.new-chat-btn {
+		width: auto;
+		gap: 0.3rem;
+		padding: 0 0.55rem;
+		font-size: 0.75rem;
+	}
+	.new-chat-btn span {
+		font-family: var(--font-mono);
+	}
 	.head-actions {
 		display: inline-flex;
 		align-items: center;
 		gap: 0.2rem;
-	}
-
-	.chips {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.4rem;
-		padding: 0.6rem 1rem 0;
-	}
-	.chip {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.35rem;
-		font-size: 0.76rem;
-		font-family: var(--font-mono);
-		padding: 0.25rem 0.5rem;
-		border-radius: 999px;
-		background: color-mix(in oklch, var(--accent) 14%, transparent);
-		color: var(--accent);
-		border: 1px solid color-mix(in oklch, var(--accent) 30%, var(--color-rule));
-	}
-	.chip em {
-		color: var(--color-ink-300);
-		font-style: normal;
-	}
-	.chip-x {
-		display: inline-flex;
-		background: none;
-		border: none;
-		color: inherit;
-		cursor: pointer;
-		padding: 0;
-		opacity: 0.7;
-	}
-	.chip-x:hover {
-		opacity: 1;
 	}
 
 	.messages {
@@ -728,6 +720,12 @@ memory.push(human, new AIMessage(answer));                 // memory = the messa
 		min-height: 11rem;
 		max-height: 23rem;
 		overflow-y: auto;
+		scrollbar-width: thin;
+		scrollbar-color: transparent transparent;
+		transition: scrollbar-color 0.3s ease;
+	}
+	.messages:hover {
+		scrollbar-color: color-mix(in oklch, var(--color-fg) 20%, transparent) transparent;
 	}
 
 	.msg {
@@ -748,18 +746,32 @@ memory.push(human, new AIMessage(answer));                 // memory = the messa
 		border-radius: 0.9rem;
 		font-size: 0.84rem;
 		line-height: 1.5;
-		white-space: pre-wrap;
 		word-break: break-word;
 	}
 	.msg.user .bubble {
 		background: var(--accent);
 		color: #1a1206;
 		border-bottom-right-radius: 0.3rem;
+		white-space: pre-wrap;
 	}
 	.msg.assistant .bubble {
 		background: var(--color-bg-elev-2);
 		color: var(--color-ink-100);
 		border-bottom-left-radius: 0.3rem;
+	}
+	.msg.assistant .bubble :global(.markdown) {
+		font-size: 0.84rem;
+		line-height: 1.55;
+	}
+	.msg.assistant .bubble :global(.markdown p:first-child) {
+		margin-top: 0;
+	}
+	.msg.assistant .bubble :global(.markdown p:last-child) {
+		margin-bottom: 0;
+	}
+	.msg.assistant .bubble :global(.markdown pre.shiki) {
+		border-radius: 0.5rem;
+		margin: 0.5em 0;
 	}
 	.thumb {
 		max-width: 11rem;
@@ -807,8 +819,18 @@ memory.push(human, new AIMessage(answer));                 // memory = the messa
 		font-size: 0.78rem;
 		font-style: italic;
 		line-height: 1.5;
-		white-space: pre-wrap;
 		word-break: break-word;
+	}
+	.think-body :global(.markdown) {
+		font-size: 0.78rem;
+		color: var(--color-ink-200);
+		font-style: italic;
+	}
+	.think-body :global(.markdown p:first-child) {
+		margin-top: 0;
+	}
+	.think-body :global(.markdown p:last-child) {
+		margin-bottom: 0;
 	}
 	.bubble.typing {
 		display: inline-flex;
@@ -856,17 +878,13 @@ memory.push(human, new AIMessage(answer));                 // memory = the messa
 	.composer {
 		position: relative;
 		display: block;
-		margin: 0.7rem;
-		border: 1px solid var(--color-rule);
-		border-radius: 1.3rem;
+		margin: 0;
+		border: none;
+		border-top: 1px solid var(--color-rule);
+		border-radius: 0;
 		background: var(--color-bg-elev);
-		/* extra bottom space reserves the row the +/send float in */
 		padding: 0.7rem 0.85rem 2.5rem;
 		cursor: text;
-		transition: border-color 0.15s ease;
-	}
-	.composer:focus-within {
-		border-color: var(--accent-rule);
 	}
 	.attach-row {
 		display: flex;
@@ -900,6 +918,61 @@ memory.push(human, new AIMessage(answer));                 // memory = the messa
 		cursor: pointer;
 	}
 
+	.doc-attach {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.4rem 0.55rem;
+		border-radius: 0.5rem;
+		border: 1px solid var(--color-rule);
+		background: var(--color-paper);
+		color: var(--color-fg-muted);
+		min-width: 0;
+	}
+	.doc-attach > :first-child {
+		flex-shrink: 0;
+		color: var(--accent);
+		opacity: 0.7;
+	}
+	.doc-attach-info {
+		display: flex;
+		flex-direction: column;
+		gap: 0.05rem;
+		min-width: 0;
+	}
+	.doc-attach-name {
+		font-size: 0.76rem;
+		font-family: var(--font-mono);
+		color: var(--color-fg);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.doc-attach-meta {
+		font-size: 0.65rem;
+		color: var(--color-fg-faint);
+	}
+	.attach-x {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+		width: 1.1rem;
+		height: 1.1rem;
+		border-radius: 50%;
+		border: none;
+		background: transparent;
+		color: var(--color-fg-muted);
+		cursor: pointer;
+		padding: 0;
+		margin-left: auto;
+		transition: color 0.15s ease, background 0.15s ease;
+	}
+	.attach-x:hover {
+		color: var(--color-fg);
+		background: var(--color-bg-elev-2);
+	}
+
 	/* Seamless field: the global .demo-pane textarea rule has high specificity (its :is()
 	   inherits an attribute-selector score), so we scope under .composer to win and strip
 	   its surface (background, radius, shadow) — just text on the composer, no inner box. */
@@ -922,7 +995,8 @@ memory.push(human, new AIMessage(answer));                 // memory = the messa
 		max-height: 11rem;
 	}
 	.composer .text-in::placeholder {
-		color: var(--color-ink-300);
+		color: var(--color-fg-faint, oklch(0.45 0.01 75));
+		opacity: 0.5;
 	}
 
 	.plus-wrap {
@@ -930,24 +1004,27 @@ memory.push(human, new AIMessage(answer));                 // memory = the messa
 		left: 0.7rem;
 		bottom: 0.5rem;
 	}
-	.round-btn {
+	.plus-btn {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
 		width: 1.85rem;
 		height: 1.85rem;
 		border-radius: 50%;
-		border: 1px solid var(--color-rule);
-		background: var(--color-bg);
+		border: none;
+		background: transparent;
 		color: var(--color-ink-200);
 		cursor: pointer;
 		transition:
-			color 0.15s ease,
-			border-color 0.15s ease;
+			color 0.2s ease,
+			transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 	}
-	.round-btn:hover {
+	.plus-btn:hover {
 		color: var(--accent);
-		border-color: var(--accent-rule);
+	}
+	.plus-btn.open {
+		color: var(--accent);
+		transform: rotate(45deg);
 	}
 
 	.pm-backdrop {

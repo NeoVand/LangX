@@ -36,6 +36,12 @@ const aliases: Record<string, string> = {
 	'structured output': 'Structured output',
 	'tool calling': 'Tool calling',
 	'function calling': 'Function calling',
+	validation: 'Validation',
+	validated: 'Validation',
+	enum: 'Enum',
+	enums: 'Enum',
+	includeraw: 'includeRaw',
+	'include raw': 'includeRaw',
 	'vector store': 'Vector store',
 	'context window': 'Context window',
 	'map-reduce': 'Map-reduce',
@@ -395,8 +401,8 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'Schema',
 		chapter: 'langchain',
-		short: 'Typed contract for structured model output.',
-		long: 'In LangX, Zod objects with fields, enums, and constraints. withStructuredOutput(schema) registers it as a tool so the model must fill the record — no regex parsing.'
+		short: 'A precise description of the data shape you want.',
+		long: 'A schema spells out exactly which fields a record has, their types, and the allowed values — for example a status that must be one of "open" or "closed". Hand one to a model with structured output and the reply is constrained to fit, so your code receives a predictable record instead of prose it has to scrape apart. In LangX schemas are written with Zod.'
 	},
 	{
 		term: 'stream',
@@ -413,8 +419,8 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'Structured output',
 		chapter: 'langchain',
-		short: 'Force JSON matching a schema, not free text.',
-		long: 'Declare Zod schema → withStructuredOutput → typed object returned. Provider tool-calling API constrains shape; you skip fragile post-hoc parsing.'
+		short: 'A model reply constrained to a typed shape you define.',
+		long: 'Instead of hoping a model’s reply happens to be valid JSON, you declare the exact shape you want and the model is constrained to produce it — returning a typed, validated object rather than a paragraph. The provider’s tool-calling API enforces the shape, so you skip the fragile "ask for JSON, then strip fences and parse" dance entirely.'
 	},
 	{
 		term: 'tool',
@@ -437,8 +443,26 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'withStructuredOutput',
 		chapter: 'langchain',
-		short: 'Wrap model to return a Zod-typed object.',
-		long: 'model.withStructuredOutput(BugReportSchema) registers schema as a tool and returns z.infer<typeof BugReport> directly — the structured-output lesson centerpiece.'
+		short: 'Wrap a model so it returns a schema-typed object.',
+		long: 'model.withStructuredOutput(schema) returns a Runnable whose invoke gives you a value matching your schema (typed via z.infer) instead of a message. It registers the schema as a tool the model must fill; pass { includeRaw: true } to also get the underlying tool call and token usage.'
+	},
+	{
+		term: 'Validation',
+		chapter: 'langchain',
+		short: 'Checking a value really matches its schema.',
+		long: 'Validation confirms a value has every required field, each with the right type and an allowed value, before your code trusts it. Structured output validates the model’s reply against your schema automatically — so an enum field can never arrive as an unlisted string, and a number never sneaks in as text.'
+	},
+	{
+		term: 'includeRaw',
+		chapter: 'langchain',
+		short: 'Return the raw message alongside the parsed object.',
+		long: 'withStructuredOutput(schema, { includeRaw: true }) returns { raw, parsed } instead of just the parsed value — so you can inspect the underlying tool call and token usage that produced the structured result. Useful for debugging and for seeing the mechanism behind structured output.'
+	},
+	{
+		term: 'Enum',
+		chapter: 'langchain',
+		short: 'A field restricted to a fixed set of values.',
+		long: 'An enum constrains a field to a closed list of choices — like a severity that must be one of "low", "medium", or "high". With structured output the model cannot return anything outside the set (no typos, no invented labels), which makes enums the backbone of reliable classification and routing.'
 	},
 	{
 		term: 'Zod',

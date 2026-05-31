@@ -59,14 +59,22 @@
 
 <style>
 	.lesson-nav {
+		/* Frosted footer the panes scroll UNDER — mirrors the top nav exactly. */
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		z-index: 20;
 		display: grid;
 		grid-template-columns: 1fr auto 1fr;
 		align-items: center;
 		gap: 1rem;
 		height: 52px;
 		padding: 0 1.4rem;
-		background: color-mix(in oklch, var(--color-bg) 90%, transparent);
-		backdrop-filter: blur(10px);
+		background: color-mix(in oklch, var(--color-bg) 64%, transparent);
+		backdrop-filter: blur(16px) saturate(1.2);
+		-webkit-backdrop-filter: blur(16px) saturate(1.2);
+		border-top: 1px solid color-mix(in oklch, var(--color-fg) 8%, transparent);
 	}
 
 	.link {
@@ -151,6 +159,13 @@
 	.vt.on {
 		color: var(--accent);
 		background: color-mix(in oklch, var(--accent) 16%, transparent);
+	}
+
+	/* Narrow: panes stack and the page scrolls, so the footer flows at the end. */
+	@media (max-width: 960px) {
+		.lesson-nav {
+			position: static;
+		}
 	}
 
 	@media (max-width: 560px) {
