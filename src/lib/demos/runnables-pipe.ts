@@ -2,6 +2,9 @@ import { ChatPromptTemplate } from '@langchain/core/prompts';
 import { StringOutputParser } from '@langchain/core/output_parsers';
 import { RunnableLambda } from '@langchain/core/runnables';
 import { getModel } from '$lib/runtime/llm';
+import { type ChainEvent, chunkText } from './stream-events';
+
+export type { ChainEvent };
 
 /** One stop in the pipe — label plus the value's shape at that step. */
 export interface PipeStep {
@@ -116,18 +119,6 @@ export async function runBatchDemo(
 	return { rows, totalMs };
 }
 
-/** One line in the streamEvents timeline. */
-export interface ChainEvent {
-	/** e.g. on_chain_start, on_chat_model_stream, on_parser_end */
-	event: string;
-	/** Which Runnable fired it (RunnableSequence, ChatAnthropic, …). */
-	name: string;
-	/** For *_stream events, the token text that arrived. */
-	chunk?: string;
-	/** Wall-clock from the start of the run, in ms. */
-	ms: number;
-}
-
 /**
  * `.streamEvents()` exposes the chain's whole lifecycle as a flat event stream —
  * every Runnable announces start, each token, and end. This is the same chain as
@@ -151,11 +142,8 @@ export async function runEventsDemo(
 	// `version: 'v2'` is the current event schema in LangChain v1.
 	for await (const ev of chain.streamEvents({ topic }, { version: 'v2' })) {
 		// Pull the token text out of model-stream events; ignore the rest.
-		let chunk: string | undefined;
-		if (ev.event === 'on_chat_model_stream') {
-			const c = ev.data?.chunk?.content;
-			chunk = typeof c === 'string' ? c : Array.isArray(c) ? c.map((p) => (typeof p === 'string' ? p : (p?.text ?? ''))).join('') : undefined;
-		}
+		const chunk =
+			ev.event === 'on_chat_model_stream' ? chunkText(ev.data?.chunk?.content) : undefined;
 		const e: ChainEvent = {
 			event: ev.event,
 			name: ev.name,

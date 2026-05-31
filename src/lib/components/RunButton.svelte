@@ -33,6 +33,9 @@
 			<span class="spinner" aria-hidden="true"></span>
 			<span>Running…</span>
 		{:else}
+			<svg class="play" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+				<path d="M8 5.5v13l11-6.5z" fill="currentColor" />
+			</svg>
 			<span>{label}</span>
 		{/if}
 	</button>
@@ -57,32 +60,64 @@
 	.run {
 		display: inline-flex;
 		align-items: center;
-		gap: 0.45rem;
+		gap: 0.5rem;
 		font-size: 0.86rem;
-		font-weight: 500;
-		padding: 0.5rem 0.95rem;
-		border-radius: 0.45rem;
+		font-weight: 600;
+		padding: 0.5rem 1rem 0.5rem 0.85rem;
+		border-radius: 0.55rem;
 		border: 1px solid transparent;
-		transition: opacity 0.15s, transform 0.15s;
+		cursor: pointer;
+		/* Match the box the gradient paints so the 1px border edge stays clean. */
+		background-origin: border-box;
+		background-clip: border-box;
+		transition:
+			border-color 0.16s ease,
+			filter 0.16s ease;
 	}
 
+	/* Primary = polished brass: a bright top-left sheen over a gold→deep-gold fill. */
 	.run[data-variant='primary'] {
-		background: var(--accent);
-		color: var(--color-bg);
+		background:
+			radial-gradient(
+				120% 130% at 16% 8%,
+				color-mix(in oklch, var(--accent) 72%, #fff),
+				transparent 55%
+			),
+			linear-gradient(155deg, var(--accent), color-mix(in oklch, var(--accent) 70%, #000));
+		color: #1a1206;
+		border-color: color-mix(in oklch, var(--accent) 60%, #000);
+	}
+	.run[data-variant='primary']:hover:not(:disabled) {
+		border-color: color-mix(in oklch, var(--accent) 70%, #fff);
+		filter: brightness(1.07);
 	}
 
+	/* Ghost = elevated surface with a faint corner glow; hover warms to accent. */
 	.run[data-variant='ghost'] {
-		background: transparent;
+		background:
+			radial-gradient(
+				120% 130% at 0% 0%,
+				color-mix(in oklch, var(--accent) 13%, transparent),
+				transparent 55%
+			),
+			var(--color-bg-elev);
 		color: var(--color-fg);
 		border-color: var(--color-border);
 	}
-
-	.run:hover:not(:disabled) {
-		transform: translateY(-1px);
+	.run[data-variant='ghost']:hover:not(:disabled) {
+		border-color: var(--accent-rule);
+		color: var(--accent);
 	}
 
 	.run:disabled {
-		opacity: 0.55;
+		opacity: 0.5;
+		cursor: default;
+	}
+
+	.play {
+		flex-shrink: 0;
+		/* Optical centering — a triangle reads slightly left of its bounding box. */
+		margin-left: 0.05rem;
 	}
 
 	.spinner {

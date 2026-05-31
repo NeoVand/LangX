@@ -41,9 +41,11 @@ export const ICONS: Record<string, string> = {
 	gauge: `<path d="M5 18a8 8 0 1 1 14 0"/><path d="M12 14l4-4"/>`,
 	zap: `<path d="M13 3 5 13h6l-1 8 8-10h-6Z"/>`,
 	arrowRight: `<path d="M5 12h13"/><path d="M13 6l6 6-6 6"/>`,
+	arrowLeft: `<path d="M19 12H6"/><path d="M11 6l-6 6 6 6"/>`,
 	download: `<path d="M12 4v10"/><path d="M8 11l4 4 4-4"/><path d="M5 19h14"/>`,
 	copy: `<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/>`,
-	eye: `<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>`
+	eye: `<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>`,
+	chevronDown: `<path d="M6 9l6 6 6-6"/>`
 };
 
 export type IconName = keyof typeof ICONS;

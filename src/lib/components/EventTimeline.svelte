@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { ChainEvent } from '$lib/demos/runnables-pipe';
+	import type { ChainEvent } from '$lib/demos/stream-events';
 
 	let { events }: { events: ChainEvent[] } = $props();
 

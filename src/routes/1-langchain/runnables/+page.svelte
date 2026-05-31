@@ -11,6 +11,7 @@
 	import Speedup from '$lib/components/Speedup.svelte';
 	import EventTimeline from '$lib/components/EventTimeline.svelte';
 	import ReadMore from '$lib/components/ReadMore.svelte';
+	import RunnableCatalog from '$lib/components/RunnableCatalog.svelte';
 	import HeroImage from '$lib/components/HeroImage.svelte';
 	import { getModel } from '$lib/runtime/llm';
 	import { withRunCache, loadCachedRun } from '$lib/runtime/runs';
@@ -24,6 +25,7 @@
 	import pipeSrc from '$lib/demos/runnables-pipe.ts?raw';
 	import { runFanoutDemo, type FanoutResult } from '$lib/demos/runnables-fanout';
 	import fanoutSrc from '$lib/demos/runnables-fanout.ts?raw';
+	import runnablesSkill from '$lib/demos/skills/runnables.md?raw';
 	import type { DemoManifest } from '$lib/demos/download';
 	import { onMount } from 'svelte';
 
@@ -35,17 +37,29 @@
 			{ path: 'lib/demos/runnables-pipe.ts', code: pipeSrc },
 			{ path: 'lib/demos/runnables-fanout.ts', code: fanoutSrc }
 		],
-		runner: `import { runPipeDemo } from './lib/demos/runnables-pipe';
+		runner: `import { runPipeDemo, runBatchDemo, runEventsDemo } from './lib/demos/runnables-pipe';
 import { runFanoutDemo } from './lib/demos/runnables-fanout';
 
-console.log('=== Sequential pipe ===');
+console.log('=== Sequential pipe (invoke) ===');
 const pipe = await runPipeDemo('the reactor pattern', (s) => console.log('  ·', s.step));
 console.log('Final:', pipe.finalText, '\\n');
 
-console.log('=== Parallel fan-out ===');
+console.log('=== Parallel fan-out (RunnableParallel) ===');
 const fan = await runFanoutDemo('the reactor pattern');
-console.log(fan);
-`
+console.log(fan.short, '\\n');
+
+console.log('=== Batch (concurrent, no loop) ===');
+const batch = await runBatchDemo(['why the sky is blue', 'how vaccines work']);
+for (const r of batch.rows) console.log('·', r.topic, '→', r.text);
+console.log('total', batch.totalMs, 'ms\\n');
+
+console.log('=== streamEvents (lifecycle) ===');
+await runEventsDemo('the reactor pattern', (e) => {
+  if (e.event === 'on_chat_model_stream') process.stdout.write(e.chunk ?? '');
+});
+console.log();
+`,
+		skill: runnablesSkill
 	};
 
 	let topic = $state('why the sky is blue');
@@ -284,6 +298,8 @@ const answers = await chain.batch([
 				<code>.pipe()</code> into each other.
 			</figcaption>
 		</figure>
+
+		<RunnableCatalog />
 
 		<Slide variant="pull-quote">
 			<p>

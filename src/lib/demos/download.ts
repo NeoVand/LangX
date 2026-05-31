@@ -24,6 +24,12 @@ export interface DemoManifest {
 	env?: string[];
 	/** Caveats appended to the README (e.g. browser-only embeddings). */
 	note?: string;
+	/**
+	 * A self-contained `SKILL.md` (Anthropic Agent Skill, with YAML frontmatter)
+	 * teaching an AI coding agent how to rebuild this demo from scratch. When set,
+	 * the demo offers a "Download skill" action alongside the source download.
+	 */
+	skill?: string;
 }
 
 // Every local module under src/lib, available as a raw string at build time.
@@ -292,6 +298,20 @@ export function downloadDemo(manifest: DemoManifest): void {
 	const a = document.createElement('a');
 	a.href = url;
 	a.download = `${root}.zip`;
+	document.body.appendChild(a);
+	a.click();
+	a.remove();
+	URL.revokeObjectURL(url);
+}
+
+/** Download the manifest's SKILL.md so an AI agent can rebuild the demo. */
+export function downloadSkill(manifest: DemoManifest): void {
+	if (!manifest.skill) return;
+	const blob = new Blob([manifest.skill], { type: 'text/markdown' });
+	const url = URL.createObjectURL(blob);
+	const a = document.createElement('a');
+	a.href = url;
+	a.download = 'SKILL.md';
 	document.body.appendChild(a);
 	a.click();
 	a.remove();

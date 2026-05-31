@@ -4,7 +4,7 @@
 	import DemoSourceView from './DemoSourceView.svelte';
 	import Icon from './Icon.svelte';
 	import { app } from '$lib/state/app.svelte';
-	import { downloadDemo, type DemoManifest } from '$lib/demos/download';
+	import { downloadDemo, downloadSkill, type DemoManifest } from '$lib/demos/download';
 
 	interface Props {
 		title: string;
@@ -23,6 +23,7 @@
 		$props();
 
 	let flipped = $state(false);
+	let dlOpen = $state(false);
 
 	const hasDemo = $derived(!!(demo || inspect));
 	// Narrative ("book") and demo ("workshop") panes, toggled from the top nav.
@@ -32,7 +33,10 @@
 
 	$effect(() => {
 		// Snap back to the live side whenever the demo pane is hidden.
-		if (!showWorkshop) flipped = false;
+		if (!showWorkshop) {
+			flipped = false;
+			dlOpen = false;
+		}
 	});
 </script>
 
@@ -80,17 +84,56 @@
 							onclick={() => (flipped = !flipped)}
 							title="Flip between the live demo and its source code"
 						>
-						<Icon name={flipped ? 'arrowRight' : 'eye'} size={14} />
+						<Icon name={flipped ? 'arrowLeft' : 'eye'} size={14} />
 						{flipped ? 'Back to demo' : 'View source'}
 						</button>
-						<button
-							class="dt-btn"
-							onclick={() => source && downloadDemo(source)}
-							title="Download this demo as a standalone, runnable project"
-						>
-						<Icon name="download" size={14} />
-						Download
-						</button>
+						<div class="dt-menu-wrap">
+							<button
+								class="dt-btn"
+								class:active={dlOpen}
+								onclick={() => (dlOpen = !dlOpen)}
+								aria-haspopup="menu"
+								aria-expanded={dlOpen}
+								title="Download this demo"
+							>
+								<Icon name="download" size={14} />
+								Download
+								<Icon name="chevronDown" size={13} />
+							</button>
+							{#if dlOpen}
+								<button
+									class="dt-backdrop"
+									aria-label="Close menu"
+									onclick={() => (dlOpen = false)}
+								></button>
+								<div class="dt-menu" role="menu">
+									<button
+										class="dt-menu-item"
+										role="menuitem"
+										onclick={() => {
+											dlOpen = false;
+											if (source) downloadDemo(source);
+										}}
+									>
+										<span class="dmi-label">Source</span>
+										<span class="dmi-desc">runnable project · .zip</span>
+									</button>
+									{#if source.skill}
+										<button
+											class="dt-menu-item"
+											role="menuitem"
+											onclick={() => {
+												dlOpen = false;
+												if (source) downloadSkill(source);
+											}}
+										>
+											<span class="dmi-label">Skill</span>
+											<span class="dmi-desc">SKILL.md · rebuild with AI</span>
+										</button>
+									{/if}
+								</div>
+							{/if}
+						</div>
 					</div>
 				</div>
 			{/if}
@@ -273,6 +316,74 @@
 		color: var(--accent-ink);
 		border-color: var(--accent-rule);
 		background: var(--accent-soft);
+	}
+
+	/* Download dropdown. */
+	.dt-menu-wrap {
+		position: relative;
+		display: inline-flex;
+	}
+	.dt-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 30;
+		border: 0;
+		padding: 0;
+		background: transparent;
+		cursor: default;
+	}
+	.dt-menu {
+		position: absolute;
+		top: calc(100% + 0.35rem);
+		right: 0;
+		z-index: 31;
+		display: flex;
+		flex-direction: column;
+		gap: 0.1rem;
+		min-width: 12rem;
+		padding: 0.3rem;
+		background: var(--color-bg-elev-2, var(--color-bg-elev));
+		border: 1px solid var(--color-rule);
+		border-radius: 0.6rem;
+		box-shadow: 0 14px 36px -16px rgba(0, 0, 0, 0.7);
+		animation: dt-menu-in 0.13s ease;
+	}
+	@keyframes dt-menu-in {
+		from {
+			opacity: 0;
+			transform: translateY(-4px);
+		}
+		to {
+			opacity: 1;
+			transform: none;
+		}
+	}
+	.dt-menu-item {
+		display: flex;
+		flex-direction: column;
+		gap: 0.1rem;
+		padding: 0.45rem 0.55rem;
+		border-radius: 0.4rem;
+		border: none;
+		background: transparent;
+		text-align: left;
+		cursor: pointer;
+	}
+	.dt-menu-item:hover {
+		background: var(--color-bg);
+	}
+	.dmi-label {
+		font-family: var(--font-mono);
+		font-size: 0.78rem;
+		color: var(--color-fg);
+	}
+	.dt-menu-item:hover .dmi-label {
+		color: var(--accent);
+	}
+	.dmi-desc {
+		font-family: var(--font-mono);
+		font-size: 0.64rem;
+		color: var(--color-fg-faint);
 	}
 	/* Flip transition between the live demo and its source. */
 	.face {

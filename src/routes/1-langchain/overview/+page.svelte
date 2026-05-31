@@ -35,6 +35,7 @@
 	import chatbotSrc from '$lib/demos/overview-chatbot.ts?raw';
 	import loaderSrc from '$lib/demos/document-loader.ts?raw';
 	import ragSrc from '$lib/demos/rag-pipeline.ts?raw';
+	import overviewSkill from '$lib/demos/skills/overview.md?raw';
 	import type { DemoManifest } from '$lib/demos/download';
 	import type { InMemoryVectorStore } from '$lib/runtime/rag/in-memory-vector-store';
 
@@ -75,7 +76,8 @@ const { answer } = await respondStream(
 );
 
 appendTurn(memory, human, answer);                 // grow memory for the next turn
-`
+`,
+		skill: overviewSkill
 	};
 
 	type Turn = {
