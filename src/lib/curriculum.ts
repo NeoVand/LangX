@@ -61,6 +61,11 @@ export const chapters: Chapter[] = [
 				slug: 'middleware-hooks',
 				title: 'Middleware & hooks',
 				subtitle: 'Slotting behavior into the loop — before, around, and after.'
+			},
+			{
+				slug: 'agentic-rag',
+				title: 'Agentic RAG — the capstone',
+				subtitle: 'A document agent that searches, cites, and clarifies — pure createAgent.'
 			}
 		]
 	},

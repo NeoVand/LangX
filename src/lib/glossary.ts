@@ -376,6 +376,18 @@ export const glossary: GlossaryEntry[] = [
 		long: 'RAG (retrieval-augmented generation) grounds answers in your own data: you split documents into chunks and embed them, then at question time you retrieve the most relevant chunks and paste them into the prompt so the model answers from real sources instead of guessing. It’s how you give a model private or up-to-date knowledge — and most RAG mistakes come from bad retrieval, not the model.'
 	},
 	{
+		term: 'Agentic RAG',
+		chapter: 'langchain',
+		short: 'RAG where the agent decides when and how to search, not a fixed pipeline.',
+		long: 'Naive RAG retrieves once and stuffs the chunks into the prompt. Agentic RAG instead gives the model a search tool and lets the agent loop drive: it searches, judges the results, rewrites a weak query and searches again, asks the user to clarify when unsure, and cites its sources — recovering from bad queries and ambiguous questions that one-shot RAG can’t. In LangChain it’s just a createAgent with a retrieval tool and a good system prompt.'
+	},
+	{
+		term: 'Grounding',
+		chapter: 'langchain',
+		short: 'Tying every claim in an answer to a retrieved source.',
+		long: 'A grounded answer says only what the retrieved passages support, and points back to them (citations). You ground a model by instructing it to use only the provided context and to cite each claim — the main defense against hallucination in RAG. Ungrounded confidence is the failure mode grounding exists to prevent.'
+	},
+	{
 		term: 'ReAct',
 		chapter: 'langchain',
 		short: 'Reason + Act: model thinks, calls tools, repeats.',
