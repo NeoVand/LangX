@@ -323,8 +323,8 @@ memory.push(human, new AIMessage(answer));                 // memory = the messa
 			<p>
 				In reality, most chatbots are more than a bare loop. The one on the right is still simple,
 				but it can also pull from a document you give it (<Term t="RAG">retrieval</Term>) and read
-				an image. That's the pipeline its answers actually flow through — we'll take retrieval apart
-				properly in the <a href="/1-langchain/rag">RAG</a> lesson.
+				an image. That's the pipeline its answers actually flow through — and by the end of this
+				course you'll rebuild it as a proper agent.
 			</p>
 		</Slide>
 
@@ -386,10 +386,11 @@ memory.push(human, new AIMessage(answer));                 // memory = the messa
 					><Term t="Runnable">Runnables</Term></a
 				>, <a href="/1-langchain/streaming">streaming</a>,
 				<a href="/1-langchain/structured-output">structured output</a>,
-				<a href="/1-langchain/tools"><Term t="tool">tools</Term></a>, and
-				<a href="/1-langchain/rag"><Term t="RAG" /></a>. When the loop itself needs to grow —
-				branching, persistence, pausing for a human — that's <Term t="LangGraph" /> in
-				<a href="/2-langgraph">Level 2</a>, which modern LangChain agents are built on.
+				<a href="/1-langchain/tools"><Term t="tool">tools</Term></a>, and the
+				<a href="/1-langchain/agent"><Term t="create_agent">agent</Term></a> that ties them together.
+				When the loop itself needs to grow — branching, persistence, pausing for a human — that's
+				<Term t="LangGraph" /> in <a href="/2-langgraph">Level 2</a>, which modern LangChain agents are
+				built on.
 			</p>
 		</Slide>
 	{/snippet}

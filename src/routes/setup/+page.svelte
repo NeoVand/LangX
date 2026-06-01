@@ -350,9 +350,9 @@
 	<section class="block">
 		<h2>Step 3 · <Term t="embedding model">Embeddings</Term> (RAG)</h2>
 		<p class="muted">
-			The <a href="/1-langchain/rag">RAG lesson</a> turns text into vectors with an embedding model.
-			Local <Term t="MiniLM">MiniLM</Term> runs in-browser with no key; to use a hosted model in the RAG
-			demo, pick it below and add that provider's key.
+			The <a href="/1-langchain/overview">Overview chatbot</a> turns your documents into vectors with an
+			embedding model. Local <Term t="MiniLM">MiniLM</Term> runs in-browser with no key; to use a hosted
+			model, pick it below and add that provider's key.
 		</p>
 		{#each embedGroups as group (group.provider)}
 			<div class="embed-group" class:locked={!group.hasKey}>

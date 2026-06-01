@@ -166,11 +166,6 @@
 		color: var(--color-ink-300);
 	}
 
-	/* code-first: title is small, body is dominated by a code block */
-	.variant-code-first .slide-title {
-		font-size: 1.1rem;
-		font-weight: 500;
-		color: var(--color-ink-200);
-		margin-bottom: 0.5rem;
-	}
+	/* code-first slides use the same title style as every other slide — coherence
+	   across the page matters more than shrinking the heading above a code block. */
 </style>

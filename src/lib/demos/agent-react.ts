@@ -5,9 +5,35 @@ import { weatherTool, calculatorTool } from '$lib/runtime/tools';
 import { displayContent } from '$lib/runtime/messages';
 import type { OnStep } from './types';
 
-const SYSTEM_PROMPT =
+export const DEFAULT_SYSTEM_PROMPT =
 	'You are a concise assistant. Use the get_weather and calculator tools when they help, ' +
 	'then give a short final answer in plain prose.';
+
+/** The two starting questions the demo offers — both editable in the UI. */
+export const DEFAULT_USER_PROMPTS = {
+	weather: "What's the weather like in San Francisco today?",
+	multi: "Compare today's weather in Tokyo and London, and tell me the temperature difference in °C."
+} as const;
+
+/**
+ * The toolbox the agent is given. `exportName` points at the real `tool(...)`
+ * definition in `$lib/runtime/tools` so the lesson can show its actual source.
+ */
+export const agentToolSpecs = [
+	{
+		name: 'get_weather',
+		description:
+			'Get the current weather for any city worldwide via the Open-Meteo API. Returns temperature in °C and conditions.',
+		params: ['city'],
+		exportName: 'weatherTool'
+	},
+	{
+		name: 'calculator',
+		description: 'Evaluate a basic arithmetic expression and return the result as a string.',
+		params: ['expression'],
+		exportName: 'calculatorTool'
+	}
+];
 
 /**
  * The real LangChain v1 agent. `createAgent({ model, tools })` compiles a ReAct
@@ -18,7 +44,8 @@ const SYSTEM_PROMPT =
  * -> model_request -> end`. This file is exactly what the demo runs.
  */
 export async function runAgentScenario(
-	mode: 'weather' | 'multi',
+	systemPrompt: string,
+	userPrompt: string,
 	onMessages: (messages: BaseMessage[]) => void,
 	onPath: (path: string[], active: string) => void,
 	onStep: OnStep
@@ -30,13 +57,10 @@ export async function runAgentScenario(
 	const agent = createAgent({
 		model,
 		tools: [weatherTool, calculatorTool],
-		systemPrompt: SYSTEM_PROMPT
+		systemPrompt: systemPrompt?.trim() || DEFAULT_SYSTEM_PROMPT
 	});
 
-	const prompt =
-		mode === 'weather'
-			? "What's the weather like in San Francisco today?"
-			: "Compare today's weather in Tokyo and London, and tell me the temperature difference in °C.";
+	const prompt = userPrompt?.trim() || DEFAULT_USER_PROMPTS.weather;
 
 	const messages: BaseMessage[] = [new HumanMessage(prompt)];
 	onMessages([...messages]);

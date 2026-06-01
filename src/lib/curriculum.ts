@@ -53,11 +53,6 @@ export const chapters: Chapter[] = [
 				subtitle: 'Letting the model call functions.'
 			},
 			{
-				slug: 'rag',
-				title: 'RAG',
-				subtitle: 'Retrieval-augmented generation, in your browser.'
-			},
-			{
 				slug: 'agent',
 				title: 'createAgent',
 				subtitle: 'A standard ReAct loop on top of a graph.'

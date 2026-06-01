@@ -35,6 +35,7 @@ const aliases: Record<string, string> = {
 	'state graph': 'StateGraph',
 	'structured output': 'Structured output',
 	'tool calling': 'Tool calling',
+	'agent loop': 'Agent loop',
 	'function calling': 'Function calling',
 	validation: 'Validation',
 	validated: 'Validation',
@@ -265,10 +266,16 @@ export const glossary: GlossaryEntry[] = [
 		long: 'Roughly ¾ of an English word. Token counts drive cost, latency, and context limits — LangX compaction demos track live usage against eviction and summarization thresholds.'
 	},
 	{
+		term: 'Agent loop',
+		chapter: 'langchain',
+		short: 'Model → tool calls → results → model, repeated.',
+		long: 'The cycle at the heart of every agent: the model is asked, it may request one or more tool calls, your code runs them and feeds the results back, and the model is asked again — repeating until it answers with no further calls. There is nothing more mysterious inside an "agent" than this loop wrapped around a tool-using model.'
+	},
+	{
 		term: 'Tool calling',
 		chapter: 'general',
-		short: 'Model emits structured function calls instead of plain text.',
-		long: 'After bindTools, the model responds with tool_calls (name + JSON args). Runtime executes each call, returns ToolMessages, and re-invokes — the control loop behind every agent in LangX.'
+		short: 'How a model takes action instead of only answering.',
+		long: 'You give the model typed tools; instead of replying with text it can reply with a tool call — the name of a tool plus the arguments to run it with. Your code executes the call and returns the result, and the model carries on. It is the mechanism that turns a text generator into something that can look things up, query data, and change the world.'
 	},
 
 	// ── LangChain ───────────────────────────────────────────────────────────
@@ -735,8 +742,8 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'interruptOn',
 		chapter: 'deepagents',
-		short: 'Tool names requiring human approval before run.',
-		long: 'interruptOn: ["write_file"] wraps listed tools in HITL gates — graph pauses, host shows args, resumes with Command({ resume }). HITL lesson toggles this.'
+		short: 'Per-tool map of which tools pause for human approval.',
+		long: 'humanInTheLoopMiddleware / createDeepAgent take interruptOn as an object: { issue_refund: { allowedDecisions: ["approve","edit","reject"] }, lookup_order: false }. true (or a config) gates a tool; false auto-approves it. The graph pauses on a gated call, surfaces the args, and resumes with Command({ resume }).'
 	},
 	{
 		term: 'load_skill',
@@ -1160,7 +1167,7 @@ export const glossary: GlossaryEntry[] = [
 		term: 'oracle',
 		chapter: 'langchain',
 		short: 'Passive Q&A model that never executes tools or side effects.',
-		long: 'Tools lesson contrasts early LLMs as oracles (question in, paragraph out) with tool-calling agents that act in your system. Every ReAct loop in LangX is the shift from oracle to participant.'
+		long: 'A way to describe early language models: you put a question in and got a paragraph out, but the model itself never touched anything — any real action was wired up separately, by you. Tool calling ends the oracle era: the model can reach for tools and act, becoming a participant in your system rather than a detached answer machine.'
 	},
 	{
 		term: 'participant',
@@ -1749,6 +1756,48 @@ export const glossary: GlossaryEntry[] = [
 		chapter: 'langchain',
 		short: 'Points in the loop where your code runs — before or after a step.',
 		long: 'A hook is a function the framework calls at a specific moment: before the model is called, after it replies, or before/after a tool runs. Where middleware is a whole layer wrapped around a step, a hook is a single tap-in point you attach a function to — for logging, validation, metrics, or last-minute edits to inputs and outputs.'
+	},
+	{
+		term: 'createMiddleware',
+		chapter: 'langchain',
+		short: 'Build your own middleware from a name plus the hooks you need.',
+		long: 'createMiddleware({ name, beforeModel, wrapToolCall, … }) returns a middleware you can pass to createAgent. You only define the hooks you care about; the rest of the loop is untouched. It is how you write a custom layer when no built-in middleware fits.'
+	},
+	{
+		term: 'beforeModel',
+		chapter: 'langchain',
+		short: 'Hook that runs just before each model call.',
+		long: 'A node-style hook that reads (and can update) state right before the model is invoked — validate inputs, inject context, or short-circuit the loop with jumpTo: "end" so the model is skipped entirely. Runs on every iteration. Its mirror is afterModel.'
+	},
+	{
+		term: 'afterModel',
+		chapter: 'langchain',
+		short: 'Hook that runs right after each model reply.',
+		long: 'A node-style hook that sees the model’s response and can update state — log it, count tokens, flag content, or enforce a policy. Runs on every loop iteration, after the model and before any tools execute.'
+	},
+	{
+		term: 'wrapModelCall',
+		chapter: 'langchain',
+		short: 'Wrapper around the model call — retry, cache, swap, fall back.',
+		long: 'A wrap-style hook: it receives the request and a handler, and decides how the model runs. Call handler(request) to proceed, or wrap it to retry on error, cache the result, swap the model/tools/system prompt for this turn, or fall back to a backup model. Wrap hooks nest like onion layers — the first middleware is the outermost.'
+	},
+	{
+		term: 'wrapToolCall',
+		chapter: 'langchain',
+		short: 'Wrapper around each tool call — authorize, monitor, intercept.',
+		long: 'A wrap-style hook around tool execution. It can check permissions, log the call, replace the result, or pause for a human before the tool runs — which is exactly how human-in-the-loop middleware gates a sensitive tool.'
+	},
+	{
+		term: 'humanInTheLoopMiddleware',
+		chapter: 'langchain',
+		short: 'Built-in middleware that pauses for human approval before chosen tools.',
+		long: 'humanInTheLoopMiddleware({ interruptOn: { issue_refund: { allowedDecisions: ["approve","edit","reject"] } } }) wraps the named tools in an approval gate. When the model calls one, the run interrupts; a human approves, edits the arguments, or rejects with a message, and you resume with Command({ resume }). Needs a checkpointer to hold the paused state.'
+	},
+	{
+		term: 'todoListMiddleware',
+		chapter: 'langchain',
+		short: 'Built-in middleware that gives an agent a planning to-do list.',
+		long: 'Adds a write_todos tool and a planning prompt so the agent can lay out and track a multi-step task. It is one of the standard pieces a Deep Agent is assembled from, alongside a filesystem, summarization, and subagents.'
 	},
 	{
 		term: 'Multimodal',
