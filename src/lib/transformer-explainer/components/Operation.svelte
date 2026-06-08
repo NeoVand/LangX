@@ -134,8 +134,8 @@
 			transform: translateX(50%);
 		}
 		svg .icon {
-			fill: var(--color-gray-300);
-			opacity: 0.6;
+			fill: var(--color-amber-200);
+			opacity: 0.7;
 		}
 		.icon {
 			opacity: 1;
@@ -161,7 +161,7 @@
 
 	.dropout {
 		path {
-			stroke: var(--color-gray-400);
+			stroke: var(--color-bronze-200);
 			stroke-dasharray: 2, 2;
 			fill: none;
 			stroke-width: 2;
@@ -171,12 +171,12 @@
 		width: 0.5rem;
 
 		path {
-			stroke: var(--color-gray-400);
+			stroke: var(--color-bronze-200);
 			fill: none;
 			stroke-width: 1;
 		}
 		.head {
-			stroke: var(--color-gray-400);
+			stroke: var(--color-bronze-200);
 		}
 		.residual-text {
 			position: absolute;
@@ -190,14 +190,14 @@
 	}
 	.ln {
 		path {
-			stroke: var(--color-gray-400);
+			stroke: var(--color-bronze-200);
 			fill: none;
 			stroke-width: 1;
 		}
 	}
 	.activation {
 		path {
-			stroke: var(--color-gray-400);
+			stroke: var(--color-bronze-200);
 			fill: none;
 			stroke-dasharray: 2, 4;
 			fill: none;
@@ -242,7 +242,7 @@
 		}
 
 		path {
-			stroke: var(--color-gray-400);
+			stroke: var(--color-bronze-200);
 			fill: none;
 			stroke-width: 1;
 			stroke-dasharray: none;

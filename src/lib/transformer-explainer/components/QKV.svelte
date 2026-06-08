@@ -9,7 +9,9 @@
 
 	export let className: string | undefined = undefined;
 
-	const embeddingVectorColor = 'bg-gray-300';
+	// the block's INPUT embedding column (a copy of the embedding stream entering
+	// the block) — gold like the rest of the carrier backbone, not grey.
+	const embeddingVectorColor = 'te-bg-gold';
 
 	let vectorHoverIdx: number | null = null;
 	const queryVectorColor = 'bg-blue-300';
@@ -45,10 +47,10 @@
 			<div class="column vectors embedding-column">
 				{#each $tokens as token, index}
 					<div
-						class={`vector ${$blockIdx !== 0 ? 'bg-blue-200' : embeddingVectorColor}`}
+						class={`vector ${embeddingVectorColor}`}
 						class:last={index === $tokens.length - 1}
 					>
-						<VectorCanvas colorScale={$blockIdx !== 0 ? 'blue' : 'gray'} />
+						<VectorCanvas colorScale="gold" active />
 					</div>
 				{/each}
 			</div>
@@ -141,10 +143,13 @@
 				}
 				.sub-vector {
 					user-select: none;
-					font-size: 1rem;
+					font-size: 0.8rem;
 					opacity: 0.8;
 					span {
-						opacity: 0.45;
+						/* the Q/K/V glyphs: white so they read clearly on the dark vectors
+						   (was inheriting the dark channel colour at low opacity) */
+						opacity: 1;
+						color: var(--color-fg);
 					}
 					&.query {
 						color: var(--color-blue-600);
