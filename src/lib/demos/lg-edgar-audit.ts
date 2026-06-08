@@ -30,7 +30,8 @@
 import { Annotation, StateGraph, MemorySaver, Send, START, END, interrupt } from '@langchain/langgraph';
 import { z } from 'zod';
 import { getModel } from '$lib/runtime/llm';
-import { fetchCompanyFacts, factsDigest, type CompanyFacts } from '$lib/runtime/edgar';
+import { fetchCompanyFacts, factsDigest, resolveSample, type CompanyFacts } from '$lib/runtime/edgar';
+import { runGraphTurn, type StreamableGraph } from './graph-run';
 
 // ── The data that flows through the graph ──────────────────────────────────
 export type ClaimField =
@@ -93,6 +94,13 @@ export const AuditState = Annotation.Root({
 });
 
 // ── Structured-output schemas (the model must return exactly these) ─────────
+const CompanySchema = z.object({
+	ticker: z
+		.string()
+		.describe('the stock ticker symbol (best guess, uppercase) of the single U.S. public company this statement is about, e.g. "AAPL"'),
+	name: z.string().describe('the company name as written or implied in the statement')
+});
+
 const ClaimsSchema = z.object({
 	claims: z
 		.array(
@@ -138,6 +146,9 @@ const EditsSchema = z.object({
 });
 
 // ── Prompts (plain strings — structured output handles the formatting) ──────
+const identifyInput = (statement: string) =>
+	`Identify the single U.S. public company this statement is about. Return its stock ticker symbol (your best guess, uppercase) and its name. Do not explain.\n\nStatement:\n"""\n${statement}\n"""`;
+
 const extractInput = (statement: string) =>
 	`You are auditing a paragraph written about a public company. Pull out every concrete, checkable factual claim it makes about the company's IDENTITY (legal name, ticker symbol, stock exchange, industry, fiscal-year end, state of incorporation, former names) and its SEC FILINGS (which forms it filed and when). Tag any claim about dollar amounts or financial results as "financial". Split compound sentences into separate atomic claims. Keep each claim's wording close to the original.\n\nStatement:\n"""\n${statement}\n"""`;
 
@@ -175,6 +186,10 @@ function buildReport(s: typeof AuditState.State): string {
 
 // ── Build the compiled graph (await models once, then wire the nodes) ───────
 export async function buildAuditGraph(checkpointer: MemorySaver) {
+	const identifyModel = (await getModel({ temperature: 0, maxTokens: 80 })).withStructuredOutput(
+		CompanySchema,
+		{ name: 'identify_company' }
+	);
 	const extractModel = (await getModel({ temperature: 0, maxTokens: 700 })).withStructuredOutput(
 		ClaimsSchema,
 		{ name: 'extract_claims' }
@@ -189,11 +204,21 @@ export async function buildAuditGraph(checkpointer: MemorySaver) {
 	);
 
 	return new StateGraph(AuditState)
-		// 1 · Pull the company's live identity + filing record from EDGAR.
+		// 1 · The agent works out WHICH company the statement is about (model),
+		//     then pulls that company's live identity + filing record (EDGAR).
+		//     Nothing is hard-coded — the target is derived from the prose.
 		.addNode('resolve_company', async (s) => {
 			if (s.company) return {}; // already resolved (e.g. on resume) — keep it
-			const facts = await fetchCompanyFacts(s.cik);
-			return { company: facts, digest: factsDigest(facts) };
+			const id = await identifyModel.invoke(identifyInput(s.statement));
+			const match = resolveSample(id.ticker) ?? resolveSample(id.name);
+			if (!match) {
+				throw new Error(
+					`Couldn't match "${id.name || id.ticker || '?'}" to a company in the offline SEC directory. ` +
+						`Try one of the examples, or a large US-listed company (AAPL, MSFT, GOOGL, …).`
+				);
+			}
+			const facts = await fetchCompanyFacts(match.cik);
+			return { cik: match.cik, company: facts, digest: factsDigest(facts) };
 		})
 		// 2 · Turn the prose into a list of atomic, typed claims (LLM).
 		.addNode('extract_claims', async (s) => {
@@ -343,32 +368,43 @@ export async function runAuditTurn(
 	graph: CompiledAuditGraph,
 	input: unknown,
 	config: { configurable: { thread_id: string } },
-	onUpdate?: (node: string, snapshot: AuditSnapshot) => void
+	/**
+	 * Called once per node as the graph streams. May return a promise — the run
+	 * awaits it, so the caller can pace playback (code nodes like triage/report
+	 * finish in microseconds and would otherwise flash past in a single frame).
+	 */
+	onUpdate?: (node: string, snapshot: AuditSnapshot) => void | Promise<void>,
+	/**
+	 * Prior state to continue from. When resuming after an interrupt, the second
+	 * turn's stream only carries the post-resume node updates — seed it with the
+	 * pre-pause snapshot so accumulated state (company, claims, verdicts…) carries
+	 * across the pause instead of resetting to empty.
+	 */
+	seed?: AuditSnapshot
 ): Promise<TurnResult> {
-	const snap = emptySnapshot();
-	let lastNode: string | null = null;
-	let interrupted = false;
-	let pendingEdits: Edit[] = [];
+	const r = await runGraphTurn<AuditSnapshot>(graph as unknown as StreamableGraph, input, config, {
+		empty: emptySnapshot,
+		merge: mergeInto,
+		clone: cloneSnapshot,
+		onUpdate
+	});
+	// The auditor pauses with an `{ edits }` payload at the human gate.
+	const pendingEdits =
+		(r.interruptValue as { value?: { edits?: Edit[] } }[] | undefined)?.[0]?.value?.edits ?? [];
+	return {
+		lastNode: r.lastNode,
+		interrupted: r.interrupted,
+		pendingEdits,
+		snapshot: r.snapshot
+	};
+}
 
-	const stream = await graph.stream(input as never, { ...config, streamMode: 'updates' });
-	for await (const chunk of stream as AsyncIterable<Record<string, unknown>>) {
-		for (const [key, value] of Object.entries(chunk)) {
-			if (key === '__interrupt__') {
-				interrupted = true;
-				const v = (value as { value?: { edits?: Edit[] } }[])[0]?.value;
-				pendingEdits = v?.edits ?? [];
-				continue;
-			}
-			lastNode = key;
-			mergeInto(snap, value as Record<string, unknown>);
-			onUpdate?.(key, {
-				...snap,
-				claims: [...snap.claims],
-				verdicts: [...snap.verdicts],
-				edits: [...snap.edits],
-				decisions: [...snap.decisions]
-			});
-		}
-	}
-	return { lastNode, interrupted, pendingEdits, snapshot: snap };
+function cloneSnapshot(s: AuditSnapshot): AuditSnapshot {
+	return {
+		...s,
+		claims: [...s.claims],
+		verdicts: [...s.verdicts],
+		edits: [...s.edits],
+		decisions: [...s.decisions]
+	};
 }

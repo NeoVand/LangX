@@ -40,7 +40,14 @@ export const SAMPLE_COMPANIES: SampleCompany[] = [
 	{ ticker: 'TSLA', cik: '0001318605', name: 'Tesla, Inc.' },
 	{ ticker: 'AMZN', cik: '0001018724', name: 'Amazon.com, Inc.' },
 	{ ticker: 'KO', cik: '0000021344', name: 'The Coca-Cola Company' },
-	{ ticker: 'CAT', cik: '0000018230', name: 'Caterpillar Inc.' }
+	{ ticker: 'CAT', cik: '0000018230', name: 'Caterpillar Inc.' },
+	{ ticker: 'GOOGL', cik: '0001652044', name: 'Alphabet Inc.' },
+	{ ticker: 'META', cik: '0001326801', name: 'Meta Platforms, Inc.' },
+	{ ticker: 'NFLX', cik: '0001065280', name: 'Netflix, Inc.' },
+	{ ticker: 'WMT', cik: '0000104169', name: 'Walmart Inc.' },
+	{ ticker: 'JPM', cik: '0000019617', name: 'JPMorgan Chase & Co.' },
+	{ ticker: 'INTC', cik: '0000050863', name: 'Intel Corporation' },
+	{ ticker: 'NKE', cik: '0000320187', name: 'NIKE, Inc.' }
 ];
 
 export interface FilingRow {

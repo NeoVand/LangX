@@ -1,82 +1,79 @@
+/**
+ * The classic ReAct loop, hand-built from StateGraph primitives — the bare
+ * machine that Level 1's `createAgent` compiles to:
+ *
+ *   START → agent → (tool_calls?) → tools → agent → … → END
+ *
+ * • `agent` is a MODEL node: it hands the whole message list to the model and
+ *   appends the reply.
+ * • `tools` is a CODE node: a prebuilt ToolNode that runs whatever tool calls the
+ *   model asked for and appends the results.
+ * • A CONDITIONAL EDGE after `agent` reads the last message and loops back to
+ *   `tools` while there are tool calls, or routes to END once the model answers.
+ *
+ * The state is just `{ messages }` (MessagesAnnotation) with an append reducer —
+ * so every node returns a *partial* update (the new message(s)) and the runtime
+ * merges it. The lesson streams this through <LiveGraph> via `runGraphTurn`.
+ */
 import { StateGraph, MessagesAnnotation, START, END } from '@langchain/langgraph/web';
 import { ToolNode } from '@langchain/langgraph/prebuilt';
 import { calculatorTool, weatherTool } from '$lib/runtime/tools';
 import { getModel } from '$lib/runtime/llm';
 import { AIMessage, HumanMessage, type BaseMessage } from '@langchain/core/messages';
+import { runGraphTurn, type StreamableGraph } from './graph-run';
 
 export type StateGraphMode = 'simple' | 'multi';
 
-export interface StateGraphCallbacks {
-	/** Called with the growing superstep order, e.g. ['agent', 'tools', ...]. */
-	onPath?: (path: string[]) => void;
-	/** Called with the node currently running (or '__end__' when finished). */
-	onActive?: (node: string | undefined) => void;
-	/** Called with the full message list after each superstep. */
-	onMessages?: (messages: BaseMessage[]) => void;
+/** The graph's state, snapshotted per step for the live graph. */
+export interface SGSnapshot {
+	messages: BaseMessage[];
 }
 
 /**
- * The classic ReAct loop, hand-built from StateGraph primitives: an `agent`
- * node calls the model, a conditional edge routes to a `tools` node whenever the
- * model emits tool calls, and the loop continues until the model just answers.
- * Streaming `streamMode: 'values'` yields the full state after every superstep.
- * This is the exact source the demo runs.
+ * Build (and compile) the agent ↔ tools graph for the given scenario. The
+ * `simple` scenario has one tool (weather); `multi` adds a calculator so the
+ * model loops twice. Returns a compiled, streamable graph.
  */
-export async function runStateGraphDemo(
-	userInput: string,
-	mode: StateGraphMode,
-	cb: StateGraphCallbacks = {}
-): Promise<{ messages: BaseMessage[]; path: string[] }> {
-	// ── Tools + bound model ─────────────────────────────────────────────────
+export async function buildStateGraph(mode: StateGraphMode) {
 	const tools = mode === 'simple' ? [weatherTool] : [weatherTool, calculatorTool];
 	const model = await getModel({ temperature: 0, maxTokens: 320 });
 	const bound = model.bindTools!(tools);
-	// ToolNode is a prebuilt node that executes every tool_call in the last AIMessage.
 	const toolNode = new ToolNode(tools);
 
-	let path: string[] = [];
-	const pushPath = (node: string) => {
-		path = [...path, node];
-		cb.onPath?.(path);
-	};
-
-	// ── Graph build: agent ↔ tools ReAct loop ───────────────────────────────
-	// MessagesAnnotation: state is { messages } with an append reducer on messages.
-	const graph = new StateGraph(MessagesAnnotation)
+	return new StateGraph(MessagesAnnotation)
 		.addNode('agent', async (state) => {
-			pushPath('agent');
-			cb.onActive?.('agent');
+			// MODEL node — append the model's reply (a partial update; the reducer merges it).
 			const ai = await bound.invoke(state.messages);
-			// Partial update — reducer appends this AIMessage to state.messages.
 			return { messages: [ai] };
 		})
-		.addNode('tools', async (state) => {
-			pushPath('tools');
-			cb.onActive?.('tools');
-			return await toolNode.invoke(state);
-		})
+		.addNode('tools', toolNode)
 		.addEdge(START, 'agent')
-		// Conditional edge: route to tools when the last message has tool_calls.
+		// CONDITIONAL EDGE — loop to tools while the model asks for them, else finish.
 		.addConditionalEdges('agent', (state) => {
 			const last = state.messages[state.messages.length - 1] as AIMessage;
-			if (last.tool_calls?.length) return 'tools';
-			return END;
+			return last.tool_calls?.length ? 'tools' : END;
 		})
 		.addEdge('tools', 'agent')
 		.compile();
+}
 
-	// ── Run: stream full state after each superstep ─────────────────────────
-	const seedMessages: BaseMessage[] = [new HumanMessage(userInput)];
-	let collected: BaseMessage[] = seedMessages;
-	for await (const update of await graph.stream(
-		{ messages: seedMessages },
-		{ streamMode: 'values' }
-	)) {
-		collected = update.messages as BaseMessage[];
-		cb.onMessages?.(collected);
-	}
-	cb.onActive?.('__end__');
-	pushPath('__end__');
-
-	return { messages: collected, path };
+/**
+ * Stream one run into <LiveGraph>. Only the user's question goes in; the state is
+ * seeded with it so the START frame already shows the message, and each node's
+ * streamed update (its new message) is appended by `merge`.
+ */
+export async function runStateGraphTurn(
+	graph: Awaited<ReturnType<typeof buildStateGraph>>,
+	userInput: string,
+	config: { configurable: { thread_id: string } },
+	onUpdate?: (node: string, snapshot: SGSnapshot) => void | Promise<void>
+) {
+	return runGraphTurn<SGSnapshot>(graph as unknown as StreamableGraph, { messages: [new HumanMessage(userInput)] }, config, {
+		empty: () => ({ messages: [new HumanMessage(userInput)] }),
+		merge: (s, u) => {
+			const msgs = (u as { messages?: BaseMessage[] }).messages;
+			if (Array.isArray(msgs)) s.messages = [...s.messages, ...msgs];
+		},
+		onUpdate
+	});
 }

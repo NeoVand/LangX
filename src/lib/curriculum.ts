@@ -33,6 +33,11 @@ export const chapters: Chapter[] = [
 				subtitle: 'One hand-built chatbot: memory, documents, and images.'
 			},
 			{
+				slug: 'model',
+				title: 'The Model',
+				subtitle: 'What an LLM is — and how LangChain wraps it.'
+			},
+			{
 				slug: 'runnables',
 				title: 'Runnables & LCEL',
 				subtitle: 'The pipe operator and the Runnable protocol.'

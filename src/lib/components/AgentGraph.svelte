@@ -33,6 +33,8 @@
 		 *  `to` side perpendicular, with a rounded mid-bend — like a real diagram. */
 		ortho?: { from: Side; to: Side };
 	}
+	/** A hover target the host can render a popover for. */
+	export type InspectTarget = { kind: 'node' | 'edge'; id: string; rect: DOMRect };
 	interface Props {
 		nodes: GNode[];
 		edges: GEdge[];
@@ -41,16 +43,60 @@
 		pausedNode?: string;
 		path?: string[];
 		caption?: string;
+		/** Set of node ids / "from|to" edge ids that have inspectable detail. */
+		inspectable?: Set<string>;
+		/** Fired on hover enter (target) / leave (null) of an inspectable element. */
+		onInspect?: (target: InspectTarget | null) => void;
+		/** Fired when a node is clicked — host can jump the run to that node. */
+		onActivate?: (id: string) => void;
 	}
-	let { nodes, edges, activeNode, pausedNode, path = [], caption }: Props = $props();
+	let {
+		nodes,
+		edges,
+		activeNode,
+		pausedNode,
+		path = [],
+		caption,
+		inspectable,
+		onInspect,
+		onActivate
+	}: Props = $props();
+
+	function canInspect(id: string) {
+		return !inspectable || inspectable.has(id);
+	}
+	function hoverEnter(kind: 'node' | 'edge', id: string, e: PointerEvent) {
+		if (!onInspect || !canInspect(id)) return;
+		const el = e.currentTarget as SVGGraphicsElement;
+		onInspect({ kind, id, rect: el.getBoundingClientRect() });
+	}
+	function hoverLeave() {
+		onInspect?.(null);
+	}
 
 	const byId = $derived(new Map(nodes.map((n) => [n.id, n])));
 
-	// viewBox from node extents + padding.
+	// viewBox from node extents + padding — plus the edge bows and labels, so a
+	// bowed arc or a lifted label never clips against the frame.
 	const pad = 18;
 	const vb = $derived.by(() => {
 		const xs = nodes.flatMap((n) => [n.cx - n.w / 2, n.cx + n.w / 2]);
 		const ys = nodes.flatMap((n) => [n.cy - n.h / 2, n.cy + n.h / 2]);
+		for (const e of edges) {
+			if (e.ortho) {
+				const op = orthoPoints(e);
+				if (op) for (const p of op) { xs.push(p.x); ys.push(p.y); }
+			} else {
+				const g = endpoints(e);
+				if (g) { xs.push(g.cx, g.p1.x, g.p2.x); ys.push(g.cy, g.p1.y, g.p2.y); }
+			}
+			if (e.label) {
+				const lp = labelPos(e);
+				const lw = e.label.length * 5.6 + 14;
+				xs.push(lp.x - lw / 2, lp.x + lw / 2);
+				ys.push(lp.y - 9, lp.y + 9);
+			}
+		}
 		const minX = Math.min(...xs) - pad;
 		const minY = Math.min(...ys) - pad;
 		const w = Math.max(...xs) + pad - minX;
@@ -189,8 +235,8 @@
 				viewBox="0 0 10 10"
 				refX="8.5"
 				refY="5"
-				markerWidth="7"
-				markerHeight="7"
+				markerWidth="12"
+				markerHeight="12"
 				markerUnits="userSpaceOnUse"
 				orient="auto-start-reverse"
 			>
@@ -201,8 +247,8 @@
 				viewBox="0 0 10 10"
 				refX="8.5"
 				refY="5"
-				markerWidth="7"
-				markerHeight="7"
+				markerWidth="12"
+				markerHeight="12"
 				markerUnits="userSpaceOnUse"
 				orient="auto-start-reverse"
 			>
@@ -222,7 +268,14 @@
 			{#if e.label}
 				{@const lp = labelPos(e)}
 				{@const lw = e.label.length * 5.6 + 14}
-				<g class="edge-label-g" class:on>
+				{@const eid = `${e.from}|${e.to}`}
+				<g
+					class="edge-label-g"
+					class:on
+					class:inspectable={canInspect(eid)}
+					onpointerenter={(ev) => hoverEnter('edge', eid, ev)}
+					onpointerleave={hoverLeave}
+				>
 					<rect class="edge-label-bg" x={lp.x - lw / 2} y={lp.y - 9} width={lw} height={18} rx={6} />
 					<text class="edge-label" x={lp.x} y={lp.y}>{e.label}</text>
 				</g>
@@ -233,7 +286,21 @@
 			{@const active = n.id === activeNode}
 			{@const paused = n.id === pausedNode}
 			{@const seen = fullPath.includes(n.id)}
-			<g class="node" class:active class:seen class:paused class:variant-code={n.variant === 'code'} class:variant-llm={n.variant === 'llm'} class:variant-router={n.variant === 'router'} class:variant-interrupt={n.variant === 'interrupt'} class:variant-fanout={n.variant === 'fanout'}>
+			<g
+				class="node"
+				class:active
+				class:seen
+				class:paused
+				class:inspectable={canInspect(n.id)}
+				class:variant-code={n.variant === 'code'}
+				class:variant-llm={n.variant === 'llm'}
+				class:variant-router={n.variant === 'router'}
+				class:variant-interrupt={n.variant === 'interrupt'}
+				class:variant-fanout={n.variant === 'fanout'}
+				onpointerenter={(ev) => hoverEnter('node', n.id, ev)}
+				onpointerleave={hoverLeave}
+				onclick={() => onActivate?.(n.id)}
+			>
 				<rect
 					x={n.cx - n.w / 2}
 					y={n.cy - n.h / 2}
@@ -262,6 +329,24 @@
 		height: auto;
 		display: block;
 		font-family: var(--font-mono);
+		-webkit-user-select: none;
+		user-select: none;
+		-webkit-tap-highlight-color: transparent;
+	}
+	.node,
+	.edge-label-g {
+		outline: none;
+	}
+	.node.inspectable,
+	.edge-label-g.inspectable {
+		cursor: pointer;
+	}
+	/* A soft hover ring on inspectable nodes so the affordance is discoverable. */
+	.node.inspectable:hover rect {
+		stroke: var(--accent);
+	}
+	.edge-label-g.inspectable:hover .edge-label-bg {
+		stroke: var(--accent-rule);
 	}
 
 	/* Edges */

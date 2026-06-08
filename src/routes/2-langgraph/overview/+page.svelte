@@ -4,8 +4,7 @@
 	import Term from '$lib/components/Term.svelte';
 	import Panel from '$lib/components/Panel.svelte';
 	import CodeBlock from '$lib/components/CodeBlock.svelte';
-	import AgentGraph from '$lib/components/AgentGraph.svelte';
-	import StateInspector from '$lib/components/StateInspector.svelte';
+	import LiveGraph, { type NodeMeta, type StepInfo, type EdgeDetail } from '$lib/components/LiveGraph.svelte';
 	import Markdown from '$lib/components/Markdown.svelte';
 	import HeroImage from '$lib/components/HeroImage.svelte';
 	import Accordion from '$lib/components/Accordion.svelte';
@@ -19,9 +18,9 @@
 		type Decision,
 		type Verdict
 	} from '$lib/demos/lg-edgar-audit';
-	import { SAMPLE_COMPANIES, resolveSample } from '$lib/runtime/edgar';
 	import edgarSrc from '$lib/runtime/edgar/index.ts?raw';
 	import auditSrc from '$lib/demos/lg-edgar-audit.ts?raw';
+	import graphRunSrc from '$lib/demos/graph-run.ts?raw';
 	import lgOverviewSkill from '$lib/demos/skills/langgraph-overview.md?raw';
 	import type { DemoManifest } from '$lib/demos/download';
 
@@ -35,10 +34,13 @@
 		CAT: 'Caterpillar Inc., the heavy-equipment manufacturer, trades on the Nasdaq under the ticker CAT, and is incorporated in Illinois.'
 	};
 
-	let ticker = $state<string>('AAPL');
-	let statement = $state(SAMPLES.AAPL);
-	function pickCompany(t: string) {
-		ticker = t;
+	// The box is the primary entry — a custom blurb about ANY public company.
+	// The agent figures out which company it is; the examples below just pre-fill.
+	let statement = $state('');
+	const activeTemplate = $derived(
+		Object.keys(SAMPLES).find((t) => SAMPLES[t] === statement.trim()) ?? null
+	);
+	function fillTemplate(t: string) {
 		statement = SAMPLES[t];
 		reset();
 	}
@@ -53,7 +55,7 @@
 	const COL_L = 150, COL_M = 314, COL_R = 500; // three aligned columns (wide gaps for labels)
 	const graphNodes = [
 		{ id: '__start__', label: 'START', cx: 46, cy: R1, w: 56, h: 28, shape: 'pill' as const },
-		{ id: 'resolve_company', label: 'Resolve', sub: 'code node', cx: COL_L, cy: R1, w: BW, h: BH, shape: 'box' as const, variant: 'code' as const },
+		{ id: 'resolve_company', label: 'Resolve', sub: 'model + EDGAR', cx: COL_L, cy: R1, w: BW, h: BH, shape: 'box' as const, variant: 'llm' as const },
 		{ id: 'extract_claims', label: 'Extract', sub: 'LLM · structured', cx: COL_M, cy: R1, w: BW, h: BH, shape: 'box' as const, variant: 'llm' as const },
 		{ id: 'verify', label: 'Verify ⇉', sub: 'Send · fan-out', cx: COL_R, cy: R1, w: BW, h: BH, shape: 'box' as const, variant: 'fanout' as const },
 		{ id: 'triage', label: 'Triage', sub: 'cond. edge', cx: COL_R, cy: R2, w: BW, h: BH, shape: 'box' as const, variant: 'router' as const },
@@ -75,6 +77,42 @@
 		{ from: 'compose_report', to: '__end__' },
 		{ from: 'triage', to: 'compose_report', label: 'all clear', ortho: { from: 'bottom' as const, to: 'top' as const } }
 	];
+
+	// Edges that carry real control-flow structure get their own hover popover.
+	const EDGE_DETAIL: Record<string, EdgeDetail> = {
+		'extract_claims|verify': {
+			title: 'Send · fan-out',
+			variant: 'fanout',
+			desc: 'Not a normal edge — a conditional edge that returns an array of Send objects. One Send() per claim spawns an independent verify branch; they run in parallel and a concat reducer merges every verdict back into one list.',
+			code: `// one Send() per claim → N parallel 'verify' branches
+.addConditionalEdges('extract_claims',
+  (s) => s.claims.map(
+    (claim) => new Send('verify', { claim, digest: s.digest })
+  ),
+  ['verify'])`
+		},
+		'triage|propose_edits': {
+			title: 'Conditional edge · contradicted',
+			variant: 'router',
+			desc: 'Taken when at least one verdict came back contradicted — routes to propose_edits to draft corrected wording. Routing is a function of state, not a prompt.',
+			code: `.addConditionalEdges('triage',
+  (s) => s.verdicts.some((v) => v.status === 'contradicted')
+    ? 'propose_edits'    // ← this branch: something to fix
+    : 'compose_report',
+  ['propose_edits', 'compose_report'])`
+		},
+		'triage|compose_report': {
+			title: 'Conditional edge · all clear',
+			variant: 'router',
+			desc: 'Taken when every claim is supported — skips propose_edits, the human gate, and apply_edits, jumping straight to the report. A loop would still walk every step.',
+			code: `.addConditionalEdges('triage',
+  (s) => s.verdicts.some((v) => v.status === 'contradicted')
+    ? 'propose_edits'
+    : 'compose_report',  // ← this branch: nothing to fix
+  ['propose_edits', 'compose_report'])`
+		}
+	};
+
 	const NODE_LABEL: Record<string, string> = {
 		__start__: 'Start',
 		resolve_company: 'Resolve company',
@@ -89,7 +127,7 @@
 	};
 	const NODE_DESC: Record<string, string> = {
 		__start__: "The run begins — state is initialised with the statement + CIK.",
-		resolve_company: "A plain function (no LLM) fetches the company’s live EDGAR record.",
+		resolve_company: "The model spots which company the blurb is about, then fetches that company’s live EDGAR record.",
 		extract_claims: "The model parses the blurb into atomic, typed claims via withStructuredOutput.",
 		verify: "One Send() per claim → N parallel branches. A reducer merges all verdicts back.",
 		triage: "A conditional edge reads the merged verdicts and picks the next node — no prompt.",
@@ -100,9 +138,59 @@
 		__end__: "The graph reached END — all state is final."
 	};
 
+	// Plain-language, beginner-friendly explanation for the popover's first tab.
+	// `lead` is the one-line takeaway; `body` teaches what's really happening.
+	const NODE_EXPLAIN: Record<string, { lead: string; body: string }> = {
+		__start__: {
+			lead: 'Press play.',
+			body: 'Every run begins here. START hands your input — the paragraph to fact-check and which company it is about — to the first step, and the flow begins. Nothing is computed yet; it just kicks things off.'
+		},
+		resolve_company: {
+			lead: 'Work out who, then get the facts.',
+			body: "First the AI reads your statement and works out which public company it is about — its ticker symbol. Nothing is hard-coded: the agent decides what to look up based on what you wrote. Then a plain web request pulls that company's official record from the SEC's EDGAR database — legal name, ticker, exchange, industry, fiscal-year end, and so on. Every later step is checked against these real facts."
+		},
+		extract_claims: {
+			lead: 'Turn the paragraph into a checklist.',
+			body: "The paragraph is just prose, so the AI reads it and breaks it into separate, checkable statements — 'it trades on the NYSE', 'its fiscal year ends in December', and so on. Each becomes a 'claim' we can verify on its own. This is the language model's job: turning messy text into tidy, structured data."
+		},
+		verify: {
+			lead: 'Fact-check every claim at once.',
+			body: "Instead of checking claims one after another, the graph fires off a separate worker for each claim and runs them all at the same time. Each worker compares its claim to the EDGAR facts and returns a verdict — supported, contradicted, or can't-tell. Running them in parallel is the whole point: it's far faster than a plain loop, and it's something a simple chatbot can't do on its own."
+		},
+		triage: {
+			lead: 'A fork in the road.',
+			body: "A quick decision point with no AI involved. The graph looks at all the verdicts and asks one question: did anything come back wrong? If yes, it heads down the path to fix things. If everything checks out, it skips ahead straight to writing the report. It's just an if/else, written in code rather than left to the model."
+		},
+		propose_edits: {
+			lead: 'Suggest fixes — but only suggest.',
+			body: 'Something was wrong, so the AI drafts a corrected version of each mistaken sentence, grounded in the real EDGAR facts. Important: nothing is changed yet. These are only proposals — a human still gets the final say in the next step.'
+		},
+		human_gate: {
+			lead: 'The program waits for you.',
+			body: "This is the magic moment. The graph pauses itself, shows you the suggested fixes, and waits for you to accept or reject each one. It's called 'human-in-the-loop': the program literally stops mid-run, remembers exactly where it was, and only continues once you decide. It could wait a second or a week — this is something a normal one-shot AI call simply cannot do."
+		},
+		apply_edits: {
+			lead: 'Carry out your decisions.',
+			body: 'Now that you have chosen, this step rewrites the paragraph — swapping in the fixes you accepted and leaving everything else untouched. Plain code again: just a careful find-and-replace on the text.'
+		},
+		compose_report: {
+			lead: 'Write up the results.',
+			body: 'The final write-up. This step assembles a tidy report — the corrected paragraph plus a table showing every claim, its verdict, and what EDGAR actually says. No AI here either; it is simply formatting results we already have.'
+		},
+		__end__: {
+			lead: 'Done.',
+			body: 'The graph has reached END. All the work is finished and the final state — report and all — is locked in. The run is complete.'
+		}
+	};
+
 	// ── Code snippets per node — shown in the expandable timeline ─────────────
 	const NODE_CODE: Record<string, string> = {
-		resolve_company: `const facts = await fetchCompanyFacts(state.cik);
+		resolve_company: `// the model works out which company the statement is about…
+const { ticker } = await model
+  .withStructuredOutput(CompanySchema)
+  .invoke(\`Which public company is this about?\\n\${state.statement}\`);
+// …then we resolve its CIK and fetch its live EDGAR record
+const facts = await fetchCompanyFacts(resolveCik(ticker));
 return { company: facts, digest: factsDigest(facts) };`,
 		extract_claims: `const model = getModel().withStructuredOutput(ClaimsSchema);
 const { claims } = await model.invoke(messages);
@@ -156,15 +244,7 @@ return { corrected: text };`,
 	let reviewDecision = $state<Record<string, 'accept' | 'reject'>>({});
 	let reviewText = $state<Record<string, string>>({});
 	let modalTab = $state<'review' | 'code'>('review');
-	let tlExpanded = $state<Record<string, boolean>>({});
-	let tlTab = $state<Record<string, 'state' | 'code'>>({});
 
-	function toggleExpand(nodeId: string) {
-		tlExpanded = { ...tlExpanded, [nodeId]: !tlExpanded[nodeId] };
-	}
-	function setTlTab(nodeId: string, tab: 'state' | 'code') {
-		tlTab = { ...tlTab, [nodeId]: tab };
-	}
 	function setDecision(id: string, action: 'accept' | 'reject') {
 		reviewDecision = { ...reviewDecision, [id]: action };
 	}
@@ -189,15 +269,11 @@ await graph.invoke(
 	let config: { configurable: { thread_id: string } } | null = null;
 	let threadCounter = 0;
 
-	const cur = $derived(frames.length ? frames[Math.min(frameIdx, frames.length - 1)] : null);
-	const snap = $derived<AuditSnapshot | null>(cur?.snap ?? null);
-	const activeNode = $derived(cur?.node);
-	const pathSoFar = $derived(frames.slice(0, frameIdx + 1).map((f) => f.node));
+	// The latest snapshot, regardless of where the playback head is — so the
+	// Output panel keeps showing the full result while you scrub the graph.
+	const final = $derived<AuditSnapshot | null>(frames.length ? frames[frames.length - 1].snap : null);
 	const atLatest = $derived(frameIdx >= frames.length - 1);
 	const pausedNode = $derived(interrupted && atLatest ? 'human_gate' : undefined);
-	const stepLabel = $derived(
-		frames.length ? `Step ${frameIdx + 1} / ${frames.length} · ${NODE_LABEL[cur?.node ?? ''] ?? ''}` : ''
-	);
 
 	const STATUS_ICON: Record<Verdict['status'], string> = {
 		supported: '✓',
@@ -205,139 +281,83 @@ await graph.invoke(
 		unverifiable: '–'
 	};
 
-	// ── Execution timeline — derived from frames up to viewIdx ────────────────
-	type TLEntry = {
-		node: string;
-		label: string;
-		primitive: string;
-		variant: string;
-		summary: string;
-		stateChange?: string;
-		items?: { icon: string; text: string; detail: string; status: string }[];
-		insight?: string;
-		frameEnd: number;
-		stateObj?: Record<string, unknown>;
-		changedKeys?: string[];
-	};
+	// What <LiveGraph> needs from this demo: per-node popover content (meta), the
+	// per-step "what happened" (describe), and the State-tab object (buildStateObj).
+	const nodeMeta: Record<string, NodeMeta> = Object.fromEntries(
+		graphNodes.map((n) => [
+			n.id,
+			{ label: NODE_LABEL[n.id], explain: NODE_EXPLAIN[n.id], desc: NODE_DESC[n.id], code: NODE_CODE[n.id] }
+		])
+	);
 
-	const timelineEntries = $derived.by((): TLEntry[] => {
-		const entries: TLEntry[] = [];
-		const visible = frames.slice(0, frameIdx + 1);
-		let i = 0;
-		while (i < visible.length) {
-			const f = visible[i];
-			const s = f.snap;
-			switch (f.node) {
-				case '__start__':
-					entries.push({ node: '__start__', label: 'Start', primitive: '', variant: '', summary: 'Graph invoked with statement + CIK', frameEnd: i });
-					i++;
-					break;
-				case 'resolve_company':
-					entries.push({
-						node: 'resolve_company', label: 'Resolve', primitive: 'code node', variant: 'code',
-						summary: `Fetched EDGAR record for ${s.company?.name ?? '?'}`,
-						stateChange: s.company ? `company.name = "${s.company.name}"  ·  tickers = [${s.company.tickers.map((t) => `"${t}"`).join(', ')}]` : undefined,
-						frameEnd: i
-					});
-					i++;
-					break;
-				case 'extract_claims':
-					entries.push({
-						node: 'extract_claims', label: 'Extract', primitive: 'LLM · structured', variant: 'llm',
-						summary: `Parsed ${s.claims.length} checkable claims via withStructuredOutput`,
-						stateChange: `claims = [${s.claims.length} items]`,
-						frameEnd: i
-					});
-					i++;
-					break;
-				case 'verify': {
-					const start = i;
-					while (i < visible.length && visible[i].node === 'verify') i++;
-					const last = visible[i - 1];
-					const verdicts = last.snap.verdicts;
-					const count = i - start;
-					entries.push({
-						node: 'verify', label: 'Verify', primitive: 'Send · fan-out', variant: 'fanout',
-						summary: `${count} claim${count > 1 ? 's' : ''} checked in parallel`,
-						items: verdicts.map((v) => ({ icon: STATUS_ICON[v.status], text: v.text, detail: v.truth || v.note, status: v.status })),
-						stateChange: `verdicts = [${verdicts.length} merged via (a, b) => [...a, ...b]]`,
-						insight: count > 1 ? `${count} branches ran in parallel — a loop would check them one by one` : undefined,
-						frameEnd: i - 1
-					});
-					break;
-				}
-				case 'triage': {
-					const contradicted = s.verdicts.filter((v) => v.status === 'contradicted').length;
-					entries.push({
-						node: 'triage', label: 'Triage', primitive: 'conditional edge', variant: 'router',
-						summary: contradicted > 0 ? `${contradicted} contradiction${contradicted > 1 ? 's' : ''} found → propose fixes` : 'All supported → skip to report',
-						insight: contradicted > 0
-							? 'A conditional edge reads state and picks the next node — code, not a prompt'
-							: 'Skipped 3 nodes (propose, review, apply) — a loop visits every step',
-						frameEnd: i
-					});
-					i++;
-					break;
-				}
-				case 'propose_edits':
-					entries.push({
-						node: 'propose_edits', label: 'Propose', primitive: 'LLM · structured', variant: 'llm',
-						summary: `Drafted ${s.edits.length} correction${s.edits.length !== 1 ? 's' : ''} for contradicted claims`,
-						stateChange: `edits = [${s.edits.length} items]`,
-						frameEnd: i
-					});
-					i++;
-					break;
-				case 'human_gate':
-					entries.push({
-						node: 'human_gate', label: 'Review', primitive: 'interrupt()', variant: 'interrupt',
-						summary: 'Paused — waiting for your accept / reject decisions',
-						insight: 'interrupt() checkpoints the full state — resume later, from anywhere, same thread',
-						frameEnd: i
-					});
-					i++;
-					break;
-				case 'apply_edits': {
-					const accepted = s.decisions?.filter((d) => d.action !== 'reject').length ?? 0;
-					entries.push({
-						node: 'apply_edits', label: 'Apply', primitive: 'code node', variant: 'code',
-						summary: `Applied ${accepted} accepted fix${accepted !== 1 ? 'es' : ''}`,
-						stateChange: `decisions = [${s.decisions?.map((d) => `"${d.action}"`).join(', ') ?? ''}]`,
-						frameEnd: i
-					});
-					i++;
-					break;
-				}
-				case 'compose_report':
-					entries.push({
-						node: 'compose_report', label: 'Report', primitive: 'code node', variant: 'code',
-						summary: 'Assembled the corrected statement + audit table',
-						frameEnd: i
-					});
-					i++;
-					break;
-				case '__end__':
-					entries.push({ node: '__end__', label: 'End', primitive: '', variant: '', summary: 'Graph reached END — all state is final', frameEnd: i });
-					i++;
-					break;
-				default:
-					i++;
+	function describe(node: string, s: AuditSnapshot, _prev: unknown, count: number): StepInfo | null {
+		switch (node) {
+			case '__start__':
+				return { summary: 'Graph invoked with the statement' };
+			case 'resolve_company':
+				return {
+					summary: `Identified ${s.company?.name ?? '?'} and fetched its EDGAR record`,
+					stateChange: s.company
+						? `company.name = "${s.company.name}"  ·  tickers = [${s.company.tickers.map((t) => `"${t}"`).join(', ')}]`
+						: undefined,
+					items: s.company
+						? [
+								{ icon: '·', text: 'Name', detail: s.company.name },
+								{ icon: '·', text: 'Ticker', detail: s.company.tickers.join(', ') || '—' },
+								{ icon: '·', text: 'Exchange', detail: s.company.exchanges.join(', ') || '—' },
+								{ icon: '·', text: 'Industry', detail: s.company.sicDescription },
+								{ icon: '·', text: 'Fiscal yr', detail: s.company.fiscalYearEndLabel },
+								{ icon: '·', text: 'State', detail: s.company.stateOfIncorporation }
+							]
+						: undefined
+				};
+			case 'extract_claims':
+				return {
+					summary: `Parsed ${s.claims.length} checkable claims via withStructuredOutput`,
+					stateChange: `claims = [${s.claims.length} items]`
+				};
+			case 'verify':
+				return {
+					summary: `${count} claim${count > 1 ? 's' : ''} checked in parallel`,
+					items: s.verdicts.map((v) => ({ icon: STATUS_ICON[v.status], text: v.text, detail: v.truth || v.note, status: v.status })),
+					stateChange: `verdicts = [${s.verdicts.length} merged via (a, b) => [...a, ...b]]`,
+					insight: count > 1 ? `${count} branches ran in parallel — a loop would check them one by one` : undefined
+				};
+			case 'triage': {
+				const contradicted = s.verdicts.filter((v) => v.status === 'contradicted').length;
+				return {
+					summary: contradicted > 0 ? `${contradicted} contradiction${contradicted > 1 ? 's' : ''} found → propose fixes` : 'All supported → skip to report',
+					insight: contradicted > 0
+						? 'A conditional edge reads state and picks the next node — code, not a prompt'
+						: 'Skipped 3 nodes (propose, review, apply) — a loop visits every step'
+				};
 			}
+			case 'propose_edits':
+				return {
+					summary: `Drafted ${s.edits.length} correction${s.edits.length !== 1 ? 's' : ''} for contradicted claims`,
+					stateChange: `edits = [${s.edits.length} items]`
+				};
+			case 'human_gate':
+				return {
+					summary: 'Paused — waiting for your accept / reject decisions',
+					insight: 'interrupt() checkpoints the full state — resume later, from anywhere, same thread'
+				};
+			case 'apply_edits': {
+				const accepted = s.decisions?.filter((d) => d.action !== 'reject').length ?? 0;
+				return {
+					summary: `Applied ${accepted} accepted fix${accepted !== 1 ? 'es' : ''}`,
+					stateChange: `decisions = [${s.decisions?.map((d) => `"${d.action}"`).join(', ') ?? ''}]`
+				};
+			}
+			case 'compose_report':
+				return { summary: 'Assembled the corrected statement + audit table' };
+			case '__end__':
+				return { summary: 'Graph reached END — all state is final' };
+			default:
+				return null;
 		}
-		// Second pass: attach the full state at each step + which top-level keys
-		// changed since the previous step (the diff, shown highlighted in the UI).
-		// Seed with the empty baseline so untouched [] / null don't read as changed.
-		let prev: Record<string, unknown> = { company: null, claims: [], verdicts: [], edits: [], decisions: [] };
-		for (const e of entries) {
-			const obj = buildStateObj(frames[e.frameEnd]?.snap);
-			e.stateObj = obj;
-			e.changedKeys = Object.keys(obj).filter(
-				(k) => JSON.stringify(obj[k]) !== JSON.stringify(prev[k])
-			);
-			prev = obj;
-		}
-		return entries;
-	});
+	}
+
 
 	function reset() {
 		frames = [];
@@ -347,34 +367,31 @@ await graph.invoke(
 		reviewDecision = {};
 		reviewText = {};
 		modalTab = 'review';
-		tlExpanded = {};
-		tlTab = {};
 		error = '';
 		graph = null;
 		config = null;
 	}
 
-	function pushFrame(node: string, s: AuditSnapshot) {
+	// Reveal each streamed step, then hold briefly so even the instant code nodes
+	// (triage, compose_report) are watchable instead of flashing past in one tick.
+	const STEP_MS = 480;
+	async function pushFrame(node: string, s: AuditSnapshot) {
 		frames = [...frames, { node, snap: s }];
 		frameIdx = frames.length - 1;
+		await new Promise((r) => setTimeout(r, STEP_MS));
 	}
 
 	async function run() {
-		if (running) return;
+		if (running || !statement.trim()) return;
 		reset();
 		running = true;
-		const company = resolveSample(ticker);
-		if (!company) {
-			error = `Unknown company: ${ticker}`;
-			running = false;
-			return;
-		}
 		try {
 			graph = await buildAuditGraph(new MemorySaver());
 			config = { configurable: { thread_id: `audit-${threadCounter++}` } };
+			// Only the statement goes in — the graph identifies the company itself.
 			const result = await runAuditTurn(
 				graph,
-				{ statement, cik: company.cik },
+				{ statement },
 				config,
 				(node, s) => pushFrame(node, s)
 			);
@@ -403,9 +420,16 @@ await graph.invoke(
 				: { id: e.id, action: 'accept' };
 		});
 		interrupted = false;
+		// Carry the pre-pause state across the resume so the post-resume frames
+		// (apply → report → end) keep the company, claims and verdicts.
+		const seed = frames.length ? frames[frames.length - 1].snap : undefined;
 		try {
-			await runAuditTurn(graph, new Command({ resume: { decisions } }), config, (node, s) =>
-				pushFrame(node, s)
+			await runAuditTurn(
+				graph,
+				new Command({ resume: { decisions } }),
+				config,
+				(node, s) => pushFrame(node, s),
+				seed
 			);
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
@@ -421,6 +445,7 @@ await graph.invoke(
 			'A LangGraph program that fact-checks a company blurb against live SEC EDGAR — parallel verification, conditional branching, and a human-approval interrupt.',
 		entries: [
 			{ path: 'lib/runtime/edgar/index.ts', code: edgarSrc },
+			{ path: 'lib/demos/graph-run.ts', code: graphRunSrc },
 			{ path: 'lib/demos/lg-edgar-audit.ts', code: auditSrc }
 		],
 		runner: `import { MemorySaver, Command } from '@langchain/langgraph';
@@ -428,9 +453,10 @@ import { buildAuditGraph, runAuditTurn } from './lib/demos/lg-edgar-audit';
 
 const graph = await buildAuditGraph(new MemorySaver());
 const config = { configurable: { thread_id: 'audit-1' } };
+// Just the prose — the graph identifies the company from it (no CIK needed).
 const statement = 'Apple Inc., the Cupertino software company, trades on the NYSE under AAPL.';
 
-const r1 = await runAuditTurn(graph, { statement, cik: '0000320193' }, config,
+const r1 = await runAuditTurn(graph, { statement }, config,
   (node) => console.log('  ·', node));
 if (r1.interrupted) {
   const decisions = r1.pendingEdits.map((e) => ({ id: e.id, action: 'accept' }));
@@ -562,7 +588,7 @@ state = await graph.invoke(new Command({ resume: { decisions } }), config);`;
 		<Slide title="Read the graph">
 			<p>The auditor runs nine steps. Notice that a node is <em>just a function</em> — some are code, some are the model:</p>
 			<ul>
-				<li><strong>Resolve</strong> — a code node fetches the company's live <Term t="EDGAR">EDGAR</Term> record (identity + filing history).</li>
+				<li><strong>Resolve</strong> — the model identifies which company the blurb is about, then fetches that company's live <Term t="EDGAR">EDGAR</Term> record (identity + filing history).</li>
 				<li><strong>Extract</strong> — an LLM node turns the blurb into a list of atomic, checkable claims.</li>
 				<li><strong>Verify ⇉</strong> — a <Term t="Send">Send</Term> <Term t="fan-out">fans the claims out</Term> to parallel branches; each verdict <em>merges back</em> through a <Term t="reducer">reducer</Term>.</li>
 				<li><strong>Triage</strong> — a <Term t="conditional edge">conditional edge</Term> reads the merged verdicts and branches: propose fixes, or skip straight to the report.</li>
@@ -678,26 +704,27 @@ state = await graph.invoke(new Command({ resume: { decisions } }), config);`;
 	{/snippet}
 
 	{#snippet demo()}
-		<Panel title="The statement to audit" subtitle="pick a company, or edit the blurb — every fact is checked against live EDGAR">
-			<div class="picker">
-				{#each SAMPLE_COMPANIES.filter((c) => c.ticker in SAMPLES) as c (c.ticker)}
-					<button
-						class="chip"
-						class:on={ticker === c.ticker}
-						onclick={() => pickCompany(c.ticker)}
-						disabled={running}
-					>
-						{c.ticker}
-					</button>
-				{/each}
-				<span class="picker-hint">{resolveSample(ticker)?.name}</span>
-			</div>
-			<textarea class="statement" bind:value={statement} rows="4" spellcheck="false"></textarea>
+		<Panel title="The statement to audit" subtitle="write a sentence or paragraph about any public company — the agent figures out which one and checks every fact against live SEC EDGAR">
+			<textarea
+				class="statement"
+				bind:value={statement}
+				rows="4"
+				spellcheck="false"
+				placeholder="e.g. Apple Inc., the Cupertino software company, trades on the New York Stock Exchange under AAPL and its fiscal year ends in December."
+			></textarea>
 			<div class="run-row">
-				<button class="run" onclick={run} disabled={running}>
+				<button class="run" onclick={run} disabled={running || !statement.trim()}>
 					{running ? 'Auditing…' : 'Audit against EDGAR'}
 				</button>
 				{#if frames.length}<button class="reset" onclick={reset} disabled={running}>Clear</button>{/if}
+			</div>
+			<div class="examples">
+				<span class="examples-label">or try an example:</span>
+				{#each Object.keys(SAMPLES) as t (t)}
+					<button class="chip" class:on={activeTemplate === t} onclick={() => fillTemplate(t)} disabled={running}>
+						{t}
+					</button>
+				{/each}
 			</div>
 			{#if error}
 				<div class="err">{error}</div>
@@ -705,52 +732,19 @@ state = await graph.invoke(new Command({ resume: { decisions } }), config);`;
 		</Panel>
 
 		{#if frames.length}
-			<Panel title="The graph, live" subtitle={stepLabel}>
-				<AgentGraph nodes={graphNodes} edges={graphEdges} {activeNode} {pausedNode} path={pathSoFar} />
-				<div class="playback">
-					<button onclick={() => (frameIdx = Math.max(0, frameIdx - 1))} disabled={frameIdx <= 0}>‹ Prev</button>
-					<span class="pb-label">{stepLabel}</span>
-					<button onclick={() => (frameIdx = Math.min(frames.length - 1, frameIdx + 1))} disabled={frameIdx >= frames.length - 1}>Next ›</button>
-				</div>
-				<div class="step-desc">{NODE_DESC[cur?.node ?? ''] ?? ''}</div>
+			<Panel title="The graph, live" subtitle="hover any node or labelled edge to inspect what it does">
+				<LiveGraph
+					nodes={graphNodes}
+					edges={graphEdges}
+					{frames}
+					bind:frameIdx
+					meta={nodeMeta}
+					edgeDetails={EDGE_DETAIL}
+					{describe}
+					toState={buildStateObj}
+					{pausedNode}
+				/>
 			</Panel>
-
-			{#if snap?.company}
-				<Panel title="Inspection" subtitle="EDGAR ground truth vs. extracted claims">
-					<div class="inspection">
-						<div class="insp-facts">
-							<div class="insp-heading">EDGAR record</div>
-							<dl class="facts-compact">
-								<div><dt>Name</dt><dd>{snap.company.name}</dd></div>
-								<div><dt>Ticker</dt><dd>{snap.company.tickers.join(', ') || '—'}</dd></div>
-								<div><dt>Exchange</dt><dd>{snap.company.exchanges.join(', ') || '—'}</dd></div>
-								<div><dt>Industry</dt><dd>{snap.company.sicDescription}</dd></div>
-								<div><dt>Fiscal yr</dt><dd>{snap.company.fiscalYearEndLabel}</dd></div>
-								<div><dt>State</dt><dd>{snap.company.stateOfIncorporation}</dd></div>
-							</dl>
-							<a class="prov" href={snap.company.source} target="_blank" rel="noopener noreferrer">
-								live EDGAR record ↗
-							</a>
-						</div>
-						{#if snap.verdicts.length}
-							<div class="insp-verdicts">
-								<div class="insp-heading">Claims & verdicts</div>
-								{#each snap.verdicts as v (v.id)}
-									<div class="v-row {v.status}">
-										<span class="v-icon">{STATUS_ICON[v.status]}</span>
-										<div class="v-content">
-											<div class="v-claim">{v.text}</div>
-											{#if v.truth || v.note}
-												<div class="v-truth">{v.truth || v.note}</div>
-											{/if}
-										</div>
-									</div>
-								{/each}
-							</div>
-						{/if}
-					</div>
-				</Panel>
-			{/if}
 		{/if}
 
 		{#if interrupted && atLatest}
@@ -796,85 +790,15 @@ state = await graph.invoke(new Command({ resume: { decisions } }), config);`;
 			</div>
 		{/if}
 
-		{#if snap && snap.report && !interrupted}
-			<Panel title="Audit report" subtitle="corrected statement + provenance">
-				{#if snap.corrected}
-					<div class="corrected"><Markdown source={snap.corrected} /></div>
+		{#if final && final.report && !interrupted}
+			<Panel title="Output" subtitle="everything the run produced — stays put as you step through the graph">
+				{#if final.corrected}
+					<div class="corrected"><Markdown source={final.corrected} /></div>
 				{/if}
-				<div class="report"><Markdown source={snap.report} /></div>
+				<div class="report"><Markdown source={final.report} /></div>
 			</Panel>
 		{/if}
 
-		{#if timelineEntries.length}
-			<Panel title="Under the hood" subtitle="what each node is, what it wrote, and why a graph can do it">
-				<div class="timeline">
-					{#each timelineEntries as entry (entry.node)}
-						<div class="tl-entry {entry.variant}" class:tl-active={entry.node === activeNode}>
-							<div class="tl-head">
-								{#if entry.variant}
-									<span class="tl-dot {entry.variant}"></span>
-								{/if}
-								<span class="tl-name">{entry.label}</span>
-								{#if entry.primitive}
-									<span class="tl-badge {entry.variant}">{entry.primitive}</span>
-								{/if}
-							</div>
-							<div class="tl-body">
-								<div class="tl-summary">{entry.summary}</div>
-								{#if entry.items}
-									<div class="tl-items">
-										{#each entry.items as item}
-											<div class="tl-item {item.status}">
-												<span class="tl-icon">{item.icon}</span>
-												<span class="tl-text">{item.text}</span>
-												{#if item.detail}
-													<span class="tl-detail">{item.detail}</span>
-												{/if}
-											</div>
-										{/each}
-									</div>
-								{/if}
-								{#if entry.stateChange}
-									<code class="tl-delta">{entry.stateChange}</code>
-								{/if}
-								{#if entry.insight}
-									<div class="tl-insight">{entry.insight}</div>
-								{/if}
-								{#if entry.primitive}
-									<button class="tl-toggle" onclick={() => toggleExpand(entry.node)}>
-										{tlExpanded[entry.node] ? '▾ hide details' : '▸ inspect state & code'}
-									</button>
-								{/if}
-								{#if tlExpanded[entry.node] && entry.primitive}
-									{@const tab = tlTab[entry.node] ?? 'state'}
-									<div class="tl-expanded">
-										<div class="tl-tabs">
-											<button class:on={tab === 'state'} onclick={() => setTlTab(entry.node, 'state')}>State</button>
-											{#if NODE_CODE[entry.node]}
-												<button class:on={tab === 'code'} onclick={() => setTlTab(entry.node, 'code')}>Implementation</button>
-											{/if}
-										</div>
-										{#if tab === 'code' && NODE_CODE[entry.node]}
-											<CodeBlock code={NODE_CODE[entry.node]} lang="ts" dense />
-										{:else}
-											{#if entry.changedKeys?.length}
-												<div class="tl-changed">
-													<span class="tl-changed-label">changed this step</span>
-													{#each entry.changedKeys as k}
-														<span class="tl-chip">{k}</span>
-													{/each}
-												</div>
-											{/if}
-											<StateInspector state={entry.stateObj} compact />
-										{/if}
-									</div>
-								{/if}
-							</div>
-						</div>
-					{/each}
-				</div>
-			</Panel>
-		{/if}
 	{/snippet}
 </Lesson>
 
@@ -914,110 +838,18 @@ state = await graph.invoke(new Command({ resume: { decisions } }), config);`;
 		color: var(--color-fg-muted);
 	}
 
-	.step-desc {
-		margin-top: 0.55rem;
-		text-align: center;
-		font-family: var(--font-mono);
-		font-size: 0.72rem;
-		color: var(--color-fg-muted);
-		min-height: 1.1em;
-	}
-
-	/* ── Combined inspection panel: facts left, verdicts right ── */
-	.inspection {
-		display: grid;
-		grid-template-columns: auto 1fr;
-		gap: 0 1.2rem;
-	}
-	.insp-heading {
-		font-family: var(--font-mono);
-		font-size: 0.62rem;
-		text-transform: uppercase;
-		letter-spacing: 0.08em;
-		color: var(--color-fg-faint);
-		margin-bottom: 0.45rem;
-	}
-	.insp-facts {
-		min-width: 9rem;
-	}
-	.facts-compact {
-		display: flex;
-		flex-direction: column;
-		gap: 0.2rem;
-		margin: 0 0 0.5rem;
-	}
-	.facts-compact div {
-		display: flex;
-		gap: 0.4rem;
-		align-items: baseline;
-	}
-	.facts-compact dt {
-		font-family: var(--font-mono);
-		font-size: 0.6rem;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		color: var(--color-fg-faint);
-		min-width: 4.2rem;
-		flex-shrink: 0;
-	}
-	.facts-compact dd {
-		margin: 0;
-		font-size: 0.78rem;
-		color: var(--color-fg);
-	}
-	.prov {
-		font-family: var(--font-mono);
-		font-size: 0.68rem;
-		color: var(--color-fg-muted);
-		text-decoration: none;
-		border-bottom: 1px solid var(--accent-rule);
-		padding-bottom: 1px;
-	}
-	.prov:hover {
-		color: var(--accent);
-	}
-	.insp-verdicts {
-		border-left: 1px solid var(--color-rule);
-		padding-left: 1rem;
-	}
-	.v-row {
-		display: flex;
-		gap: 0.4rem;
-		padding: 0.25rem 0;
-		border-bottom: 1px solid color-mix(in oklch, var(--color-rule) 50%, transparent);
-		align-items: flex-start;
-	}
-	.v-row:last-child { border-bottom: none; }
-	.v-icon {
-		font-family: var(--font-mono);
-		font-weight: 700;
-		font-size: 0.78rem;
-		flex-shrink: 0;
-		width: 1rem;
-		text-align: center;
-	}
-	.v-row.supported .v-icon { color: var(--color-accent-success); }
-	.v-row.contradicted .v-icon { color: var(--color-accent-danger); }
-	.v-row.unverifiable .v-icon { color: var(--color-fg-faint); }
-	.v-content { min-width: 0; }
-	.v-claim {
-		font-size: 0.78rem;
-		color: var(--color-fg);
-		line-height: 1.35;
-	}
-	.v-truth {
-		font-family: var(--font-mono);
-		font-size: 0.66rem;
-		color: var(--color-fg-muted);
-		margin-top: 0.1rem;
-	}
-
-	.picker {
+	.examples {
 		display: flex;
 		align-items: center;
 		gap: 0.4rem;
 		flex-wrap: wrap;
-		margin-bottom: 0.6rem;
+		margin-top: 0.7rem;
+	}
+	.examples-label {
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		color: var(--color-fg-faint);
+		margin-right: 0.1rem;
 	}
 	.chip {
 		font-family: var(--font-mono);
@@ -1036,12 +868,6 @@ state = await graph.invoke(new Command({ resume: { decisions } }), config);`;
 	.chip.on {
 		border-color: var(--accent);
 		color: var(--accent);
-	}
-	.picker-hint {
-		font-family: var(--font-mono);
-		font-size: 0.7rem;
-		color: var(--color-fg-faint);
-		margin-left: 0.2rem;
 	}
 	.statement {
 		width: 100%;
@@ -1090,258 +916,6 @@ state = await graph.invoke(new Command({ resume: { decisions } }), config);`;
 		margin-top: 0.6rem;
 		font-size: 0.78rem;
 		color: var(--color-accent-warning);
-	}
-
-	.playback {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 0.8rem;
-		margin-top: 0.6rem;
-	}
-	.playback button {
-		font-family: var(--font-mono);
-		font-size: 0.72rem;
-		padding: 0.28rem 0.7rem;
-		border-radius: 0.4rem;
-		border: 1px solid var(--color-rule);
-		background: transparent;
-		color: var(--color-fg-muted);
-		cursor: pointer;
-	}
-	.playback button:disabled {
-		opacity: 0.4;
-		cursor: default;
-	}
-	.pb-label {
-		font-family: var(--font-mono);
-		font-size: 0.72rem;
-		color: var(--color-fg-faint);
-		min-width: 12rem;
-		text-align: center;
-	}
-
-	/* ── Execution timeline ── */
-	.timeline {
-		display: flex;
-		flex-direction: column;
-		gap: 0;
-	}
-	.tl-entry {
-		border-left: 3px solid var(--color-rule);
-		padding: 0.45rem 0 0.45rem 0.75rem;
-		transition: border-color 0.2s ease, background 0.2s ease;
-	}
-	.tl-entry + .tl-entry {
-		border-top: 1px solid color-mix(in oklch, var(--color-rule) 40%, transparent);
-	}
-	.tl-entry.code { border-left-color: #5B8AC4; }
-	.tl-entry.llm { border-left-color: #9B6BC4; }
-	.tl-entry.router { border-left-color: #C4A43B; }
-	.tl-entry.interrupt { border-left-color: #C45B6B; }
-	.tl-entry.fanout { border-left-color: #C4853B; }
-	.tl-active {
-		background: color-mix(in oklch, var(--accent) 6%, transparent);
-	}
-	.tl-head {
-		display: flex;
-		align-items: center;
-		gap: 0.4rem;
-		margin-bottom: 0.2rem;
-	}
-	.tl-dot {
-		width: 7px;
-		height: 7px;
-		border-radius: 50%;
-		flex-shrink: 0;
-		background: var(--color-rule);
-	}
-	.tl-dot.code { background: #5B8AC4; }
-	.tl-dot.llm { background: #9B6BC4; }
-	.tl-dot.router { background: #C4A43B; }
-	.tl-dot.interrupt { background: #C45B6B; }
-	.tl-dot.fanout { background: #C4853B; }
-	.tl-name {
-		font-family: var(--font-mono);
-		font-size: 0.76rem;
-		font-weight: 600;
-		color: var(--color-fg);
-	}
-	.tl-badge {
-		font-family: var(--font-mono);
-		font-size: 0.58rem;
-		padding: 0.12rem 0.4rem;
-		border-radius: 999px;
-		border: 1px solid var(--color-rule);
-		color: var(--color-fg-muted);
-		white-space: nowrap;
-	}
-	.tl-badge.code { border-color: #5B8AC4; color: #5B8AC4; }
-	.tl-badge.llm { border-color: #9B6BC4; color: #9B6BC4; }
-	.tl-badge.router { border-color: #C4A43B; color: #C4A43B; }
-	.tl-badge.interrupt { border-color: #C45B6B; color: #C45B6B; }
-	.tl-badge.fanout { border-color: #C4853B; color: #C4853B; }
-	.tl-body {
-		padding-left: 0;
-	}
-	.tl-summary {
-		font-size: 0.76rem;
-		color: var(--color-fg-muted);
-		line-height: 1.4;
-	}
-	.tl-items {
-		margin: 0.3rem 0 0.15rem;
-		display: flex;
-		flex-direction: column;
-		gap: 0.15rem;
-	}
-	.tl-item {
-		display: flex;
-		align-items: baseline;
-		gap: 0.3rem;
-		font-size: 0.72rem;
-	}
-	.tl-icon {
-		font-family: var(--font-mono);
-		font-weight: 700;
-		width: 0.9rem;
-		flex-shrink: 0;
-		text-align: center;
-	}
-	.tl-item.supported .tl-icon { color: var(--color-accent-success); }
-	.tl-item.contradicted .tl-icon { color: var(--color-accent-danger); }
-	.tl-item.unverifiable .tl-icon { color: var(--color-fg-faint); }
-	.tl-text {
-		color: var(--color-fg);
-	}
-	.tl-detail {
-		font-family: var(--font-mono);
-		font-size: 0.64rem;
-		color: var(--color-fg-faint);
-		margin-left: 0.2rem;
-	}
-	.tl-delta {
-		display: block;
-		font-family: var(--font-mono);
-		font-size: 0.66rem;
-		color: var(--color-fg-muted);
-		margin-top: 0.25rem;
-		padding: 0.2rem 0.4rem;
-		background: color-mix(in oklch, var(--color-fg) 5%, transparent);
-		border-radius: 0.25rem;
-		white-space: pre-wrap;
-		word-break: break-all;
-	}
-	.tl-insight {
-		font-size: 0.68rem;
-		color: var(--color-fg-muted);
-		margin-top: 0.25rem;
-		padding: 0.25rem 0.45rem;
-		background: color-mix(in oklch, var(--accent) 8%, transparent);
-		border-radius: 0.3rem;
-		border-left: 2px solid var(--accent-rule);
-		line-height: 1.4;
-	}
-	.tl-toggle {
-		font-family: var(--font-mono);
-		font-size: 0.64rem;
-		background: none;
-		border: none;
-		border-radius: 0.25rem;
-		color: var(--color-fg-faint);
-		cursor: pointer;
-		padding: 0.2rem 0;
-		margin-top: 0.35rem;
-		text-align: left;
-		transition: color 0.15s ease;
-	}
-	.tl-toggle:hover {
-		color: var(--accent);
-	}
-	.tl-expanded {
-		margin-top: 0.45rem;
-		padding-top: 0.5rem;
-		border-top: 1px solid color-mix(in oklch, var(--color-rule) 40%, transparent);
-	}
-	.tl-tabs {
-		display: flex;
-		gap: 0.2rem;
-		background: color-mix(in oklch, var(--color-fg) 5%, transparent);
-		border-radius: 0.4rem;
-		padding: 0.15rem;
-		margin-bottom: 0.5rem;
-		width: fit-content;
-	}
-	.tl-tabs button {
-		font-family: var(--font-mono);
-		font-size: 0.62rem;
-		padding: 0.18rem 0.55rem;
-		border-radius: 0.3rem;
-		border: none;
-		background: transparent;
-		color: var(--color-fg-muted);
-		cursor: pointer;
-		transition: background 0.15s ease, color 0.15s ease;
-	}
-	.tl-tabs button.on {
-		background: var(--color-bg-elev-2, #1c1814);
-		color: var(--color-fg);
-	}
-	.tl-changed {
-		display: flex;
-		align-items: center;
-		flex-wrap: wrap;
-		gap: 0.3rem;
-		margin-bottom: 0.45rem;
-	}
-	.tl-changed-label {
-		font-family: var(--font-mono);
-		font-size: 0.56rem;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
-		color: var(--color-fg-faint);
-		margin-right: 0.1rem;
-	}
-	.tl-chip {
-		font-family: var(--font-mono);
-		font-size: 0.62rem;
-		padding: 0.1rem 0.4rem;
-		border-radius: 0.3rem;
-		color: var(--accent);
-		background: color-mix(in oklch, var(--accent) 12%, transparent);
-		border: 1px solid var(--accent-rule);
-	}
-	/* State + code inside the timeline: tighter, fonts matched to the timeline,
-	   with a visible slim scrollbar on the state view. The .shiki / code / .line
-	   chain all need the size — code & .line carry their own font-size globally. */
-	.tl-expanded :global(.shiki),
-	.tl-expanded :global(.shiki code),
-	.tl-expanded :global(.shiki .line) {
-		font-size: 0.64rem !important;
-		line-height: 1.5 !important;
-	}
-	.tl-expanded :global(.inspector) {
-		border: 1px solid color-mix(in oklch, var(--color-rule) 50%, transparent);
-		border-radius: 0.4rem;
-		background: color-mix(in oklch, var(--color-fg) 4%, transparent);
-	}
-	.tl-expanded :global(.inspector .hl) {
-		max-height: 14rem;
-	}
-	.tl-expanded :global(.inspector pre.shiki) {
-		padding: 0.5rem 0.7rem !important;
-	}
-	.tl-expanded :global(.code) {
-		margin: 0;
-		border-radius: 0.4rem;
-		overflow: hidden;
-	}
-	.tl-expanded :global(.code pre.shiki) {
-		padding: 0.6rem 0.7rem !important;
-	}
-	.tl-expanded :global(.code figcaption) {
-		font-size: 0.6rem;
-		padding: 0.35rem 0.7rem 0.45rem;
 	}
 
 	/* ── Human-gate modal — right side only ── */
