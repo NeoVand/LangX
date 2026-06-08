@@ -182,7 +182,15 @@ const aliases: Record<string, string> = {
 	on_parser_end: 'on_parser_end',
 	approve_draft: 'approve_draft',
 	fetch_chunk: 'fetch_chunk',
-	traceevent: 'TraceEvent'
+	traceevent: 'TraceEvent',
+	'deep agents': 'Deep Agent',
+	edgar: 'EDGAR',
+	'super-step': 'Super-step',
+	'super-steps': 'Super-step',
+	superstep: 'Super-step',
+	supersteps: 'Super-step',
+	'durable execution': 'Durable execution',
+	provenance: 'Provenance'
 };
 
 export const glossary: GlossaryEntry[] = [
@@ -192,6 +200,18 @@ export const glossary: GlossaryEntry[] = [
 		chapter: 'general',
 		short: 'Standard for async parent↔subagent communication.',
 		long: 'Lets a parent delegate work without blocking on the child transcript; the parent receives a final report when the subagent finishes. Referenced in the Beyond lesson as the production pattern behind task().'
+	},
+	{
+		term: 'EDGAR',
+		chapter: 'general',
+		short: 'The SEC’s free public record of company filings.',
+		long: 'Every U.S. public company files reports with the Securities and Exchange Commission — annual (10-K), quarterly (10-Q), and material-event (8-K). EDGAR is the open database of those filings plus each company’s core identity: legal name, ticker, exchange, industry, and fiscal year. The auditor demo checks claims against it live, straight from the browser.'
+	},
+	{
+		term: 'Provenance',
+		chapter: 'general',
+		short: 'Where a claim’s answer came from — the checkable source behind it.',
+		long: 'A fact-checker is only trustworthy if you can see its evidence. Provenance means every verdict carries its source: which live EDGAR field it was checked against, and a link back to the filing record. Same idea as a citation in RAG — the system shows its work instead of asking you to trust it.'
 	},
 	{
 		term: 'Capstone',
@@ -598,6 +618,18 @@ export const glossary: GlossaryEntry[] = [
 		chapter: 'langgraph',
 		short: 'Bulk-synchronous parallel model for supersteps.',
 		long: 'Google Pregel pattern: nodes run concurrently within a superstep, emit updates, runtime merges, next superstep begins. LangGraph runtime is Pregel-flavored.'
+	},
+	{
+		term: 'Super-step',
+		chapter: 'langgraph',
+		short: 'One tick of the graph: a batch of nodes runs, then state merges.',
+		long: 'LangGraph runs in discrete super-steps (a bulk-synchronous “tick”). All nodes triggered this step run together — possibly in parallel — then their updates are merged through the reducers before the next step begins. That batch-then-merge rhythm is why a Send fan-out is one super-step of many parallel workers, and why a checkpoint is saved per super-step.'
+	},
+	{
+		term: 'Durable execution',
+		chapter: 'langgraph',
+		short: 'Runs survive pauses and crashes by replaying from a checkpoint.',
+		long: 'Because state is checkpointed every super-step, a run can stop — at an interrupt, on a crash, between machines — and resume from the last good point rather than the top. The trade-off: resumption replays from a restart point, so non-deterministic work and side effects should be idempotent or wrapped, not assumed to continue mid-line.'
 	},
 	{
 		term: 'Reducer',

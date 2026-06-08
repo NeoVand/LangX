@@ -16,7 +16,9 @@
 		w: number;
 		h: number;
 		shape?: 'box' | 'pill';
+		variant?: 'code' | 'llm' | 'router' | 'interrupt' | 'fanout';
 	}
+	type Side = 'top' | 'bottom' | 'left' | 'right';
 	interface GEdge {
 		from: string;
 		to: string;
@@ -27,6 +29,9 @@
 		label?: string;
 		/** Extra vertical nudge for the label, e.g. to lift it clear of its arrow. */
 		labelDy?: number;
+		/** Orthogonal (elbow) routing: leave `from` side perpendicular, arrive at
+		 *  `to` side perpendicular, with a rounded mid-bend — like a real diagram. */
+		ortho?: { from: Side; to: Side };
 	}
 	interface Props {
 		nodes: GNode[];
@@ -95,13 +100,78 @@
 		return { p1, p2, mx, my, bow, cx: mx + nx * bow, cy: my + ny * bow, nx, ny };
 	}
 
+	// The point on a node's border for a given side (centre of that edge).
+	function sidePoint(n: GNode, side: Side) {
+		switch (side) {
+			case 'top': return { x: n.cx, y: n.cy - n.h / 2 };
+			case 'bottom': return { x: n.cx, y: n.cy + n.h / 2 };
+			case 'left': return { x: n.cx - n.w / 2, y: n.cy };
+			case 'right': return { x: n.cx + n.w / 2, y: n.cy };
+		}
+	}
+
+	// Orthogonal waypoints: leave `from` perpendicular, meet at a mid-line, arrive
+	// at `to` perpendicular. Vertical sides → V-H-V; horizontal sides → H-V-H.
+	function orthoPoints(e: GEdge) {
+		const a = byId.get(e.from);
+		const b = byId.get(e.to);
+		if (!a || !b || !e.ortho) return null;
+		const p1 = sidePoint(a, e.ortho.from);
+		const p2 = sidePoint(b, e.ortho.to);
+		const fromV = e.ortho.from === 'top' || e.ortho.from === 'bottom';
+		const toV = e.ortho.to === 'top' || e.ortho.to === 'bottom';
+		let pts: { x: number; y: number }[];
+		if (fromV && toV) {
+			const midY = (p1.y + p2.y) / 2;
+			pts = [p1, { x: p1.x, y: midY }, { x: p2.x, y: midY }, p2];
+		} else if (!fromV && !toV) {
+			const midX = (p1.x + p2.x) / 2;
+			pts = [p1, { x: midX, y: p1.y }, { x: midX, y: p2.y }, p2];
+		} else {
+			// L-bend: the corner sits where the two perpendiculars cross.
+			pts = fromV ? [p1, { x: p1.x, y: p2.y }, p2] : [p1, { x: p2.x, y: p1.y }, p2];
+		}
+		return pts;
+	}
+
+	// A polyline with rounded corners (radius capped to half the shortest leg).
+	function roundedPath(pts: { x: number; y: number }[], r = 9): string {
+		if (pts.length < 2) return '';
+		let d = `M ${pts[0].x} ${pts[0].y}`;
+		for (let i = 1; i < pts.length - 1; i++) {
+			const prev = pts[i - 1], cur = pts[i], next = pts[i + 1];
+			const l1 = Math.hypot(prev.x - cur.x, prev.y - cur.y) || 1;
+			const l2 = Math.hypot(next.x - cur.x, next.y - cur.y) || 1;
+			const d1 = Math.min(r, l1 / 2);
+			const d2 = Math.min(r, l2 / 2);
+			const a1 = { x: cur.x + ((prev.x - cur.x) / l1) * d1, y: cur.y + ((prev.y - cur.y) / l1) * d1 };
+			const a2 = { x: cur.x + ((next.x - cur.x) / l2) * d2, y: cur.y + ((next.y - cur.y) / l2) * d2 };
+			d += ` L ${a1.x} ${a1.y} Q ${cur.x} ${cur.y} ${a2.x} ${a2.y}`;
+		}
+		const last = pts[pts.length - 1];
+		d += ` L ${last.x} ${last.y}`;
+		return d;
+	}
+
 	function edgePath(e: GEdge): string {
+		if (e.ortho) {
+			const pts = orthoPoints(e);
+			return pts ? roundedPath(pts) : '';
+		}
 		const g = endpoints(e);
 		return g ? `M ${g.p1.x} ${g.p1.y} Q ${g.cx} ${g.cy} ${g.p2.x} ${g.p2.y}` : '';
 	}
 
 	// Edge-label position: the midpoint, nudged toward the control point.
 	function labelPos(e: GEdge) {
+		if (e.ortho) {
+			const pts = orthoPoints(e);
+			if (pts && pts.length >= 4) {
+				// Centre of the mid-segment (the long connector between the two bends).
+				return { x: (pts[1].x + pts[2].x) / 2, y: (pts[1].y + pts[2].y) / 2 + (e.labelDy ?? 0) };
+			}
+			if (pts) return { x: pts[1].x, y: pts[1].y + (e.labelDy ?? 0) };
+		}
 		const g = endpoints(e);
 		if (!g) return { x: 0, y: 0 };
 		return {
@@ -163,7 +233,7 @@
 			{@const active = n.id === activeNode}
 			{@const paused = n.id === pausedNode}
 			{@const seen = fullPath.includes(n.id)}
-			<g class="node" class:active class:seen class:paused>
+			<g class="node" class:active class:seen class:paused class:variant-code={n.variant === 'code'} class:variant-llm={n.variant === 'llm'} class:variant-router={n.variant === 'router'} class:variant-interrupt={n.variant === 'interrupt'} class:variant-fanout={n.variant === 'fanout'}>
 				<rect
 					x={n.cx - n.w / 2}
 					y={n.cy - n.h / 2}
@@ -282,7 +352,7 @@
 	}
 	.node-label {
 		fill: var(--color-fg);
-		font-size: 13px;
+		font-size: 15px;
 		font-weight: 600;
 		text-anchor: middle;
 		dominant-baseline: central;
@@ -292,10 +362,17 @@
 	}
 	.node-sub {
 		fill: color-mix(in oklch, var(--color-fg) 50%, transparent);
-		font-size: 8.5px;
+		font-size: 10px;
 		text-anchor: middle;
 		dominant-baseline: central;
 	}
+
+	/* Variant colours — tinted sub-label per LangGraph primitive */
+	.variant-code .node-sub { fill: #6B9AD4; }
+	.variant-llm .node-sub { fill: #AB7BD4; }
+	.variant-router .node-sub { fill: #D4B44B; }
+	.variant-interrupt .node-sub { fill: #D46B7B; }
+	.variant-fanout .node-sub { fill: #D4954B; }
 
 	figcaption {
 		margin-top: 0.5rem;

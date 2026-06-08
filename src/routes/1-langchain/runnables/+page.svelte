@@ -518,8 +518,7 @@ const answers = await chain.batch([
 
 	/* Poster of the Runnable family — replaces the old animated SVG. */
 	.poster {
-		margin: 2rem auto;
-		max-width: 30rem;
+		margin: 2rem 0;
 	}
 	.poster :global(.hero) {
 		display: block;

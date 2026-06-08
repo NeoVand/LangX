@@ -367,8 +367,7 @@ while (true) {
 
 	/* Poster in the book column. */
 	.poster {
-		margin: 2rem auto;
-		max-width: 30rem;
+		margin: 2rem 0;
 	}
 	.poster :global(.hero) {
 		display: block;

@@ -12,21 +12,37 @@
 
 ## Style block (paste at the top of every prompt)
 
+The LangX house style is an **ornate Victorian steampunk knowledge plate** — the same
+world as the `Naive RAG` diagram, the `Runnable Family` cabinet, the `Three Levels of
+Streaming` and `Middleware & Hooks` posters, and `create-agent-anatomy`. NOT flat, NOT
+mid-century, NOT text-free: these plates are richly rendered and they DO carry readable
+engraved labels.
+
 ```
-Editorial science magazine illustration, mid-century knowledge-graphic style.
-Reduced palette: a single warm dominant (cream, ochre, faded gold) with one cool accent
-(petrol blue, cobalt, slate) and ink-black linework. Restrained color, high contrast,
-hand-drawn imperfections, no UI screenshots, no fake screenshots, no fake logos,
-no readable code, no English text in the image, NO PHOTOREALISM, no 3D render,
-no glow, no neon. Composition leaves negative space at the right third for typography
-overlay. Texture: subtle paper grain, slight risograph misregistration. Aspect 16:9.
-Mood: scholarly, calm, intellectually playful.
+Ornate Victorian steampunk infographic plate, richly detailed and painterly with
+dramatic chiaroscuro lighting. Everything is built from polished brass, bronze, and
+aged copper machinery — riveted plates, interlocking gears, pressure gauges with real
+needles, valves, levers, and segmented pipes — set against a deep near-black background
+(or aged sepia parchment for full step-by-step process diagrams) with soft vignetting.
+Warm tungsten key light; glowing accents in just two hues: cyan/teal glass vials, lenses
+and displays, and warm amber/orange furnace light. Fine engraving and etched filigree,
+faint blueprint linework in the dark margins, wisps of steam. An ornate engraved
+brass-and-wood TITLE PLAQUE across the top, and each component sits on its own small
+engraved nameplate — readable text on the plates is wanted (a title plus short labels),
+set in a decorative serif. High detail, semi-photographic painterly render, gears in the
+corners. Cohesive as one matched series of plates.
 ```
 
-Optional add-ons used per chapter:
-- **LangChain**: warm ochre + black + small petrol-blue accent (`#C57A3A` ish, `#1A1A1A`, `#1F4E5F`).
-- **LangGraph**: faded olive + black + cobalt accent (`#A6A86C`, `#1A1A1A`, `#2A4F8F`).
-- **Deep Agents**: oxblood + black + faded brass accent (`#7A2C2C`, `#1A1A1A`, `#A8884A`).
+Per-chapter accent (brass always dominates; just shift the glow):
+- **LangChain**: warm amber/gold glow with a little teal.
+- **LangGraph**: cooler — favor cyan/cobalt glass over amber.
+- **Deep Agents**: oxblood/leather tones with brass.
+
+Two exceptions to the dark steampunk plate:
+- **Chapter-intro heroes** (`chapter-*-hero`) use an antique cartographer's-MAP treatment
+  (aged parchment, aerial map of nodes + paths, compass rose, minimal corner title).
+- **Per-lesson hero banners** (`l1-*`, `l2-*`) are the steampunk style but stay (mostly)
+  TEXT-FREE with a calmer lower third, because the lesson title is overlaid in HTML.
 
 ---
 
@@ -99,6 +115,15 @@ Optional add-ons used per chapter:
   > A small mechanical homunculus seated at a desk, deciding between a stack of tools laid out in front of it. Speech-bubble shapes (empty, no text) rise above its head. The desk has a clear "loop" engraved into its top — an arrow circling back. Mid-century editorial.
 
 ### Phase 2 — LangGraph (chapter palette)
+
+- **`l2-overview`** — The whole graph (lesson hero, 16:9, steampunk, mostly TEXT-FREE)
+  > A sprawling steampunk "graph runtime" engine spread across a wide near-black plate — a living brass network: many riveted nodes (some round portholes with glowing cyan glass, some boxy modules) wired together by a web of segmented copper pipes. The pipes BRANCH at brass three-way switch-valves with little levers (conditional edges). Two or three nodes are sealed glass domes that reveal a complete miniature brass graph nested inside them (subgraphs). A couple of nodes are tool-shaped — a brass wrench-engine, a magnifier-lens unit — tapped into the mesh (tools). A wave of warm amber furnace-light pulses along one diagonal band of pipes and nodes, lighting that band brightly while the rest sit in cool dim brass with faint cyan pilot-glows (a super-step rippling through the graph). Gears and a pressure gauge in the corners, soft steam wisps, dramatic chiaroscuro. Dense and alive across the upper two-thirds; the lower third stays darker and calmer for a title overlaid later. NO title text or large lettering anywhere (the lesson title is added in HTML); edges vignette to near-black. Wide banner, 16:9 (e.g. 1600 × 900). Save as `static/images/l2-overview.png`.
+
+- **`langgraph-program-poster`** — "Powers of the Graph" specimen plate (portrait 2:3, titled)
+  > An ornate steampunk specimen-cabinet poster in the exact style of the "Runnable Family" plate: a tall portrait brass frame with an engraved title plaque across the top reading **POWERS OF THE GRAPH**, and FIVE framed niches (arranged three over two) each holding a distinct brass instrument on its own engraved nameplate. (1) **STATE** — a tall brass reservoir with a sight-glass of glowing cyan fluid (shared memory). (2) **CONDITIONAL EDGE** — a brass railway-switch / Y-junction with a lever throwing the track one way. (3) **SEND · FAN-OUT** — a brass manifold splitting one pipe into many parallel outlets. (4) **INTERRUPT** — a gated valve with a raised lever and a small brass bell, mid-pause. (5) **CHECKPOINT** — a brass press stamping a disc beside a neat stack of saved medallions. Deep near-black ground, polished brass, cyan glass + warm amber glow, gears and filigree in the corners, dramatic chiaroscuro. Readable engraved labels on every nameplate. Portrait 2:3 (e.g. 1024 × 1536). Save as `static/images/langgraph-program-poster.png`.
+
+- **`langgraph-superstep`** — "One Super-step" plate (landscape 16:9, titled)
+  > An ornate steampunk plate, near-black background, with an engraved brass title plaque across the top reading **ONE SUPER-STEP**, telling one "tick" left to right. LEFT, on a nameplate **NODES RUN TOGETHER**: a row of identical brass worker-machines all firing at once — gauges spiking, gears spinning, cyan glass aglow — each emitting a small token of amber light. CENTER, on a nameplate **MERGE · REDUCERS**: their pipes pour down into a single large brass merging-manifold / funnel that combines the tokens into one engraved ledger. RIGHT, on a nameplate **CHECKPOINT**: a brass press stamps a numbered medallion beside a neat stack of saved discs. Behind the whole assembly sits a faint, dimmer identical copy with a curved brass arrow looping back into it (the next tick). Polished brass, cyan + amber glow, steam wisps, gears in the corners, dramatic chiaroscuro. Readable engraved nameplates. Landscape 16:9 (e.g. 1600 × 900). Save as `static/images/langgraph-superstep.png`.
 
 - **`l2-stategraph`** — StateGraph
   > A garden-maze plan view: nodes are gazebos connected by pathways, and a glass jar in the center is labeled "STATE" by glyph. A walker leaves footprints from gazebo to gazebo, occasionally returning to the jar. Olive tones, cobalt accent on the jar.

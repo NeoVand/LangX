@@ -614,8 +614,7 @@ for await (const ev of chain.streamEvents({ topic }, { version: 'v2' })) {
 
 	/* Three-levels poster in the book column. */
 	.poster {
-		margin: 2rem auto;
-		max-width: 30rem;
+		margin: 2rem 0;
 	}
 	.poster :global(.hero) {
 		display: block;

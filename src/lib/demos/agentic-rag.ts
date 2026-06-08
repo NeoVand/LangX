@@ -15,10 +15,13 @@ import { MemorySaver } from '@langchain/langgraph';
 import { AIMessage, HumanMessage, ToolMessage, type BaseMessage } from '@langchain/core/messages';
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
+import type { Embeddings } from '@langchain/core/embeddings';
 import { getModel } from '$lib/runtime/llm';
 import { displayContent } from '$lib/runtime/messages';
 import { chunkDocuments, buildStore } from './rag-pipeline';
-import type { InMemoryVectorStore } from '$lib/runtime/rag/in-memory-vector-store';
+import { cosine, type InMemoryVectorStore } from '$lib/runtime/rag/in-memory-vector-store';
+import { makeEmbeddings, type EmbeddingsProviderId } from '$lib/runtime/rag/registry';
+import { fitPca2, project, type Pca2 } from '$lib/runtime/rag/pca';
 import type { OnStep } from './types';
 
 // ── The corpus: documents the user uploaded, chunked + embedded in the browser ─
@@ -30,20 +33,95 @@ export interface CorpusDoc {
 	text: string;
 }
 
-/** Chunk, embed, and index uploaded documents. Resets the citation registry. */
-export async function setCorpus(docs: CorpusDoc[]): Promise<{ documents: number; chunks: number }> {
+/**
+ * Normalize text for display + grounding: fold ligatures/compatibility forms
+ * (NFKC turns "ﬁ" → "fi", full-width → half-width), drop control/zero-width/BOM
+ * characters that leak in from PDFs, and collapse runs of spaces. Keeps real
+ * Unicode (accents, em-dashes, °, curly quotes) intact.
+ */
+function clean(text: string): string {
+	return text
+		.normalize('NFKC')
+		// Strip control chars (keep tab/newline), DEL + C1 block, zero-width chars and BOM.
+		.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u200B-\u200D\uFEFF]/g, '')
+		.replace(/[ \t]{2,}/g, ' ')
+		.trim();
+}
+
+// 2-D map of every chunk embedding (PCA), so the demo can show retrieval as geometry.
+export interface ChunkPoint {
+	key: string; // `${source}#${index}`
+	source: string;
+	index: number;
+	text: string;
+	x: number;
+	y: number;
+}
+let pca: Pca2 | null = null;
+let chunkPoints: ChunkPoint[] = [];
+let corpusProvider: EmbeddingsProviderId = 'local';
+
+export function corpusEmbeddingProvider(): EmbeddingsProviderId {
+	return corpusProvider;
+}
+
+/**
+ * Chunk, embed, and index the uploaded documents with the chosen embedding
+ * provider. Resets the citation registry + the embedding map.
+ */
+export async function setCorpus(
+	docs: CorpusDoc[],
+	provider: EmbeddingsProviderId = 'local'
+): Promise<{ documents: number; chunks: number }> {
+	corpusProvider = provider;
 	const chunks = await chunkDocuments(docs);
-	store = await buildStore(chunks, 'local');
+	store = await buildStore(chunks, provider);
+	// Count from the indexed entries (the same source the embedding map plots) so
+	// the chip's chunk count always matches the dots on the map.
 	corpus = docs.map((d) => ({
 		source: d.source,
-		chunks: chunks.filter((c) => c.source === d.source).length
+		chunks: store!.entries.filter((e) => e.doc.metadata?.source === d.source).length
 	}));
+	// Fit a 2-D projection of the chunk embeddings for the embedding map.
+	if (store.entries.length) {
+		pca = fitPca2(store.entries.map((e) => e.embedding));
+		chunkPoints = store.entries.map((e) => {
+			const source = String(e.doc.metadata?.source ?? 'document');
+			const index = Number(e.doc.metadata?.index ?? 0);
+			const [x, y] = project(e.embedding, pca!);
+			return { key: `${source}#${index}`, source, index, text: clean(e.doc.pageContent), x, y };
+		});
+	} else {
+		pca = null;
+		chunkPoints = [];
+	}
 	resetCitations();
 	return { documents: docs.length, chunks: chunks.length };
 }
 
 export function corpusSummary(): { source: string; chunks: number }[] {
 	return corpus;
+}
+
+export function getChunkPoints(): ChunkPoint[] {
+	return chunkPoints;
+}
+
+// ── Embedding utilities for the in-book explorer (real models, in-browser) ────
+const embCache = new Map<EmbeddingsProviderId, Embeddings>();
+export async function embedText(
+	text: string,
+	provider: EmbeddingsProviderId = 'local'
+): Promise<number[]> {
+	let emb = embCache.get(provider);
+	if (!emb) {
+		emb = await makeEmbeddings(provider);
+		embCache.set(provider, emb);
+	}
+	return emb.embedQuery(text);
+}
+export function cosineSimilarity(a: number[], b: number[]): number {
+	return cosine(a, b);
 }
 
 // ── Citations: stable [S#] ids the agent can reference and the UI can resolve ──
@@ -83,19 +161,47 @@ export function getCitations(): Citation[] {
 	return [...citById.values()];
 }
 
+// Each query the agent runs leaves a trace on the embedding map: where the query
+// landed (in PCA space) and which chunks it pulled. Reset at the start of a turn.
+export interface SearchHit {
+	key: string;
+	score: number;
+}
+export interface SearchEvent {
+	query: string;
+	x: number;
+	y: number;
+	hits: SearchHit[];
+}
+let searchEvents: SearchEvent[] = [];
+export function getSearchEvents(): SearchEvent[] {
+	return searchEvents;
+}
+
 // ── Tools the agent can call ────────────────────────────────────────────────
 export const searchDocuments = tool(
 	async ({ query, k }) => {
-		if (!store) {
-			return JSON.stringify({ error: 'No documents are loaded yet. Ask the user to upload some.' });
-		}
-		const hits = await store.similaritySearch(query, k ?? 4);
-		const results = hits.map((h) => {
-			const source = String(h.doc.metadata?.source ?? 'document');
-			const index = Number(h.doc.metadata?.index ?? 0);
-			const id = cite(source, index, h.doc.pageContent, h.score);
-			return { id, source, score: Number(h.score.toFixed(3)), snippet: h.doc.pageContent };
+		if (!store) return 'No documents are loaded yet. Ask the user to upload some.';
+		// Embed the query ONCE, then score every chunk by cosine — we reuse the
+		// query vector both to rank and to plot the query on the embedding map.
+		const qvec = await store.embeddings.embedQuery(query);
+		const scored = store.entries
+			.map((e) => ({ e, score: cosine(qvec, e.embedding) }))
+			.sort((a, b) => b.score - a.score)
+			.slice(0, k ?? 4);
+		const hits: SearchHit[] = [];
+		const results = scored.map(({ e, score }) => {
+			const source = String(e.doc.metadata?.source ?? 'document');
+			const index = Number(e.doc.metadata?.index ?? 0);
+			const snippet = clean(e.doc.pageContent);
+			hits.push({ key: `${source}#${index}`, score });
+			const id = cite(source, index, snippet, score);
+			return { id, source, score: Number(score.toFixed(3)), snippet };
 		});
+		if (pca) {
+			const [x, y] = project(qvec, pca);
+			searchEvents.push({ query, x, y, hits });
+		}
 		return JSON.stringify({ query, results });
 	},
 	{
@@ -154,7 +260,7 @@ export const DEFAULT_SYSTEM_PROMPT = `You are a meticulous research assistant. A
 
 How to work:
 1. Before answering, call search_documents with a focused query, then read the passages and their scores.
-2. If the top results are weak or off-topic, REWRITE the query and search again — try synonyms, simpler terms, or split a multi-part question into separate searches. Make a few attempts before giving up.
+2. Search each distinct part of a question with its OWN query, and if the best result looks weak or off-topic, REWRITE the query (synonyms, simpler terms) and search again. Searching two or three times is normal and good.
 3. If the question is ambiguous, or the documents truly don't cover it, do NOT guess — reply with one short clarifying question, or say plainly that the documents don't cover it.
 4. Cite every claim inline using the passage ids, like [S1] or [S2][S3]. Only cite passages you actually used.
 5. Be warm, clear, and concise. Never invent sources or facts that aren't in the passages.
@@ -198,6 +304,7 @@ export async function sendTurn(
 	if (!session) throw new Error('Start a chat first — upload a document.');
 	const { agent, threadId } = session;
 	lastTurnSearches = 0;
+	searchEvents = []; // fresh trace for this turn's embedding map
 
 	const turn: BaseMessage[] = [];
 	const stream = await agent.stream(

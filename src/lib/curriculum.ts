@@ -79,6 +79,11 @@ export const chapters: Chapter[] = [
 		intro: { slug: '', title: 'Level 2 — LangGraph', subtitle: 'The orchestration layer.' },
 		lessons: [
 			{
+				slug: 'overview',
+				title: 'The whole graph',
+				subtitle: 'A program, not a loop — see every primitive at once.'
+			},
+			{
 				slug: 'stategraph',
 				title: 'StateGraph',
 				subtitle: 'Nodes, edges, and the chat-tool loop.'
