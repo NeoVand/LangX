@@ -5,7 +5,7 @@
 
 	interface Props {
 		id: Chapter['id'];
-		/** Matches `static/images/<heroId>.png` — see image-prompts.md “Chapter intros”. */
+		/** Matches `static/images/<heroId>.png`. */
 		heroId: string;
 		heroAlt: string;
 		/** object-position for cropping the banner artwork. */
