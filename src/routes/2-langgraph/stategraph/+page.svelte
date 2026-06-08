@@ -18,6 +18,7 @@
 	import { AIMessage, HumanMessage, ToolMessage, SystemMessage, type BaseMessage } from '@langchain/core/messages';
 	import lgStateGraphSrc from '$lib/demos/lg-stategraph.ts?raw';
 	import graphRunSrc from '$lib/demos/graph-run.ts?raw';
+	import stateGraphSkill from '$lib/demos/skills/langgraph-stategraph.md?raw';
 	import type { DemoManifest } from '$lib/demos/download';
 
 	const demoSource: DemoManifest = {
@@ -34,7 +35,8 @@ const graph = await buildStateGraph('simple');
 const config = { configurable: { thread_id: 'sg-1' } };
 const r = await runStateGraphTurn(graph, "What's the weather in Tokyo? One sentence.", config,
   (node) => console.log('  ·', node));
-console.log('\\n' + r.snapshot.messages.at(-1)?.content);`
+console.log('\\n' + r.snapshot.messages.at(-1)?.content);`,
+		skill: stateGraphSkill
 	};
 
 	// ── Hand-wired layout of the agent ⇄ tools loop ───────────────────────────
