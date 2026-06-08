@@ -26,3 +26,6 @@ test-results
 
 # Transformer Explainer model weights (626MB — host on HF Hub for prod)
 static/model-v2/
+
+# Personal Azure endpoint list (never publish)
+azure_endpoints.txt

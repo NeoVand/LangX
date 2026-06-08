@@ -6,6 +6,13 @@
 		setProviderModel,
 		setEmbeddingModel,
 		setTjsModel,
+		addAzureModel,
+		removeAzureModel,
+		setAzureChatModel,
+		setAzureEmbeddingModel,
+		azureChatModels,
+		azureEmbeddingModels,
+		selectedAzureChatModel,
 		TJS_MODELS,
 		type ModelProvider
 	} from '$lib/state/app.svelte';
@@ -18,9 +25,10 @@
 		type HostedProvider,
 		type EmbeddingModel
 	} from '$lib/models/catalog';
+	import { parseAzureEndpoint } from '$lib/models/azure';
 	import ParrotMark from '$lib/components/ParrotMark.svelte';
 	import Term from '$lib/components/Term.svelte';
-	import { Link2, Cpu } from '@lucide/svelte';
+	import { Link2, Cpu, Cloud, Trash2 } from '@lucide/svelte';
 
 	/** Provider brand marks (under static/images/brands). */
 	const brandLogo: Record<string, string> = {
@@ -48,6 +56,7 @@
 		{ id: 'anthropic', title: 'Anthropic' },
 		{ id: 'openai', title: 'OpenAI' },
 		{ id: 'google', title: 'Google Gemini' },
+		{ id: 'azure', title: 'Azure OpenAI' },
 		{ id: 'transformers-js', title: 'Local' }
 	] as const;
 
@@ -81,18 +90,25 @@
 		voyage: { placeholder: 'pa-...', keysUrl: 'https://dashboard.voyageai.com/' }
 	};
 
-	/** Selected provider as a hosted provider, or null when running locally. */
+	/** Selected provider as a hosted provider, or null when running locally / on Azure. */
+	const isAzure = $derived(provider === 'azure');
 	const hostedProvider = $derived(
-		provider === 'transformers-js' ? null : (provider as HostedProvider)
+		provider === 'transformers-js' || provider === 'azure' ? null : (provider as HostedProvider)
 	);
 	const activeKey = $derived(hostedProvider ? app.keys[hostedProvider] : '');
-	const canPing = $derived(!!hostedProvider && !!activeKey);
-	/** Configured = local runtime (no key) or the selected hosted provider has a key. */
-	const connected = $derived(provider === 'transformers-js' || !!activeKey);
+	const canPing = $derived(
+		isAzure ? !!selectedAzureChatModel() : !!hostedProvider && !!activeKey
+	);
+	/** Configured = local runtime, an Azure chat model, or the hosted provider has a key. */
+	const connected = $derived(
+		provider === 'transformers-js' || (isAzure ? !!selectedAzureChatModel() : !!activeKey)
+	);
 	const selectedModelLabel = $derived(
-		hostedProvider
-			? (findHostedModel(app.models[hostedProvider])?.label ?? app.models[hostedProvider])
-			: ''
+		isAzure
+			? (selectedAzureChatModel()?.label ?? 'Azure model')
+			: hostedProvider
+				? (findHostedModel(app.models[hostedProvider])?.label ?? app.models[hostedProvider])
+				: ''
 	);
 
 	const embedGroups = $derived([
@@ -130,6 +146,84 @@
 		return m.price ? `$${m.price.inMtok} / $${m.price.outMtok}` : m.costTier;
 	}
 
+	// ── Azure OpenAI (keyless) ────────────────────────────────────────────────
+	// Per-form state for adding a chat deployment and an embedding deployment.
+	type AzureForm = {
+		label: string;
+		endpoint: string;
+		busy: boolean;
+		ok: boolean | null;
+		message: string | null;
+	};
+	const azureForms = $state<Record<'chat' | 'embedding', AzureForm>>({
+		chat: { label: '', endpoint: '', busy: false, ok: null, message: null },
+		embedding: { label: '', endpoint: '', busy: false, ok: null, message: null }
+	});
+
+	/** Hit the local proxy to verify keyless auth + the endpoint, without adding it. */
+	async function testAzureEndpoint(
+		endpoint: string,
+		kind: 'chat' | 'embedding'
+	): Promise<{ ok: boolean; message: string }> {
+		const res = await fetch('/api/azure/test', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ endpoint, kind })
+		});
+		return res.json();
+	}
+
+	async function testAzure(kind: 'chat' | 'embedding') {
+		const form = azureForms[kind];
+		const endpoint = form.endpoint.trim();
+		const parsed = parseAzureEndpoint(endpoint);
+		if (!parsed) {
+			form.ok = false;
+			form.message = 'Not a valid Azure endpoint (expects https://….azure.com/openai/deployments/…).';
+			return;
+		}
+		form.busy = true;
+		form.ok = null;
+		form.message = null;
+		try {
+			const r = await testAzureEndpoint(endpoint, kind);
+			form.ok = r.ok;
+			form.message = r.message;
+		} catch (err) {
+			form.ok = false;
+			form.message = err instanceof Error ? err.message : String(err);
+		} finally {
+			form.busy = false;
+		}
+	}
+
+	function addAzure(kind: 'chat' | 'embedding') {
+		const form = azureForms[kind];
+		const endpoint = form.endpoint.trim();
+		const parsed = parseAzureEndpoint(endpoint);
+		if (!parsed) {
+			form.ok = false;
+			form.message = 'Not a valid Azure endpoint (expects https://….azure.com/openai/deployments/…).';
+			return;
+		}
+		// Guard against adding an embeddings endpoint as a chat model (or vice versa).
+		if (parsed.kind !== 'unknown' && parsed.kind !== kind) {
+			form.ok = false;
+			form.message = `That looks like a ${parsed.kind} endpoint — add it under ${parsed.kind === 'chat' ? 'Chat' : 'Embeddings'}.`;
+			return;
+		}
+		addAzureModel({
+			label: form.label.trim() || parsed.deployment,
+			endpoint,
+			deployment: parsed.deployment,
+			kind
+		});
+		form.label = '';
+		form.endpoint = '';
+		form.ok = null;
+		form.message = null;
+	}
+
 	function embedCost(m: EmbeddingModel): string {
 		return m.price ? `$${m.price.inMtok}/Mtok` : m.costTier;
 	}
@@ -142,6 +236,94 @@
 		return 'tier-xl';
 	}
 </script>
+
+{#snippet azurePanel(kind: 'chat' | 'embedding')}
+	{@const form = azureForms[kind]}
+	{@const list = kind === 'chat' ? azureChatModels() : azureEmbeddingModels()}
+	{@const selectedId = kind === 'chat' ? app.azureChatModel : app.azureEmbeddingModel}
+	<div class="azure-panel">
+		<div class="azure-add">
+			<label class="az-field">
+				<span>Deployment endpoint</span>
+				<input
+					type="url"
+					bind:value={form.endpoint}
+					placeholder={`https://<resource>.openai.azure.com/openai/deployments/<name>/${
+						kind === 'chat' ? 'chat/completions' : 'embeddings'
+					}?api-version=…`}
+					autocomplete="off"
+					spellcheck="false"
+				/>
+			</label>
+			<label class="az-field az-field-narrow">
+				<span>Label (optional)</span>
+				<input type="text" bind:value={form.label} placeholder="e.g. gpt-4.1" autocomplete="off" />
+			</label>
+			<div class="az-actions">
+				<button
+					type="button"
+					class="btn ghost"
+					disabled={!form.endpoint.trim() || form.busy}
+					onclick={() => testAzure(kind)}
+				>
+					{form.busy ? 'Testing…' : 'Test'}
+				</button>
+				<button
+					type="button"
+					class="btn primary"
+					disabled={!form.endpoint.trim()}
+					onclick={() => addAzure(kind)}
+				>
+					Add
+				</button>
+			</div>
+		</div>
+		{#if form.message}
+			<p class="ping-msg" class:ok={form.ok} class:bad={form.ok === false}>{form.message}</p>
+		{/if}
+
+		{#if list.length}
+			<div class="models hosted-models az-list">
+				{#each list as m (m.id)}
+					<label class="model" class:selected={selectedId === m.id}>
+						<input
+							type="radio"
+							name={`azure-${kind}`}
+							value={m.id}
+							checked={selectedId === m.id}
+							onchange={() =>
+								kind === 'chat' ? setAzureChatModel(m.id) : setAzureEmbeddingModel(m.id)}
+						/>
+						<div class="m-head">
+							<div>
+								<span class="m-name font-display">{m.label}</span>
+								<span class="m-sub">{m.deployment}</span>
+							</div>
+							<button
+								type="button"
+								class="az-remove"
+								title="Remove deployment"
+								aria-label="Remove deployment"
+								onclick={(e) => {
+									e.preventDefault();
+									e.stopPropagation();
+									removeAzureModel(m.id);
+								}}
+							>
+								<Trash2 size={14} strokeWidth={2} />
+							</button>
+						</div>
+						<p class="m-notes az-endpoint">{m.endpoint}</p>
+					</label>
+				{/each}
+			</div>
+		{:else}
+			<p class="muted az-empty">
+				No Azure {kind === 'chat' ? 'chat' : 'embedding'} deployments yet — add one above.
+			</p>
+		{/if}
+	</div>
+{/snippet}
 
 <main class="setup">
 	<header class="hero">
@@ -178,6 +360,8 @@
 				>
 					{#if brandLogo[pc.id]}
 						<img class="ptab-logo" src={brandLogo[pc.id]} alt="" aria-hidden="true" />
+					{:else if pc.id === 'azure'}
+						<Cloud size={16} strokeWidth={2} />
 					{:else}
 						<Cpu size={16} strokeWidth={2} />
 					{/if}
@@ -186,7 +370,14 @@
 			{/each}
 		</div>
 
-		{#if hostedProvider}
+		{#if isAzure}
+			<p class="provider-blurb">
+				Azure OpenAI deployments via <strong>keyless</strong> auth — no API key. Sign in once with
+				<code>az login</code> in your terminal; the local proxy gets a token from your session. Paste
+				a deployment endpoint below to add a chat model.
+			</p>
+			{@render azurePanel('chat')}
+		{:else if hostedProvider}
 			<p class="provider-blurb">{PROVIDER_META[hostedProvider].blurb}</p>
 			<div class="models hosted-models">
 				{#each modelsForProvider(hostedProvider) as model (model.id)}
@@ -286,7 +477,23 @@
 	<!-- Step 2 — only the selected model's key, with the test tied to that model. -->
 	<section class="block gate" class:ok={connected}>
 		<div class="gate-body">
-			{#if hostedProvider}
+			{#if isAzure}
+				<h2>Step 2 · Sign in with Azure CLI</h2>
+				<p class="muted">
+					No API key — authentication is <strong>keyless</strong>. Run <code>az login</code> in your
+					terminal where the dev server runs; the local proxy uses your
+					<Term t="DefaultAzureCredential">DefaultAzureCredential</Term> to fetch a token. Then test the
+					selected deployment below.
+				</p>
+				<div class="ping">
+					<button class="btn ghost" disabled={!canPing || testing} onclick={pingModel}>
+						{testing ? 'Testing…' : canPing ? `Test ${selectedModelLabel}` : 'Add a chat model first'}
+					</button>
+					{#if testMessage}
+						<p class="ping-msg" class:ok={testOk} class:bad={testOk === false}>{testMessage}</p>
+					{/if}
+				</div>
+			{:else if hostedProvider}
 				<h2>Step 2 · Connect {PROVIDER_META[hostedProvider].label}</h2>
 				<p class="muted">
 					Paste your {PROVIDER_META[hostedProvider].label} key — it stays in
@@ -339,6 +546,9 @@
 			{#if connected}
 				<span class="check">✔</span>
 				<span>Ready — start the curriculum below.</span>
+			{:else if isAzure}
+				<span class="x">!</span>
+				<span>Add and select an Azure chat deployment to continue.</span>
 			{:else}
 				<span class="x">!</span>
 				<span>Add your {hostedProvider ? PROVIDER_META[hostedProvider].label : ''} key to continue.</span>
@@ -409,6 +619,17 @@
 				</div>
 			</div>
 		{/each}
+		<div class="embed-group az-embed-group">
+			<div class="embed-head">
+				<span class="embed-provider font-display">Azure OpenAI</span>
+				<span class="embed-key ok">keyless</span>
+			</div>
+			<p class="muted az-embed-note">
+				Add an Azure <strong>embeddings</strong> deployment endpoint — authenticated with
+				<code>az login</code>, no key. Pick one to use it for RAG.
+			</p>
+			{@render azurePanel('embedding')}
+		</div>
 		<p class="muted local-note">
 			<strong>Local · MiniLM</strong> (all-MiniLM-L6-v2, 384-dim) runs fully in-browser with no key — the
 			default in the RAG lesson.
@@ -910,6 +1131,94 @@
 	}
 	.ping-msg.bad {
 		color: var(--color-accent-warning);
+	}
+
+	/* Azure keyless panel — add-deployment form + list of saved deployments. */
+	.azure-panel {
+		display: flex;
+		flex-direction: column;
+		gap: 0.85rem;
+		margin-top: 0.5rem;
+	}
+	.azure-add {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: flex-end;
+		gap: 0.75rem;
+		border: 1px solid var(--color-rule);
+		border-radius: 0.6rem;
+		padding: 1rem 1.1rem;
+		background: var(--color-paper);
+	}
+	.az-field {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+		flex: 1 1 22rem;
+		min-width: 14rem;
+	}
+	.az-field-narrow {
+		flex: 0 1 12rem;
+		min-width: 9rem;
+	}
+	.az-field span {
+		font-size: 0.72rem;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: var(--color-ink-300);
+	}
+	.az-field input {
+		width: 100%;
+		padding: 0.55rem 0.7rem;
+		border: 1px solid var(--color-rule);
+		border-radius: 0.45rem;
+		background: var(--color-bg);
+		color: var(--color-ink-100);
+		font-family: var(--font-mono);
+		font-size: 0.85rem;
+	}
+	.az-field input:focus {
+		outline: 2px solid color-mix(in oklch, var(--accent) 50%, transparent);
+		outline-offset: 1px;
+	}
+	.az-actions {
+		display: flex;
+		gap: 0.5rem;
+		flex: 0 0 auto;
+	}
+	.az-list {
+		margin-top: 0;
+	}
+	.az-endpoint {
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		word-break: break-all;
+		color: var(--color-ink-300);
+	}
+	.az-remove {
+		display: inline-grid;
+		place-items: center;
+		width: 1.6rem;
+		height: 1.6rem;
+		border-radius: 0.4rem;
+		border: 1px solid var(--color-rule);
+		background: transparent;
+		color: var(--color-ink-300);
+		cursor: pointer;
+	}
+	.az-remove:hover {
+		color: var(--color-accent-warning);
+		border-color: color-mix(in oklch, var(--color-accent-warning) 50%, var(--color-rule));
+	}
+	.az-empty {
+		margin: 0;
+		font-size: 0.85rem;
+	}
+	.az-embed-group {
+		margin-top: 0.5rem;
+	}
+	.az-embed-note {
+		margin-bottom: 0.5rem;
 	}
 
 	.end {

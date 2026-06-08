@@ -3,13 +3,31 @@ import { defaultModelFor, defaultEmbeddingModelFor, type HostedProvider } from '
 
 const STORAGE_KEY = 'langx.app.v2';
 
-export type ModelProvider = 'transformers-js' | 'openai' | 'anthropic' | 'google';
+export type ModelProvider = 'transformers-js' | 'openai' | 'anthropic' | 'google' | 'azure';
 
 export interface ApiKeys {
 	openai: string;
 	anthropic: string;
 	google: string;
 	voyage: string;
+}
+
+/**
+ * A user-added Azure OpenAI deployment. Authenticated keyless via the local
+ * `/api/azure` proxy (Entra ID / `az login`), so no key is ever stored — only
+ * the endpoint the user pasted and the metadata we derive from it.
+ */
+export interface AzureModel {
+	/** Stable client-generated id. */
+	id: string;
+	/** Friendly label (defaults to the deployment name). */
+	label: string;
+	/** Full Azure endpoint URL, including deployment + api-version. */
+	endpoint: string;
+	/** Deployment name parsed from the endpoint. */
+	deployment: string;
+	/** Chat completions or embeddings deployment. */
+	kind: 'chat' | 'embedding';
 }
 
 export interface TransformersJsModel {
@@ -149,6 +167,12 @@ export interface AppState {
 	/** Selected embedding model ID per hosted embeddings provider (RAG). */
 	embeddingModels: { openai: string; voyage: string };
 	keys: ApiKeys;
+	/** User-added Azure OpenAI deployments (chat + embedding). */
+	azureModels: AzureModel[];
+	/** Selected Azure chat deployment id, or null. */
+	azureChatModel: string | null;
+	/** Selected Azure embedding deployment id, or null. */
+	azureEmbeddingModel: string | null;
 	preferredProvider: ModelProvider;
 	viewMode: ViewMode;
 	theme: 'dark' | 'light';
@@ -168,6 +192,9 @@ const defaultState = (): AppState => ({
 		voyage: defaultEmbeddingModelFor('voyage')
 	},
 	keys: { openai: '', anthropic: '', google: '', voyage: '' },
+	azureModels: [],
+	azureChatModel: null,
+	azureEmbeddingModel: null,
 	preferredProvider: 'anthropic',
 	viewMode: { workshop: true, book: true },
 	theme: 'dark',
@@ -188,10 +215,11 @@ function withDefaults(parsed: Partial<AppState>): AppState {
 		keys: { ...base.keys, ...(parsed.keys ?? {}) },
 		models: { ...base.models, ...(parsed.models ?? {}) },
 		embeddingModels: { ...base.embeddingModels, ...(parsed.embeddingModels ?? {}) },
+		azureModels: Array.isArray(parsed.azureModels) ? parsed.azureModels : base.azureModels,
 		viewMode: { ...base.viewMode, ...(parsed.viewMode ?? {}) }
 	};
 	// Migrate retired providers (e.g. the removed 'groq') to the default.
-	const valid: ModelProvider[] = ['transformers-js', 'openai', 'anthropic', 'google'];
+	const valid: ModelProvider[] = ['transformers-js', 'openai', 'anthropic', 'google', 'azure'];
 	if (!valid.includes(merged.preferredProvider)) merged.preferredProvider = 'anthropic';
 	return merged;
 }
@@ -255,6 +283,63 @@ export function setApiKey(provider: keyof ApiKeys, value: string) {
 	persist();
 }
 
+// ── Azure OpenAI (keyless) ────────────────────────────────────────────────
+
+function makeId(): string {
+	if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
+	return `az-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/** Add an Azure deployment; auto-selects it if it's the first of its kind. */
+export function addAzureModel(model: Omit<AzureModel, 'id'>): AzureModel {
+	const entry: AzureModel = { ...model, id: makeId() };
+	app.azureModels = [...app.azureModels, entry];
+	if (entry.kind === 'chat' && !app.azureChatModel) app.azureChatModel = entry.id;
+	if (entry.kind === 'embedding' && !app.azureEmbeddingModel) app.azureEmbeddingModel = entry.id;
+	persist();
+	return entry;
+}
+
+/** Remove an Azure deployment, clearing the selection if it was selected. */
+export function removeAzureModel(id: string) {
+	app.azureModels = app.azureModels.filter((m) => m.id !== id);
+	if (app.azureChatModel === id) {
+		app.azureChatModel = app.azureModels.find((m) => m.kind === 'chat')?.id ?? null;
+	}
+	if (app.azureEmbeddingModel === id) {
+		app.azureEmbeddingModel = app.azureModels.find((m) => m.kind === 'embedding')?.id ?? null;
+	}
+	persist();
+}
+
+export function setAzureChatModel(id: string | null) {
+	app.azureChatModel = id;
+	persist();
+}
+
+export function setAzureEmbeddingModel(id: string | null) {
+	app.azureEmbeddingModel = id;
+	persist();
+}
+
+export function azureChatModels(): AzureModel[] {
+	return app.azureModels.filter((m) => m.kind === 'chat');
+}
+
+export function azureEmbeddingModels(): AzureModel[] {
+	return app.azureModels.filter((m) => m.kind === 'embedding');
+}
+
+/** The currently selected Azure chat deployment, if any. */
+export function selectedAzureChatModel(): AzureModel | undefined {
+	return app.azureModels.find((m) => m.id === app.azureChatModel && m.kind === 'chat');
+}
+
+/** The currently selected Azure embedding deployment, if any. */
+export function selectedAzureEmbeddingModel(): AzureModel | undefined {
+	return app.azureModels.find((m) => m.id === app.azureEmbeddingModel && m.kind === 'embedding');
+}
+
 export function setPreferredProvider(p: ModelProvider) {
 	app.preferredProvider = p;
 	persist();
@@ -293,6 +378,7 @@ export function isConfigured(): boolean {
 	if (p === 'anthropic') return !!app.keys.anthropic;
 	if (p === 'openai') return !!app.keys.openai;
 	if (p === 'google') return !!app.keys.google;
+	if (p === 'azure') return !!selectedAzureChatModel();
 	return false; // transformers-js needs cache check; treat as not-yet-configured.
 }
 
@@ -300,5 +386,6 @@ export function bestAvailableProvider(): ModelProvider | null {
 	if (app.keys.anthropic) return 'anthropic';
 	if (app.keys.openai) return 'openai';
 	if (app.keys.google) return 'google';
+	if (selectedAzureChatModel()) return 'azure';
 	return null;
 }

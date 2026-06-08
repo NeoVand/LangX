@@ -1,6 +1,7 @@
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import { app, type ModelProvider, TJS_MODELS } from '$lib/state/app.svelte';
+import { app, type ModelProvider, TJS_MODELS, selectedAzureChatModel } from '$lib/state/app.svelte';
 import { findHostedModel } from '$lib/models/catalog';
+import { azureProxyBaseUrl, isReasoningDeployment } from '$lib/models/azure';
 import { TransformersJsChatModel, type TjsProgress } from './transformers-js';
 
 export type ProviderHint = ModelProvider | 'auto';
@@ -30,10 +31,12 @@ export function resolveProvider(hint: ProviderHint = 'auto'): ModelProvider {
 	if (pref === 'openai' && app.keys.openai) return 'openai';
 	if (pref === 'anthropic' && app.keys.anthropic) return 'anthropic';
 	if (pref === 'google' && app.keys.google) return 'google';
+	if (pref === 'azure' && selectedAzureChatModel()) return 'azure';
 	if (pref === 'transformers-js') return 'transformers-js';
 	if (app.keys.anthropic) return 'anthropic';
 	if (app.keys.openai) return 'openai';
 	if (app.keys.google) return 'google';
+	if (selectedAzureChatModel()) return 'azure';
 	return 'transformers-js';
 }
 
@@ -96,6 +99,31 @@ export async function getModel(opts: GetModelOptions = {}): Promise<BaseChatMode
 			clientOptions: {
 				dangerouslyAllowBrowser: true
 			}
+		});
+	}
+
+	if (provider === 'azure') {
+		const model = selectedAzureChatModel();
+		if (!model) throw new NoConfiguredProviderError('azure');
+		const { ChatOpenAI } = await import('@langchain/openai');
+		// Keyless: the local /api/azure proxy injects an Entra ID bearer token, so the
+		// SDK key is a placeholder. The target deployment endpoint travels in a header.
+		const configuration = {
+			baseURL: azureProxyBaseUrl(),
+			defaultHeaders: { 'x-azure-endpoint': model.endpoint },
+			dangerouslyAllowBrowser: true
+		} as never;
+		if (isReasoningDeployment(model.deployment)) {
+			// Reasoning deployments reject a custom temperature and meter output with
+			// max_completion_tokens; send the minimal surface like the OpenAI branch.
+			return new ChatOpenAI({ apiKey: 'keyless', model: model.deployment, configuration });
+		}
+		return new ChatOpenAI({
+			apiKey: 'keyless',
+			model: model.deployment,
+			temperature: opts.temperature ?? 0,
+			maxTokens: opts.maxTokens,
+			configuration
 		});
 	}
 

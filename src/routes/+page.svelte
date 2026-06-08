@@ -1,10 +1,17 @@
 <script lang="ts">
 	import { chapters } from '$lib/curriculum';
-	import { app, TJS_MODELS } from '$lib/state/app.svelte';
+	import {
+		app,
+		TJS_MODELS,
+		selectedAzureChatModel,
+		selectedAzureEmbeddingModel
+	} from '$lib/state/app.svelte';
 	import { findHostedModel, findEmbeddingModel, type HostedProvider } from '$lib/models/catalog';
 	import { Link2, VectorSquare, Bot } from '@lucide/svelte';
 
-	const configured = $derived(!!(app.keys.anthropic || app.keys.openai || app.keys.google));
+	const configured = $derived(
+		!!(app.keys.anthropic || app.keys.openai || app.keys.google || selectedAzureChatModel())
+	);
 
 	// What the lessons will actually use, surfaced on the setup chip below.
 	const chatModel = $derived.by(() => {
@@ -12,10 +19,14 @@
 		if (p === 'transformers-js') {
 			return TJS_MODELS.find((m) => m.id === app.tjsModel)?.label ?? 'Local model';
 		}
+		if (p === 'azure') {
+			return selectedAzureChatModel()?.label ?? '—';
+		}
 		return findHostedModel(app.models[p as HostedProvider])?.label ?? '—';
 	});
 
 	const embedModel = $derived.by(() => {
+		if (selectedAzureEmbeddingModel()) return selectedAzureEmbeddingModel()?.label ?? '—';
 		if (app.keys.openai) return findEmbeddingModel(app.embeddingModels.openai)?.label ?? '—';
 		if (app.keys.voyage) return findEmbeddingModel(app.embeddingModels.voyage)?.label ?? '—';
 		return 'MiniLM (local)';
