@@ -320,14 +320,15 @@
 			font-family: monospace;
 		}
 		.filtered {
-			background-color: var(--color-purple-100);
+			background-color: color-mix(in oklch, var(--accent) 22%, transparent);
+			border-radius: 0.2rem;
 		}
 		.text {
 			font-size: 0.9rem;
 			font-weight: 300;
 		}
 		.highlight {
-			color: var(--color-purple-500);
+			color: var(--accent-ink);
 			font-weight: 600;
 		}
 
@@ -338,7 +339,7 @@
 			.frac-line {
 				width: 100%;
 				height: 1px;
-				background-color: black;
+				background-color: var(--color-fg-faint);
 				margin: 0.1rem 0;
 			}
 			.frac-top {
@@ -381,7 +382,7 @@
 
 	.softmax-popover-title {
 		.highlight {
-			color: var(--color-purple-700);
+			color: var(--accent-ink);
 			font-weight: 800;
 		}
 	}

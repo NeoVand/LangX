@@ -163,10 +163,10 @@
 						align-items: center;
 						font-weight: 700;
 						text-shadow:
-							-1px -1px 0 white,
-							1px -1px 0 white,
-							-1px 1px 0 white,
-							1px 1px 0 white;
+							-1px -1px 0 #191510,
+							1px -1px 0 #191510,
+							-1px 1px 0 #191510,
+							1px 1px 0 #191510;
 					}
 				}
 			}

@@ -201,7 +201,7 @@
 		:global(.operator) {
 			padding: 0 0.5rem;
 			font-size: 1.2rem;
-			color: black;
+			color: var(--color-fg);
 			opacity: 0.8;
 		}
 	}

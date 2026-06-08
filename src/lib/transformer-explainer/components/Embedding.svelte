@@ -149,7 +149,7 @@ import { theme } from '$lib/transformer-explainer/constants/theme';
 		isHovered = false;
 	}
 
-	const embeddingVectorColor = 'bg-gray-300';
+	const embeddingVectorColor = 'te-bg-gold';
 </script>
 
 <div
@@ -222,7 +222,7 @@ import { theme } from '$lib/transformer-explainer/constants/theme';
 							</div>
 							<div class="cell flex items-center">
 								<div class={`vector ${embeddingVectorColor}`}>
-									<VectorCanvas active />
+									<VectorCanvas active colorScale="gold" />
 								</div>
 								<span class="index-val text-xs">
 									{#if index === 0}
@@ -260,7 +260,7 @@ import { theme } from '$lib/transformer-explainer/constants/theme';
 										return d3
 											.scaleDiverging()
 											.domain([0, 0.5, 1])
-											.range([theme.colors['red'][400], 'white', theme.colors['blue'][400]])(d);
+											.range([theme.colors['red'][200], '#191510', theme.colors['blue'][200]])(d);
 									}}
 								/>
 							</div>
@@ -289,7 +289,10 @@ import { theme } from '$lib/transformer-explainer/constants/theme';
 			<div class="column vectors embedding-column">
 				{#each $tokens as token, index}
 					<div class={`vector ${embeddingVectorColor}`} class:last={index === $tokens.length - 1}>
-						<VectorCanvas active={$blockIdx === 0 && (isHovered || isEmbeddingExpanded)} />
+						<!-- always show the golden data texture (unconditionally active, not
+						     gated on hover/expand/blockIdx) so the embedding column reads as
+						     structured molten gold instead of a grey block -->
+						<VectorCanvas active colorScale="gold" />
 					</div>
 				{/each}
 			</div>

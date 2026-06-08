@@ -111,21 +111,26 @@
 	// transformer block bounding
 	onMount(() => {
 		const setPosition = () => {
-			const scrollLeft = window.scrollX;
-			const topbarHeight = document.querySelector('.top-bar')?.offsetHeight;
+			// The bounding box is position:absolute inside .nodes (its offset parent),
+			// so compute coordinates relative to .nodes — NOT document/viewport minus a
+			// topbar (the original .top-bar element no longer exists in this port, which
+			// made `top` NaN and dropped the box into empty space).
+			const nodes = document.querySelector('.te-shell .nodes');
+			const nodesRect = nodes?.getBoundingClientRect() ?? { left: 0, top: 0 };
 
 			const embedding = document.querySelector('.step.qkv .content .block-start-column');
 			const block =
 				$blockIdx === $modelMeta.layer_num - 1
 					? document.querySelector('.step.transformer-blocks .content .column.final')
 					: document.querySelector('.step.transformer-blocks .content');
+			if (!embedding || !block) return;
 
 			const embeddingRect = embedding.getBoundingClientRect();
 			const blockRect = block.getBoundingClientRect();
 
 			boundingPos = {
-				left: embeddingRect.left + scrollLeft + rootRem,
-				top: embeddingRect.top - topbarHeight,
+				left: embeddingRect.left - nodesRect.left + rootRem,
+				top: embeddingRect.top - nodesRect.top,
 				width: blockRect.left - embeddingRect.left - rootRem
 			};
 		};

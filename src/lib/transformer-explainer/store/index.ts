@@ -100,9 +100,10 @@ export const headGap = { x: 5, y: 8, scale: 0 };
 
 export const isBoundingBoxActive = writable(false);
 
-// Bright violet so the predicted token + its probability bar pop on the dark page
-// (kept in sync with --predicted-color in styles/te-theme.css).
-export const predictedColor = '#b98ae0';
+// The sampled / predicted token uses the app's golden accent
+// (≈ --color-accent-langchain oklch(0.78 0.16 70); kept in sync with
+// --predicted-color in styles/te-theme.css).
+export const predictedColor = '#d9a441';
 
 // Interactivity
 export const hoveredPath = writable();

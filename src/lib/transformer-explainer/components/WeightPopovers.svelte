@@ -44,8 +44,14 @@
 	//set popover pos
 	onMount(() => {
 		const setPosition = () => {
-			const scrollLeft = window.scrollX;
-			const topbarHeight = document.querySelector('.top-bar')?.offsetHeight;
+			// The popovers are position:absolute inside .nodes (their offset parent),
+			// so compute coordinates relative to .nodes. (The original subtracted a
+			// `.top-bar` element that no longer exists in this port → topbarHeight was
+			// undefined → every `top` became NaN → the popovers dropped to the bottom.)
+			const nodes = document.querySelector('.te-shell .nodes');
+			const nodesRect = nodes?.getBoundingClientRect() ?? { left: 0, top: 0 };
+			const dx = nodesRect.left;
+			const dy = nodesRect.top;
 
 			const embedding = document.querySelector('.step.qkv .content');
 			const mlp = document.querySelector('.step.mlp .content');
@@ -59,17 +65,15 @@
 			const attentionRect = attention?.getBoundingClientRect();
 			const softmaxRect = softmax?.getBoundingClientRect();
 
-			qkvPos = { left: embeddingRect?.right + scrollLeft, top: embeddingRect?.top - topbarHeight };
-			mlpPos = { left: mlpRect?.left + scrollLeft, top: mlpRect?.top - topbarHeight };
-			mlpDownPos = { left: mlpDownRect?.left + scrollLeft, top: mlpDownRect?.top - topbarHeight };
-			attentionPos = {
-				left: attentionRect?.right + scrollLeft,
-				top: attentionRect?.top + attentionRect?.height / 2 - topbarHeight
-			};
-			softmaxPos = {
-				left: softmaxRect?.left + scrollLeft,
-				top: softmaxRect?.top - topbarHeight
-			};
+			if (embeddingRect) qkvPos = { left: embeddingRect.right - dx, top: embeddingRect.top - dy };
+			if (mlpRect) mlpPos = { left: mlpRect.left - dx, top: mlpRect.top - dy };
+			if (mlpDownRect) mlpDownPos = { left: mlpDownRect.left - dx, top: mlpDownRect.top - dy };
+			if (attentionRect)
+				attentionPos = {
+					left: attentionRect.right - dx,
+					top: attentionRect.top + attentionRect.height / 2 - dy
+				};
+			if (softmaxRect) softmaxPos = { left: softmaxRect.left - dx, top: softmaxRect.top - dy };
 		};
 
 		setPosition();

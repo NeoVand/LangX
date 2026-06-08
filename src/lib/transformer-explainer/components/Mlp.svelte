@@ -13,10 +13,13 @@
 
 	setContext('block-id', 'mlp');
 
-	const firstLayerlColor = 'bg-purple-200';
-	const secondLayerColor = 'bg-indigo-200';
-	const outputColor = 'bg-blue-200';
-	const queryHeadVectorColor = 'bg-purple-400';
+	const firstLayerlColor = 'te-bg-gold';
+	const secondLayerColor = 'te-bg-amber';
+	const outputColor = 'te-bg-bronze';
+	// the head-1 slice highlighted inside the MLP input vector. MLP is outside
+	// self-attention, so this stays in the gold family (amber = brighter than the
+	// gold backing) instead of plum.
+	const queryHeadVectorColor = 'te-bg-amber';
 
 	let isHovered = false;
 
@@ -78,7 +81,7 @@
 					>
 						<span class="label float">{token}</span>
 						<div class={`vector flex flex-col  ${firstLayerlColor}`}>
-							<VectorCanvas colorScale="purple" active={vectorHoverIdx === index} />
+							<VectorCanvas colorScale="gold" active={vectorHoverIdx === index} />
 							<div
 								class={`sub-vector x1-12 head1 ${queryHeadVectorColor} absolute`}
 								bind:this={headCursors[`token${index}_out`]}
@@ -104,7 +107,7 @@
 						class:last={index === $tokens.length - 1}
 					>
 						<div class={classNames(`vector x4 ${secondLayerColor} opacity-80`)}>
-							<VectorCanvas colorScale="indigo" />
+							<VectorCanvas colorScale="amber" />
 						</div>
 					</div>
 				{/each}
@@ -136,7 +139,7 @@
 					{#each $tokens as token, index}
 						<div class="cell" class:last={index === $tokens.length - 1}>
 							<div class={`vector ${outputColor}`}>
-								<VectorCanvas colorScale="blue" />
+								<VectorCanvas colorScale="bronze" />
 							</div>
 						</div>
 					{/each}

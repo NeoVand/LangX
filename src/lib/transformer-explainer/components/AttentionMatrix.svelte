@@ -286,13 +286,13 @@ import { theme } from '$lib/transformer-explainer/constants/theme';
 		return d3
 			.scaleLinear()
 			.domain(qkColorScaleDomain)
-			.range(['white', theme.colors['purple'][700]])(d);
+			.range(['#191510', '#e295b5'])(d);
 	};
 	const maskedColorScale = (d, i) => {
-		return d3.scaleLinear().domain([-3, 3]).range(['white', theme.colors['purple'][700]])(d);
+		return d3.scaleLinear().domain([-3, 3]).range(['#191510', '#e295b5'])(d);
 	};
 	const softmaxColorScale = (d, i) => {
-		return d3.interpolate('white', theme.colors['purple'][700])(d);
+		return d3.interpolate('#191510', '#e295b5')(d);
 	};
 
 	const onMouseOverCell = (e, d, el) => {
@@ -300,13 +300,16 @@ import { theme } from '$lib/transformer-explainer/constants/theme';
 		const colIdx = d.colIndex;
 		hoveredMatrixCell.set({ row: rowIdx, col: colIdx });
 		if (Number.isFinite(d.cell)) {
-			d3.select(el).attr('stroke', theme.colors.gray[400]);
+			// hover → brighter, slightly thicker outline (was dark gray, which made
+			// the outline vanish on the dark theme)
+			d3.select(el).attr('stroke', '#f0e6d2').attr('stroke-width', 1.1);
 		}
 	};
 	const onMouseOutCell = (e, d, el) => {
 		hoveredMatrixCell.set({ row: null, col: null });
 		if (Number.isFinite(d.cell)) {
-			d3.select(el).attr('stroke', !Number.isFinite(d.cell) ? 'none' : theme.colors.gray[200]);
+			// restore the normal slightly-bright thin outline (NOT a dark gray)
+			d3.select(el).attr('stroke', '#c9bea9').attr('stroke-width', 0.5);
 		}
 	};
 
@@ -584,7 +587,7 @@ import { theme } from '$lib/transformer-explainer/constants/theme';
 			height: 0.4rem;
 			flex: 1 0 0;
 			border: 1px solid var(--color-gray-200);
-			background: linear-gradient(90deg, white 0%, var(--color-purple-700) 100%);
+			background: linear-gradient(90deg, #191510 0%, #e295b5 100%);
 		}
 		.val {
 			flex-shrink: 0;

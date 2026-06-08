@@ -402,11 +402,14 @@ import { theme } from '$lib/transformer-explainer/constants/theme';
 		z-index: 998;
 		width: max-content !important;
 		position: absolute;
-		top: 15rem;
+		top: 13rem;
 		right: calc(100% + 6rem);
+		/* never overflow off-screen; scroll if the viewport is short */
+		max-height: 62vh;
+		overflow-y: auto;
 	}
 	:global(.frac-line) {
-		border-color: black;
+		border-color: var(--color-fg-faint);
 	}
 
 	:global(.softmax-tooltip) {
@@ -416,7 +419,7 @@ import { theme } from '$lib/transformer-explainer/constants/theme';
 		.top-k-line {
 			width: 100%;
 			height: 1px;
-			background: var(--color-purple-500);
+			background: var(--accent);
 			top: 1.5rem;
 			position: absolute;
 		}
@@ -470,18 +473,18 @@ import { theme } from '$lib/transformer-explainer/constants/theme';
 					}
 
 					&.filtered {
-						background-color: var(--color-purple-100);
-						color: var(--color-gray-500);
+						background-color: color-mix(in oklch, var(--accent) 14%, transparent);
+						color: var(--color-fg-muted);
 					}
 
 					&.highlight {
-						color: var(--color-purple-600);
+						color: var(--accent);
 						transition: background-color 0.2s;
 					}
 
 					&.sample_highlight {
-						color: white;
-						background-color: var(--color-purple-400);
+						color: var(--color-bg);
+						background-color: var(--accent);
 					}
 
 					&.final_token_highlight {
@@ -495,7 +498,7 @@ import { theme } from '$lib/transformer-explainer/constants/theme';
 
 						.cutoff-label {
 							position: absolute;
-							color: var(--color-purple-500);
+							color: var(--accent);
 							top: 1rem;
 							transform: translate(0, 50%);
 							font-size: 0.9rem;

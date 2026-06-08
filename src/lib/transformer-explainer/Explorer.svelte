@@ -220,7 +220,10 @@
 		min-width: 900px;
 		display: flex;
 		flex-direction: column;
-		background: var(--color-bg);
+		/* near-black "stage" with a faint warm centre lift, so the gold flows glow
+		   like the reference (more contrast than the app's lighter ink page) */
+		background:
+			radial-gradient(120% 90% at 50% 38%, #16110b 0%, #0a0805 55%, #060403 100%);
 		color: var(--color-fg);
 		opacity: 0;
 		transition: opacity 0.25s;
@@ -230,6 +233,18 @@
 	}
 	.te-shell :global(svg) {
 		overflow: visible;
+	}
+	/* Luminous Sankey ribbons, the proper dark-theme way: each ribbon is a
+	   translucent fill (opacity.ts) that fades to transparent at its ends
+	   (gradient.ts), composited with an ADDITIVE blend over the near-black
+	   stage. screen never darkens, so colours glow; where ribbons cross, light
+	   adds toward a brighter gold instead of muddying — no opaque slab, no blur
+	   halo. */
+	.te-shell :global(.sankey-top path),
+	.te-shell :global(.sankey-back path),
+	.te-shell :global(.sankey-top line),
+	.te-shell :global(.sankey-back line) {
+		mix-blend-mode: screen;
 	}
 
 	.te-topbar {

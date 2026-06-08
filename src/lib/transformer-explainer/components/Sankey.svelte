@@ -116,7 +116,9 @@ import { theme } from '$lib/transformer-explainer/constants/theme';
 			},
 			onMouseOver: () => {
 				const paths = d3.select(`g.qkv`).selectAll('path');
-				paths.transition().duration(100).style('opacity', 1);
+				// stay translucent on highlight (like the MLP flows) so the gradient +
+				// glow read, instead of flattening to a solid yellow slab
+				paths.transition().duration(100).style('opacity', 0.7);
 				tooltip.set('click to see QKV calculation');
 			},
 			onMouseOut: () => {
@@ -465,7 +467,8 @@ import { theme } from '$lib/transformer-explainer/constants/theme';
 				unique: true,
 				onMouseOver: () => {
 					const paths = d3.select(`g.softmax`).selectAll('path');
-					paths.transition().duration(100).style('opacity', 1);
+					// keep it translucent on highlight (no solid-slab flattening)
+					paths.transition().duration(100).style('opacity', 0.7);
 					tooltip.set('click to see Logits calculation');
 					// showTooltip('');
 				},

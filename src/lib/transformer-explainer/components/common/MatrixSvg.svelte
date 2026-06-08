@@ -53,10 +53,10 @@ import { theme } from '$lib/transformer-explainer/constants/theme';
 			: rowLen * cellHeight + (rowLen - 1) * rowGap;
 
 	const colorKey = typeof colorScale === 'string' ? colorScale : 'blue';
+	// `gray` is a light warm neutral (the gray ramp is kept dark for Sankey flows).
+	const hiColor = colorKey === 'gray' ? '#b8af9b' : theme.colors[colorKey][200];
 	const matrixColorScale =
-		typeof colorScale === 'function'
-			? colorScale
-			: d3.interpolate('white', theme.colors[colorKey][400]);
+		typeof colorScale === 'function' ? colorScale : d3.interpolate('#191510', hiColor);
 
 	const drawMatrixSvg = () => {
 		const svg = d3.select(svgEl);
@@ -111,7 +111,9 @@ import { theme } from '$lib/transformer-explainer/constants/theme';
 					.attr('cx', 0)
 					.attr('cy', (d, i) => i * cellHeight + i * rowGap)
 					.attr('r', cellWidth / 2)
-					.attr('stroke', theme.colors.gray[500])
+					// unmasked → slightly bright outline; masked → none (so they're distinct)
+					.attr('stroke', (d) => (!Number.isFinite(d.cell) ? 'none' : '#c9bea9'))
+					.attr('stroke-width', (d) => (!Number.isFinite(d.cell) ? 0 : 0.5))
 					.attr('fill', function (d, i) {
 						return matrixColorScale(d.cell, i);
 					})
@@ -193,7 +195,10 @@ import { theme } from '$lib/transformer-explainer/constants/theme';
 					.attr(transpose ? 'cy' : 'cx', (d, i) => cellWidth / 2 + i * cellWidth + i * colGap)
 					.attr(transpose ? 'cx' : 'cy', 0)
 					.attr('r', cellWidth / 2)
-					.attr('stroke', (d) => (!Number.isFinite(d.cell) ? 'none' : theme.colors.gray[200]))
+					// unmasked cells get a slightly bright outline; masked cells get none,
+					// so the masked (no-outline) cells read as distinct on the dark theme.
+					.attr('stroke', (d) => (!Number.isFinite(d.cell) ? 'none' : '#c9bea9'))
+					.attr('stroke-width', (d) => (!Number.isFinite(d.cell) ? 0 : 0.5))
 					.on('mouseenter', onCellOver)
 					.on('mouseleave', onCellOut)
 					.transition()
@@ -318,7 +323,7 @@ import { theme } from '$lib/transformer-explainer/constants/theme';
 		opacity: 1;
 	}
 	:global(.matrix-svg .cell.dim) {
-		opacity: 0.1 !important;
+		opacity: 0.4 !important;
 	}
 
 	.matrix-tooltip {

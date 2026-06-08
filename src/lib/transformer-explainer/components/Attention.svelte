@@ -24,11 +24,14 @@
 	const blockId = getContext('block-id');
 	$: isAttentionExpanded = $expandedBlock.id === blockId;
 
-	const queryHeadVectorColor = 'bg-blue-400';
-	const keyHeadVectorColor = 'bg-red-400';
-	const valHeadVectorColor = 'bg-green-400';
+	// Q/K/V are the jewel-toned centrepiece (colour is reserved for the attention
+	// block), so they sit a step brighter than the muted [400] — matching their
+	// Sankey flow colours ([300]) for a consistent read.
+	const queryHeadVectorColor = 'bg-blue-300';
+	const keyHeadVectorColor = 'bg-red-300';
+	const valHeadVectorColor = 'bg-green-300';
 
-	const outputVectorColor = 'bg-purple-500';
+	const outputVectorColor = 'bg-purple-400';
 
 	let isHovered = false;
 
@@ -223,8 +226,8 @@
 				&.active {
 					&.query {
 						.label {
-							background-color: var(--color-blue-100);
-							color: var(--color-blue-700);
+							background-color: color-mix(in oklch, var(--color-blue-200) 30%, transparent);
+							color: var(--color-blue-100);
 							font-size: 1rem;
 							z-index: 100;
 							padding: 0.2rem;
@@ -232,8 +235,8 @@
 					}
 					&.key {
 						.label {
-							background-color: var(--color-red-100);
-							color: var(--color-red-700);
+							background-color: color-mix(in oklch, var(--color-red-200) 30%, transparent);
+							color: var(--color-red-100);
 							font-size: 1rem;
 							z-index: 100;
 							padding: 0.2rem;

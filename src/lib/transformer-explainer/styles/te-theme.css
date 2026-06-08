@@ -1,18 +1,19 @@
 /*
- * Dark-steampunk palette for the ported Transformer Explainer's CSS.
+ * Steampunk palette for the ported Transformer Explainer's CSS, tuned to LangX's
+ * warm theme (the app accent is a golden ochre, --color-accent-langchain).
  *
  * Components reference colours as `var(--color-<family>-<shade>)` (converted from
  * the original Tailwind `theme('colors.…')` calls). Scoped to `.te-shell` so they
  * don't leak. Floating UI is portaled into `.te-portal-root` (inside `.te-shell`)
  * and inherits these too.
  *
- * Two layers here:
- *   1. the gray ramp is remapped onto LangX's dark ink/cream tokens (so what was
- *      dark text becomes cream, and light surfaces become dark);
- *   2. the colour channels (blue/red/green/purple/indigo) get aged steampunk hues
- *      — kept in sync with constants/theme.ts (the JS side).
- * The white surfaces the original hard-codes (Tailwind bg-white, popovers,
- * tooltips) are re-skinned to dark at the bottom.
+ * Layers:
+ *   1. the gray ramp is remapped onto LangX's ink/cream tokens (text/borders);
+ *   2. `--color-white` is remapped to a dark surface so every `bg-white` card in
+ *      the ported code becomes dark (popovers, tooltips, the examples button);
+ *   3. the colour channels (blue/red/green/purple/indigo) are aged-metal hues,
+ *      kept in sync with constants/theme.ts (the JS side);
+ *   4. `--predicted-color` (the sampled token) is the golden app accent.
  *
  * RESTYLE NOTE: this + constants/theme.ts are the two places that control the
  * explorer's colours.
@@ -21,9 +22,14 @@
 .te-shell {
 	/* layout vars that lived on the original #app (stripped layout) */
 	--min-column-width: 22px;
-	--predicted-color: #b98ae0;
+	/* the SAMPLED / selected token uses the app's golden accent */
+	--predicted-color: var(--accent);
 
-	/* grays → LangX dark ink/cream semantics */
+	/* `bg-white` cards (popovers, tooltips, examples button) → dark surface.
+	   Only `bg-white` consumes this in the ported code (no text/border-white). */
+	--color-white: var(--color-bg-elev-2);
+
+	/* grays → LangX ink/cream semantics (text + borders) */
 	--color-gray-50: var(--color-bg-elev);
 	--color-gray-100: var(--color-bg-elev-2);
 	--color-gray-200: var(--color-border);
@@ -35,57 +41,86 @@
 	--color-gray-800: var(--color-fg);
 	--color-gray-900: var(--color-fg);
 
-	/* Query — bright azure (must read on the dark page) */
-	--color-blue-100: #cfe6fb;
-	--color-blue-200: #9fd0f5;
-	--color-blue-300: #6fb6ec;
-	--color-blue-400: #4a9ce0;
-	--color-blue-500: #3486d4;
-	--color-blue-600: #2c72bd;
-	--color-blue-700: #255f9e;
+	/* Query — steel blue */
+	--color-blue-100: #c5d8ec;
+	--color-blue-200: #5a8fc0;
+	--color-blue-300: #4a7cac;
+	--color-blue-400: #3e6890;
+	--color-blue-500: #345777;
+	--color-blue-600: #2b4861;
+	--color-blue-700: #233a4e;
 
-	/* Key — warm coral / copper */
-	--color-red-100: #fbd9c8;
-	--color-red-200: #f5b79a;
-	--color-red-300: #ee9670;
-	--color-red-400: #e87a4f;
-	--color-red-500: #d9633a;
-	--color-red-600: #bd5130;
-	--color-red-700: #9e4428;
+	/* Key — copper */
+	--color-red-100: #f1cdb6;
+	--color-red-200: #c87142;
+	--color-red-300: #b56439;
+	--color-red-400: #9d5630;
+	--color-red-500: #854829;
+	--color-red-600: #6d3b22;
+	--color-red-700: #59311c;
 
-	/* Value — emerald / verdigris */
-	--color-green-100: #c8f1dd;
-	--color-green-200: #97e3c0;
-	--color-green-300: #67d2a3;
-	--color-green-400: #45bd88;
-	--color-green-600: #2c8a62;
+	/* Value — verdigris */
+	--color-green-100: #bfe6d4;
+	--color-green-200: #56a884;
+	--color-green-300: #469073;
+	--color-green-400: #3a7a61;
+	--color-green-600: #1f4434;
 
-	/* attention / out — violet */
-	--color-purple-100: #e7d5f7;
-	--color-purple-200: #d2b4ef;
-	--color-purple-300: #bd92e6;
-	--color-purple-400: #a972dc;
-	--color-purple-500: #9558cc;
-	--color-purple-600: #7e46b0;
-	--color-purple-700: #673a90;
+	/* attention / out — plum */
+	--color-purple-100: #e8ccd6;
+	--color-purple-200: #b06a82;
+	--color-purple-300: #9c5b72;
+	--color-purple-400: #854c60;
+	--color-purple-500: #6f4050;
+	--color-purple-600: #5b3441;
+	--color-purple-700: #492a34;
 
-	/* MLP out — periwinkle */
-	--color-indigo-200: #bcc2f5;
-	--color-indigo-300: #9aa2ec;
+	/* MLP out — tarnished indigo */
+	--color-indigo-200: #8079b0;
+	--color-indigo-300: #6f689c;
+
+	/* App golden spectrum — structural/carrier + embedding magnitudes.
+	   Kept in sync with constants/theme.ts (JS side). */
+	--color-gold-200: #d9a441;
+	--color-amber-200: #ecc068;
+	--color-bronze-200: #c08a38;
 }
 
-/* ── re-skin the surfaces the original hard-codes as white ──
-   Scoped under .te-shell / .te-portal-root so they out-specify Tailwind's
-   single-class utilities (bg-white, text-gray-*, border-gray-*). */
+/* Gold-spectrum vector backings (Tailwind can't emit bg-gold-* since gold isn't
+   in its @theme, so these replace the bg-purple/indigo/blue wrapper classes).
+   A subtle top-lit vertical sheen gives the vectors a brushed-brass feel
+   instead of reading as flat, dull blocks on the dark stage. */
+.te-shell .te-bg-gold {
+	background-image: linear-gradient(180deg, #ecc676 0%, var(--color-gold-200) 52%, #b3842f 100%);
+}
+.te-shell .te-bg-amber {
+	background-image: linear-gradient(180deg, #f6d893 0%, var(--color-amber-200) 52%, #c89a44 100%);
+}
+.te-shell .te-bg-bronze {
+	background-image: linear-gradient(180deg, #d6a559 0%, var(--color-bronze-200) 52%, #946426 100%);
+}
+
+/* ── re-skin popover/tooltip surfaces to dark (covers both inline-rendered and
+   portaled ones; .te-portal-root is inside .te-shell). The bg also comes from
+   --color-white above, but these set text + border too. ── */
 .te-shell .select-button,
 .te-shell .matrix-tooltip,
-.te-portal-root .matrix-tooltip,
-.te-portal-root .weight-popover-card,
-.te-portal-root .softmax-popover,
-.te-portal-root .popover {
+.te-shell .weight-popover-card,
+.te-shell .softmax-popover,
+.te-shell .popover {
 	background: var(--color-bg-elev-2);
 	color: var(--color-fg);
 	border-color: var(--color-border);
+}
+/* popover title bars + their headings */
+.te-shell .softmax-popover-title,
+.te-shell .weight-popover-title {
+	background: var(--color-bg-elev-3);
+	border-color: var(--color-border);
+}
+.te-shell .softmax-popover-title h3,
+.te-shell .weight-popover-title h3 {
+	color: var(--color-fg);
 }
 
 /* the examples dropdown menu */

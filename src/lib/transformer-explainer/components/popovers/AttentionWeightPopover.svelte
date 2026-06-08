@@ -40,15 +40,15 @@ import { theme } from '$lib/transformer-explainer/constants/theme';
 
 	// color scale
 	const valueColorScale = (d, i) => {
-		return d3.interpolate(theme.colors['green'][100], theme.colors['green'][400])(d);
+		return d3.interpolate('#191510', theme.colors['green'][300])(d);
 	};
 
 	const outColorScale = (d, i) => {
-		return d3.interpolate(theme.colors['purple'][100], theme.colors['purple'][400])(d);
+		return d3.interpolate('#191510', theme.colors['purple'][300])(d);
 	};
 
 	const softmaxColorScale = (d, i) => {
-		return d3.interpolate('white', theme.colors['purple'][700])(d);
+		return d3.interpolate('#191510', '#e295b5')(d);
 	};
 
 	// animation

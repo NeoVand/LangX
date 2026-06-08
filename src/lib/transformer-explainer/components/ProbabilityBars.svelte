@@ -17,7 +17,7 @@ import { theme } from '$lib/transformer-explainer/constants/theme';
 	let percentPrecision = 2;
 
 	let normalColor = theme.colors.gray[300];
-	let hoverColor = theme.colors.purple[400];
+	let hoverColor = theme.colors.gold[200];
 
 	export let drawBars = () => {
 		const data = $modelData?.probabilities;
@@ -156,7 +156,7 @@ import { theme } from '$lib/transformer-explainer/constants/theme';
 		user-select: none;
 
 		:global(rect.highlighted) {
-			fill: var(--color-purple-500);
+			fill: var(--accent);
 		}
 	}
 </style>

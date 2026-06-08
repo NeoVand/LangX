@@ -51,13 +51,13 @@ import { theme } from '$lib/transformer-explainer/constants/theme';
 
 	// color scale
 	const embeddingColorScale = (d, i) => {
-		return d3.interpolate(theme.colors['blue'][100], theme.colors['blue'][400])(d);
+		return d3.interpolate('#191510', theme.colors['gold'][200])(d);
 	};
 	const weightColorScale = (d, i) => {
-		return d3.interpolate(theme.colors['gray'][100], theme.colors['gray'][400])(d);
+		return d3.interpolate('#191510', '#b8af9b')(d);
 	};
 	const logitColorScale = (d, i) => {
-		return d3.interpolate(theme.colors['blue'][100], theme.colors['gray'][400])(d);
+		return d3.interpolate('#191510', theme.colors['amber'][200])(d);
 	};
 
 	// animation

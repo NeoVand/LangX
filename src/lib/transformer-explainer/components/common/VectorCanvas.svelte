@@ -16,10 +16,16 @@ import { theme } from '$lib/transformer-explainer/constants/theme';
 	const lineHeight = 1;
 
 	$: colorKey = typeof colorScale === 'string' ? colorScale : 'gray';
-	$: color =
-		typeof colorScale === 'function'
-			? colorScale
-			: d3.interpolate(theme.colors[colorKey][100], theme.colors[colorKey][400]);
+	$: isGoldFamily = ['gold', 'amber', 'bronze'].includes(colorKey);
+	// dark theme: low values fade into the page, high values reach a visible colour.
+	// `gray` is a light warm neutral here (the gray RAMP is kept dark for the Sankey
+	// residual flows, so we can't use it as a visible high end).
+	// For the gold family, ramp ENTIRELY within bright gold (clear brass → light
+	// gold) so every magnitude reads as luminous gold — never a dark/grey low that
+	// makes the block look muddy. Structure comes from the brass↔light variation.
+	$: hiColor = colorKey === 'gray' ? '#b8af9b' : theme.colors[colorKey][isGoldFamily ? 100 : 200];
+	$: loColor = isGoldFamily ? theme.colors[colorKey][300] : '#191510';
+	$: color = typeof colorScale === 'function' ? colorScale : d3.interpolateRgb(loColor, hiColor);
 
 	function drawCanvas() {
 		const ctx = canvas.getContext('2d');
@@ -45,8 +51,16 @@ import { theme } from '$lib/transformer-explainer/constants/theme';
 
 	onMount(() => {
 		const unsubscribe = vectorHeight.subscribe(drawCanvas);
+		// redraw at the box's actual size whenever layout settles, so the texture
+		// is crisp (not a low-res strip stretched over a taller box).
+		let ro;
+		if (canvas?.parentElement && typeof ResizeObserver !== 'undefined') {
+			ro = new ResizeObserver(() => drawCanvas());
+			ro.observe(canvas.parentElement);
+		}
 		return () => {
 			unsubscribe();
+			ro?.disconnect();
 		};
 	});
 

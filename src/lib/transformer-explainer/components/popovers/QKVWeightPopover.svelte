@@ -49,12 +49,12 @@ import { theme } from '$lib/transformer-explainer/constants/theme';
 
 	// color scale
 	const embeddingColorScale = (d, i) => {
-		return d3.interpolate(theme.colors['gray'][100], theme.colors['gray'][400])(d);
+		return d3.interpolate('#191510', theme.colors['gold'][200])(d);
 	};
 
 	const qkvColorScale = (d, i) => {
 		let color = i < visibleDimension ? 'blue' : i < visibleDimension * 2 ? 'red' : 'green';
-		return d3.interpolate(theme.colors[color][100], theme.colors[color][400])(d);
+		return d3.interpolate('#191510', theme.colors[color][300])(d);
 	};
 
 	// animation

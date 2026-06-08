@@ -51,11 +51,11 @@
 			{#each $tokens as token, index}
 				<div class="cell" class:last={index === $tokens.length - 1}>
 					<div
-						class={classNames(`vector shrink-0 bg-blue-200`, {
+						class={classNames(`vector shrink-0 te-bg-gold`, {
 							'last-token': index === $tokens.length - 1
 						})}
 					>
-						<VectorCanvas colorScale="blue" />
+						<VectorCanvas colorScale="gold" />
 					</div>
 				</div>
 			{/each}

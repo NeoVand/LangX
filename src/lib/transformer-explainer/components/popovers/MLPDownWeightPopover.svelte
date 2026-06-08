@@ -48,14 +48,15 @@ import { theme } from '$lib/transformer-explainer/constants/theme';
 				.map((d) => Math.random())
 		);
 	// color scale
+	// input = expanded (amber), output = compressed (bronze), weights = neutral
 	const weightColorScale = (d, i) => {
-		return d3.interpolate(theme.colors['gray'][100], theme.colors['gray'][400])(d);
+		return d3.interpolate('#191510', '#b8af9b')(d);
 	};
 	const out1ColorScale = (d, i) => {
-		return d3.interpolate(theme.colors['indigo'][100], theme.colors['indigo'][400])(d);
+		return d3.interpolate('#191510', theme.colors['amber'][200])(d);
 	};
 	const out2ColorScale = (d, i) => {
-		return d3.interpolate(theme.colors['blue'][100], theme.colors['blue'][400])(d);
+		return d3.interpolate('#191510', theme.colors['bronze'][200])(d);
 	};
 
 	// animation
