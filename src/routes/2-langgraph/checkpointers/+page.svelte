@@ -4,198 +4,203 @@
 	import Term from '$lib/components/Term.svelte';
 	import Panel from '$lib/components/Panel.svelte';
 	import CodeBlock from '$lib/components/CodeBlock.svelte';
-	import Diagram from '$lib/components/Diagram.svelte';
-	import { checkpointer as checkpointerDiagram } from '$lib/diagrams';
-	import RunButton from '$lib/components/RunButton.svelte';
-	import StateInspector from '$lib/components/StateInspector.svelte';
+	import HeroImage from '$lib/components/HeroImage.svelte';
+	import ReadMore from '$lib/components/ReadMore.svelte';
+	import BranchingChat from '$lib/components/BranchingChat.svelte';
+	import LiveGraph, { type NodeMeta, type StepInfo, type EdgeDetail } from '$lib/components/LiveGraph.svelte';
 	import { MemorySaver } from '@langchain/langgraph/web';
-	import { HumanMessage, type BaseMessage } from '@langchain/core/messages';
 	import { getModel } from '$lib/runtime/llm';
-	import { withRunCache, loadCachedRun } from '$lib/runtime/runs';
-	import { buildCounterGraph, buildChatGraph } from '$lib/demos/lg-checkpointers';
+	import { buildChatGraph, runChatTurn, type ChatGraph } from '$lib/demos/lg-checkpointers';
 	import lgCheckpointersSrc from '$lib/demos/lg-checkpointers.ts?raw';
+	import checkpointersSkill from '$lib/demos/skills/langgraph-checkpointers.md?raw';
 	import type { DemoManifest } from '$lib/demos/download';
-	import { onMount } from 'svelte';
+	import { Pencil, RefreshCw } from '@lucide/svelte';
 
 	const demoSource: DemoManifest = {
 		id: 'checkpointers',
 		title: 'Checkpointers & time travel',
 		summary:
-			'Compile with a MemorySaver for resume, multi-turn chat memory, and forkable history.',
+			'Compile with a MemorySaver and one graph gains memory across turns, a queryable checkpoint history, and the ability to rewind and fork a conversation.',
 		entries: [{ path: 'lib/demos/lg-checkpointers.ts', code: lgCheckpointersSrc }],
 		runner: `import { MemorySaver } from '@langchain/langgraph/web';
-import { HumanMessage } from '@langchain/core/messages';
 import { getModel } from './lib/runtime/llm';
-import { buildCounterGraph, buildChatGraph } from './lib/demos/lg-checkpointers';
+import { buildChatGraph, sendTurn, historyOf } from './lib/demos/lg-checkpointers';
 
-console.log('=== Time travel ===');
-const saver = new MemorySaver();
-const cfg = { configurable: { thread_id: 'thread-1' } };
-const final = await buildCounterGraph(saver).invoke({ count: 0 }, cfg);
-console.log('final state:', final);
-for await (const snap of buildCounterGraph(saver).getStateHistory(cfg)) {
-	console.log('  checkpoint', JSON.stringify(snap.values), 'next', snap.next);
-}
+const model = await getModel({ temperature: 0.5, maxTokens: 160 });
+const graph = buildChatGraph(new MemorySaver(), model);
+const thread = 'demo-1';
 
-console.log('\\n=== Multi-turn chat (shared thread = memory) ===');
-const model = await getModel({ temperature: 0.4, maxTokens: 220 });
-const chat = buildChatGraph(model, new MemorySaver());
-const chatCfg = { configurable: { thread_id: 'chat-1' } };
-let out = await chat.invoke({ messages: [new HumanMessage("Hi, I'm planning a trip to Tokyo.")] }, chatCfg);
-console.log('assistant:', out.messages.at(-1)?.content);
-out = await chat.invoke({ messages: [new HumanMessage('Where did I say I was going?')] }, chatCfg);
-console.log('assistant:', out.messages.at(-1)?.content);
-`
+// Memory: pass only the new message; the checkpointer reloads the rest.
+await sendTurn(graph, "Hi! I'm Neo and I'm learning to bake sourdough.", thread);
+const t2 = await sendTurn(graph, 'What should I make this weekend?', thread);
+console.log('remembers:', t2.messages.at(-1)?.content);
+
+console.log('\\n--- every checkpoint ---');
+const history = await historyOf(graph, thread);
+for (const c of history) console.log(c.step, c.checkpointId.slice(-6), 'next=' + JSON.stringify(c.next));
+
+// Time travel: resume from the FIRST completed turn with a different message → a branch.
+const firstTurn = [...history].reverse().find((c) => c.next.length === 0);
+const forked = await sendTurn(graph, 'Actually I just took up watercolor — what should I paint?', thread, firstTurn.checkpointId);
+console.log('\\nforked reply:', forked.messages.at(-1)?.content);`,
+		skill: checkpointersSkill
 	};
 
-	/* ------------------------------------------------------------------ */
-	/* Demo 1: counter graph + fork (synthetic — best for explaining)      */
-	/* ------------------------------------------------------------------ */
+	// ── The chat graph (built once; one saver, threads stay isolated inside it) ──
+	const saver = new MemorySaver();
+	let graphPromise: Promise<ChatGraph> | null = null;
+	async function getGraph(): Promise<ChatGraph> {
+		graphPromise ??= (async () => buildChatGraph(saver, await getModel({ temperature: 0.6, maxTokens: 220 })))();
+		return graphPromise;
+	}
+	let threadSeq = 0;
 
-	let checkpointer = new MemorySaver();
+	// runTurn passed to <BranchingChat>: stream a turn, return reply + thread + checkpoint.
+	// resume === null means fork from empty → a brand-new thread (isolated memory);
+	// otherwise resume from that exact checkpoint on its thread.
+	async function runTurn(
+		text: string,
+		resume: { threadId: string; checkpointId: string } | null,
+		onToken: (full: string) => void
+	) {
+		const graph = await getGraph();
+		const threadId = resume?.threadId ?? `chat-${++threadSeq}`;
+		const r = await runChatTurn(graph, text, threadId, resume?.checkpointId, onToken);
+		return { text: r.text, threadId, checkpointId: r.checkpointId };
+	}
 
-	let currentState = $state<unknown>(null);
-	let history = $state<Array<{ step: number; values: unknown; checkpoint_id?: string; next: string[] }>>([]);
-	let chosenCheckpoint = $state<string | null>(null);
-	let threadId = $state('thread-1');
-	let busy = $state(false);
+	// ── Live graph (inspection): START → chat → END, lit per turn ────────────────
+	interface ChatFrameSnap {
+		threadId: string;
+		user: string;
+		reply: string;
+		checkpointId: string;
+	}
+	const graphNodes = [
+		{ id: '__start__', label: 'START', cx: 132, cy: 40, w: 56, h: 28, shape: 'pill' as const },
+		{ id: 'chat', label: 'chat', sub: 'the model replies', cx: 132, cy: 134, w: 132, h: 50, shape: 'box' as const, variant: 'llm' as const },
+		{ id: '__end__', label: 'END', cx: 132, cy: 230, w: 56, h: 28, shape: 'pill' as const }
+	];
+	const graphEdges = [
+		{ from: '__start__', to: 'chat' },
+		{ from: 'chat', to: '__end__', label: 'checkpoint ✓' }
+	];
+	const nodeMeta: Record<string, NodeMeta> = {
+		__start__: {
+			desc: 'Your message enters as state.',
+			explain: {
+				lead: 'You send a message.',
+				body: 'Only the new message goes in. Because the graph was compiled with a checkpointer, the runtime first reloads this thread’s saved history, so the model sees the whole conversation.'
+			}
+		},
+		chat: {
+			label: 'chat (model node)',
+			desc: 'Calls the model on the full (reloaded) history and appends the reply.',
+			explain: {
+				lead: 'The model answers.',
+				body: 'A single node hands the reloaded conversation to the model and appends its reply. When the node finishes, the checkpointer writes a new checkpoint — that’s the save point you can rewind to.'
+			},
+			code: `const graph = builder.compile({ checkpointer: new MemorySaver() });
+// resume a past point by passing checkpoint_id:
+await graph.invoke({ messages: [msg] },
+  { configurable: { thread_id, checkpoint_id } });`
+		},
+		__end__: {
+			desc: 'A checkpoint is saved; the reply is now part of the thread.',
+			explain: {
+				lead: 'Saved.',
+				body: 'The turn is checkpointed. Edit one of your messages or regenerate a reply and the run resumes from an earlier checkpoint — forking a new branch while the original stays intact.'
+			}
+		}
+	};
+	const EDGE_DETAIL: Record<string, EdgeDetail> = {
+		'chat|__end__': {
+			title: 'Checkpoint after every node',
+			variant: '',
+			desc: 'The checkpointer snapshots state after each super-step. That snapshot is addressable by checkpoint_id — the basis for memory, history, and time travel.',
+			code: `.compile({ checkpointer: new MemorySaver() })`
+		}
+	};
 
-	const config = $derived({ configurable: { thread_id: threadId } });
+	let frames = $state<{ node: string; snap: ChatFrameSnap }[]>([]);
+	let frameIdx = $state(0);
+	let pausedNode = $state<string | undefined>(undefined);
+	let live = $state<ChatFrameSnap>({ threadId: 'chat-1', user: '', reply: '', checkpointId: '' });
 
-	async function runOnce() {
-		busy = true;
-		try {
-			const graph = buildCounterGraph(checkpointer);
-			const result = await graph.invoke({ count: 0 }, config);
-			currentState = result;
-			await refreshHistory();
-		} finally {
-			busy = false;
+	function onTurnStart(humanText: string) {
+		live = { threadId: '', user: humanText, reply: '', checkpointId: '…saving' };
+		frames = [
+			{ node: '__start__', snap: { ...live } },
+			{ node: 'chat', snap: { ...live } }
+		];
+		frameIdx = 1;
+		pausedNode = 'chat';
+	}
+	function onStreaming(full: string) {
+		live = { ...live, reply: full };
+	}
+	function onTurnEnd(res: { text: string; threadId: string; checkpointId: string }) {
+		live = { ...live, threadId: res.threadId, reply: res.text, checkpointId: res.checkpointId };
+		frames = [...frames, { node: '__end__', snap: { ...live } }];
+		frameIdx = frames.length - 1;
+		pausedNode = undefined;
+	}
+	function onNewThread() {
+		frames = [];
+		frameIdx = 0;
+		pausedNode = undefined;
+	}
+
+	function describe(node: string, s: ChatFrameSnap): StepInfo | null {
+		switch (node) {
+			case '__start__':
+				return {
+					summary: 'Your message + the thread’s saved history become the input',
+					stateChange: 'checkpointer reloads prior messages',
+					insight: 'You only sent the new message — memory comes from the saver.'
+				};
+			case 'chat':
+				return {
+					summary: 'The model replies using the full conversation',
+					items: s.reply ? [{ icon: '◇', text: s.reply.slice(0, 80) + (s.reply.length > 80 ? '…' : '') }] : undefined,
+					stateChange: 'messages += AIMessage'
+				};
+			case '__end__':
+				return {
+					summary: `Checkpoint #${(s.checkpointId || '').slice(-6)} saved`,
+					stateChange: 'a new checkpoint is written',
+					insight: 'Rewind to it later by passing its checkpoint_id.'
+				};
+			default:
+				return null;
 		}
 	}
-
-	async function refreshHistory() {
-		const graph = buildCounterGraph(checkpointer);
-		const items: typeof history = [];
-		let i = 0;
-		for await (const snap of graph.getStateHistory(config)) {
-			items.push({
-				step: i++,
-				values: snap.values,
-				checkpoint_id: snap.config?.configurable?.checkpoint_id as string | undefined,
-				next: [...snap.next]
-			});
-		}
-		history = items;
+	function toState(s: ChatFrameSnap): Record<string, unknown> {
+		return { thread_id: s.threadId, last_message: s.user, reply: s.reply, checkpoint: s.checkpointId };
 	}
 
-	async function forkFrom(id: string) {
-		busy = true;
-		try {
-			const graph = buildCounterGraph(checkpointer);
-			const forkedConfig = {
-				configurable: { thread_id: threadId, checkpoint_id: id }
-			};
-			const updated = await graph.updateState(forkedConfig, { count: 100 }, 'add');
-			const result = await graph.invoke(null, updated);
-			currentState = result;
-			chosenCheckpoint = id;
-			await refreshHistory();
-		} finally {
-			busy = false;
-		}
-	}
+	// ── Narrative code excerpts ───────────────────────────────────────────────────
+	const code = `import { MemorySaver } from '@langchain/langgraph';
 
-	function newThread() {
-		threadId = 'thread-' + Math.random().toString(36).slice(2, 6);
-		currentState = null;
-		history = [];
-		chosenCheckpoint = null;
-	}
+// One extra line at compile time. SQLite or Postgres in production.
+const graph = builder.compile({ checkpointer: new MemorySaver() });
+const cfg = { configurable: { thread_id: 'user-42' } };
 
-	function freshSaver() {
-		checkpointer = new MemorySaver();
-		newThread();
-	}
+// Pass ONLY the new message — the checkpointer reloads the thread's history.
+await graph.invoke({ messages: [new HumanMessage("Hi, I'm Neo.")] }, cfg);
+await graph.invoke({ messages: [new HumanMessage("What's my name?")] }, cfg);  // → "Neo"`;
 
-	/* ------------------------------------------------------------------ */
-	/* Demo 2: real-LLM multi-turn chat with thread persistence           */
-	/* ------------------------------------------------------------------ */
-
-	let chatThread = $state('chat-thread');
-	let chatBusy = $state(false);
-	let userTurn = $state('I want to plan a trip to Tokyo.');
-	let chatLog = $state<{ role: 'user' | 'assistant'; text: string }[]>([]);
-
-	interface ChatPayload {
-		thread: string;
-		messages: { role: 'user' | 'assistant'; text: string }[];
-	}
-
-	const chatCheckpointer = new MemorySaver();
-
-	async function sendChat() {
-		if (!userTurn.trim()) return;
-		chatBusy = true;
-		const turnText = userTurn.trim();
-		try {
-			const model = await getModel({ temperature: 0.4, maxTokens: 220 });
-			const graph = buildChatGraph(model, chatCheckpointer);
-			const cfg = { configurable: { thread_id: chatThread } };
-
-			chatLog = [...chatLog, { role: 'user', text: turnText }];
-			const out = await graph.invoke({ messages: [new HumanMessage(turnText)] }, cfg);
-			const last = (out.messages as BaseMessage[]).at(-1);
-			const reply = typeof last?.content === 'string' ? last.content : '';
-			chatLog = [...chatLog, { role: 'assistant', text: reply }];
-
-			const payload: ChatPayload = { thread: chatThread, messages: chatLog };
-			await withRunCache<ChatPayload>({ demoId: 'l2-checkpointers-chat' }, async () => payload);
-			userTurn = '';
-		} finally {
-			chatBusy = false;
-		}
-	}
-
-	function newChatThread() {
-		chatThread = 'chat-' + Math.random().toString(36).slice(2, 6);
-		chatLog = [];
-	}
-
-	onMount(async () => {
-		const cached = await loadCachedRun<ChatPayload>({ demoId: 'l2-checkpointers-chat' });
-		if (cached) {
-			chatLog = cached.payload.messages;
-			chatThread = cached.payload.thread;
-		}
-	});
-
-	const code = `import { MemorySaver, StateGraph } from '@langchain/langgraph';
-
-const checkpointer = new MemorySaver();           // SQLite or Postgres in production
-const graph = builder.compile({ checkpointer });
-
-await graph.invoke(input, { configurable: { thread_id: 'abc' } });
-
-// Replay or list every saved step in this thread:
-for await (const snap of graph.getStateHistory({ configurable: { thread_id: 'abc' } })) {
-  console.log(snap.values, snap.next);
+	const timeTravelCode = `// List every saved checkpoint for a thread:
+for await (const snap of graph.getStateHistory({ configurable: { thread_id: 'user-42' } })) {
+  console.log(snap.config.configurable.checkpoint_id, snap.values);
 }
 
-// Fork: pick a past checkpoint, edit state, then continue:
-const forked = await graph.updateState(
-  { configurable: { thread_id: 'abc', checkpoint_id: oldId } },
-  { count: 100 }
+// Time travel: resume from a PAST checkpoint with a different message → a branch.
+await graph.invoke(
+  { messages: [new HumanMessage('Actually, call me Mr. Anderson.')] },
+  { configurable: { thread_id: 'user-42', checkpoint_id: pastId } }
 );
-await graph.invoke(null, forked);`;
-
-	const chatCode = `// Same checkpointer turns ANY graph into a multi-turn chat.
-const graph = builder.compile({ checkpointer: new MemorySaver() });
-const cfg = { configurable: { thread_id: "user-42" } };
-
-await graph.invoke({ messages: [new HumanMessage("Hi, I'm Neo.")] }, cfg);
-// → assistant remembers Neo because the previous superstep's state lives in the saver.
-await graph.invoke({ messages: [new HumanMessage("What's my name?")] }, cfg);`;
+// The original branch is untouched; both stay queryable.`;
 </script>
 
 <Lesson
@@ -203,290 +208,212 @@ await graph.invoke({ messages: [new HumanMessage("What's my name?")] }, cfg);`;
 	eyebrow="Level 2 · Lesson 03"
 	hero={{
 		id: 'l2-checkpointers',
-		alt: 'A grandfather clock with gears whose dots align like saved checkpoints'
+		alt: 'A brass machine stamping a row of glowing checkpoint medallions along a timeline rail'
 	}}
 	source={demoSource}
 >
 	{#snippet motivation()}
-		An agent without persistence is a goldfish. <Term t="Checkpointer">Checkpointers</Term> give you
-		resumption, branching histories, and forensic <Term t="Time travel">time travel</Term> — the
-		difference between a demo and a system.
+		An agent without persistence is a goldfish. A <Term t="Checkpointer">checkpointer</Term> gives the
+		same graph three things at once — <strong>memory</strong> across turns, a queryable
+		<strong>history</strong>, and the ability to <strong>rewind and fork</strong> — from one extra line.
 	{/snippet}
 	{#snippet intro()}
 		<p>
 			Plug a <Term t="Checkpointer" /> into a compiled graph and every
-			<Term t="Superstep">superstep</Term> writes a <Term t="Checkpoint">checkpoint</Term>. That
-			single fact unlocks resume-after-crash, multi-turn conversations, and
-			<Term t="Time travel">time travel</Term> — replay or fork from any earlier point in the run.
+			<Term t="Superstep">super-step</Term> writes a <Term t="Checkpoint">checkpoint</Term>. The demo
+			on the right is a chat that <em>remembers</em> — and because every turn is a saved checkpoint, you
+			can <strong>edit an earlier message or regenerate a reply</strong> to fork the conversation into a
+			parallel timeline, then switch between branches.
 		</p>
 	{/snippet}
 
 	{#snippet narrative()}
 		<Slide eyebrow="Why this shape" title="State you can re-enter" variant="dropcap">
 			<p>
-				Most "agent frameworks" treat memory as a feature you bolt on later.
-				<Term t="LangGraph" /> treats it as a property of the runtime. As long as your
-				<Term t="State">state</Term> is well-typed, the same saver that powers a multi-turn chat
-				also powers crash recovery, A/B branching, and point-in-time debugging — three problems
-				that look unrelated until they share an implementation.
+				Most frameworks treat memory as a feature you bolt on later. <Term t="LangGraph" /> treats it
+				as a property of the runtime: as long as your <Term t="State">state</Term> is well-typed, the
+				same saver that powers a multi-turn chat also powers crash recovery, A/B branching, and
+				point-in-time debugging — three problems that look unrelated until they share an implementation.
 			</p>
 			<p>
-				The mental shift: stop thinking of a graph run as one thing and start thinking of it as
-				<strong>a stream of <Term t="Superstep">supersteps</Term> with a checkpoint after each one</strong>.
-				Every snapshot is addressable. Every snapshot is forkable. Every
-				<Term t="Thread">thread</Term> is just a sequence of those snapshots, scoped by an id.
+				The mental shift: stop thinking of a run as one thing and start thinking of it as
+				<strong>a stream of <Term t="Superstep">super-steps</Term> with a checkpoint after each one</strong>.
+				Every snapshot is addressable. Every snapshot is forkable. A <Term t="Thread">thread</Term> is
+				just a sequence of those snapshots, scoped by an id.
 			</p>
 		</Slide>
 
 		<Slide title="Compile with a checkpointer" variant="code-first">
 			<p>
-				<Term t="compile"><code>graph.compile({'{ checkpointer }'})</code></Term> wires the runtime
-				to call the saver after every <Term t="Node">node</Term>.
-				<Term t="MemorySaver"><code>MemorySaver</code></Term> is in-memory; production setups use
-				SQLite, <Term t="PostgresSaver">Postgres</Term>, or any custom store you implement against
-				the saver interface.
+				<Term t="compile"><code>graph.compile({'{ checkpointer }'})</code></Term> tells the runtime to
+				save state after every <Term t="Node">node</Term>.
+				<Term t="MemorySaver"><code>MemorySaver</code></Term> is in-memory; production swaps in SQLite or
+				<Term t="PostgresSaver">Postgres</Term>. The payoff is immediate: pass a
+				<Term t="thread_id"><code>thread_id</code></Term> and only the <em>new</em> message — the
+				checkpointer reloads the rest, so the model remembers without you resending the transcript.
 			</p>
-			<CodeBlock code={code} caption="One MemorySaver, three superpowers." />
+			<CodeBlock code={code} caption="One MemorySaver, three superpowers — starting with free memory." />
 		</Slide>
 
-		<Slide title="Threads">
-			<p>
-				Every call passes <Term t="thread_id"><code>thread_id</code></Term> in
-				<Term t="configurable"><code>config.configurable</code></Term>. The
-				<Term t="Checkpointer">checkpointer</Term> treats <Term t="Thread">threads</Term> as
-				isolated: snapshots from one don't bleed into another. Two users on your app simply use
-				two thread IDs — the runtime handles the rest.
-			</p>
-		</Slide>
-
-		<Diagram spec={checkpointerDiagram} />
+		<figure class="diagram">
+			<HeroImage
+				id="checkpointers-threads"
+				alt="The chat graph (START → chat → END) with a checkpointer press stamping a medallion after the node, feeding two separate labelled rails — thread A and thread B — that never cross."
+			/>
+			<figcaption>
+				One saver, many threads. Each <code>thread_id</code> is its own isolated timeline of checkpoints.
+			</figcaption>
+		</figure>
 
 		<Slide variant="pull-quote">
 			<p>
-				A <Term t="Checkpoint">checkpoint</Term> is more than a backup — it's an address. Once your
-				runtime hands you addresses for every <Term t="Superstep">superstep</Term>, "memory" and
+				A <Term t="Checkpoint">checkpoint</Term> is more than a backup — it's an <em>address</em>. Once
+				the runtime hands you an address for every <Term t="Superstep">super-step</Term>, "memory" and
 				"debugging" stop being separate disciplines.
 			</p>
 		</Slide>
 
-		<Slide title="Time travel">
+		<Slide title="Time travel" variant="code-first">
 			<p>
 				<Term t="getStateHistory"><code>getStateHistory</code></Term> walks every checkpoint for a
-				<Term t="Thread">thread</Term>. You can pick one, call
-				<Term t="updateState"><code>updateState</code></Term> to edit it, and call
-				<code>invoke(null, newConfig)</code> to run forward from that fork. The original branch
-				stays intact, both branches stay queryable.
+				thread — each one carries a <Term t="checkpoint_id"><code>checkpoint_id</code></Term>. Resume
+				<Term t="invoke">invoke</Term> from a past id with a different input and the run <strong>forks</strong>:
+				a new branch grows from that point while the original stays intact and queryable. Editing a
+				message or regenerating a reply in any modern chat app is exactly this.
+			</p>
+			<CodeBlock code={timeTravelCode} caption="History is a list of addresses; forking is just resuming from an old one." />
+		</Slide>
+
+		<figure class="diagram">
+			<HeroImage
+				id="checkpointers-timetravel"
+				alt="A timeline of brass checkpoint medallions where one point branches into a second parallel rail — the fork — labelled getStateHistory, checkpoint_id, and resume."
+			/>
+			<figcaption>
+				Rewind to any checkpoint and send something new; the timeline grows a second branch.
+			</figcaption>
+		</figure>
+
+		<Slide title="What this unlocks" ornament>
+			<p>
+				The same primitive underpins the rest of Level 2:
+				<Term t="Interrupt">interrupts</Term> pause on a checkpoint and resume from it,
+				<Term t="streamMode">streaming</Term> replays super-steps, and any long-running agent survives a
+				crash because its last good <Term t="Checkpoint">checkpoint</Term> is just an address away.
 			</p>
 		</Slide>
 
-		<Slide title="Same primitive, multi-turn chat" variant="code-first">
-			<p>
-				The same <Term t="Checkpointer">checkpointer</Term> that powers
-				<Term t="Time travel">time travel</Term> also powers a multi-turn chat.
-				<Term t="State">State</Term> is whatever you defined; LangGraph just keeps loading the
-				latest snapshot before each new <Term t="invoke">invoke</Term> on the same
-				<Term t="thread_id"><code>thread_id</code></Term>.
-			</p>
-			<CodeBlock code={chatCode} caption="Memory is a free side-effect of persistence." />
-		</Slide>
-
-		<Slide title="Try both" ornament>
-			<p>
-				On the right: a synthetic counter graph for time-travel + fork (Demo 1), and a real
-				LLM chat that remembers across turns thanks to the saver (Demo 2).
-			</p>
-		</Slide>
+		<ReadMore
+			links={[
+				{ label: 'Persistence & checkpointers', href: 'https://langchain-ai.github.io/langgraphjs/concepts/persistence/', kind: 'docs' },
+				{ label: 'Time travel (how-to)', href: 'https://langchain-ai.github.io/langgraphjs/how-tos/time-travel/', kind: 'docs' },
+				{ label: 'MemorySaver & SqliteSaver', href: 'https://langchain-ai.github.io/langgraphjs/reference/classes/checkpoint.MemorySaver.html', kind: 'api' }
+			]}
+		/>
 	{/snippet}
 
 	{#snippet demo()}
-		<Panel title="Demo 1 · Time travel" subtitle="Two threads = two timelines">
-			<div class="thread">
-				<input type="text" bind:value={threadId} />
-				<button class="ghost" onclick={newThread}>New thread</button>
-				<button class="ghost" onclick={freshSaver}>Reset checkpointer</button>
-			</div>
-			<RunButton onclick={runOnce} running={busy} label="Run graph" />
-			{#if currentState}
-				<StateInspector state={currentState} title="Final state" compact />
-			{/if}
+		<Panel title="Try it" subtitle="a real, persistent chatbot — every message is a checkpoint">
+			<ol class="howto">
+				<li><strong>Chat normally.</strong> Tell it a couple of facts, then ask it to recall one — it remembers, because the thread is checkpointed.</li>
+				<li><strong>Branch.</strong> Hover any message and click <Pencil size={12} /> to edit one of <em>your</em> messages, or <RefreshCw size={12} /> to regenerate a reply. Either one rewinds to that checkpoint and forks a new timeline.</li>
+				<li><strong>Compare.</strong> Branched messages show <code>‹ 1/2 ›</code> arrows — flip between the original and the fork. <strong>New thread</strong> starts fresh memory.</li>
+			</ol>
 		</Panel>
 
-		<Panel title="History" subtitle="Every checkpoint for this thread">
-			{#if !history.length}
-				<p class="empty">No checkpoints yet — run the graph.</p>
-			{:else}
-				<ol class="hist">
-					{#each history as h, i (h.checkpoint_id ?? i)}
-						<li class:current={chosenCheckpoint === h.checkpoint_id}>
-							<header>
-								<span class="step">step {history.length - h.step - 1}</span>
-								<span class="ckpt">{(h.checkpoint_id ?? '').slice(0, 8) || '—'}</span>
-							</header>
-							<div class="vals">
-								<code>count={(h.values as { count?: number })?.count ?? 0}</code>
-								<code>next={JSON.stringify(h.next)}</code>
-							</div>
-							{#if h.checkpoint_id && h.next.includes('double')}
-								<button
-									class="ghost small"
-									disabled={busy}
-									onclick={() => forkFrom(h.checkpoint_id!)}
-								>
-									Fork from here with count = 100
-								</button>
-							{/if}
-						</li>
-					{/each}
-				</ol>
-			{/if}
-		</Panel>
+		<BranchingChat
+			{runTurn}
+			title="Persistent assistant"
+			placeholder="Tell me something, then ask me to recall it…"
+			starters={[
+				"Hi! I'm Neo. I'm planning a one-day trip to Kyoto and I love temples and street food.",
+				'Plan my morning.'
+			]}
+			{onTurnStart}
+			{onStreaming}
+			{onTurnEnd}
+			{onNewThread}
+		/>
 
-		<Panel title="Demo 2 · Multi-turn chat" subtitle="Same thread → real memory">
-			<div class="thread">
-				<input type="text" bind:value={chatThread} />
-				<button class="ghost" onclick={newChatThread}>New chat thread</button>
-			</div>
-			<div class="chat">
-				{#if !chatLog.length}
-					<p class="empty">Start the conversation. The model only remembers when you stay on this thread.</p>
-				{:else}
-					{#each chatLog as msg, i (i)}
-						<article class="chat-msg" data-role={msg.role}>
-							<div class="chat-role">{msg.role}</div>
-							<p>{msg.text}</p>
-						</article>
-					{/each}
-				{/if}
-			</div>
-			<label class="row">
-				<span>Your turn</span>
-				<input type="text" bind:value={userTurn} disabled={chatBusy} />
-			</label>
-			<RunButton onclick={sendChat} running={chatBusy} label="Send" />
-		</Panel>
+		{#if frames.length}
+			<Panel title="The graph, live" subtitle="one node + a checkpointer — hover to inspect what gets saved">
+				<div class="graph-wrap">
+					<LiveGraph
+						nodes={graphNodes}
+						edges={graphEdges}
+						{frames}
+						bind:frameIdx
+						meta={nodeMeta}
+						edgeDetails={EDGE_DETAIL}
+						{describe}
+						{toState}
+						{pausedNode}
+					/>
+				</div>
+			</Panel>
+		{/if}
 	{/snippet}
 </Lesson>
 
 <style>
-	.thread {
-		display: flex;
-		gap: 0.4rem;
-		margin-bottom: 0.7rem;
+	/* In-narrative diagrams: frameless, full column width. */
+	.diagram {
+		margin: 1.8rem 0;
 	}
-	.thread input {
-		flex: 1;
-		font-family: var(--font-mono);
-		font-size: 0.82rem;
-	}
-	.row {
-		display: flex;
-		flex-direction: column;
-		gap: 0.3rem;
-		margin: 0.7rem 0;
-	}
-	.row span {
-		font-size: 0.66rem;
-		text-transform: uppercase;
-		letter-spacing: 0.14em;
-		color: var(--color-ink-300);
-		font-family: var(--font-mono);
-	}
-	.row input {
-		width: 100%;
-	}
-	.ghost {
-		font-size: 0.78rem;
-		padding: 0.35rem 0.65rem;
-		background: var(--color-bg);
-		color: var(--color-ink-200);
-		border: 1px solid var(--color-rule);
-		border-radius: 0.35rem;
-	}
-	.ghost.small {
-		font-size: 0.74rem;
-		padding: 0.3rem 0.55rem;
-		margin-top: 0.4rem;
-	}
-	.ghost:hover:not(:disabled) {
-		color: var(--color-ink-100);
-	}
-
-	.empty {
-		font-style: italic;
-		color: var(--color-ink-300);
-		font-size: 0.85rem;
-		margin: 0;
-	}
-
-	.hist {
-		list-style: none;
-		padding: 0;
-		margin: 0;
-		display: flex;
-		flex-direction: column;
-		gap: 0.4rem;
-	}
-	.hist li {
-		border: 1px solid var(--color-rule);
-		border-radius: 0.4rem;
-		padding: 0.55rem 0.7rem;
-		background: var(--color-bg);
-	}
-	.hist li.current {
-		border-color: var(--accent-ink);
-	}
-	.hist header {
-		display: flex;
-		justify-content: space-between;
-		font-family: var(--font-mono);
-		font-size: 0.72rem;
-		color: var(--color-ink-300);
-		margin-bottom: 0.3rem;
-	}
-	.hist .ckpt {
-		color: var(--accent-ink);
-	}
-	.vals {
-		display: flex;
-		gap: 0.6rem;
-		font-family: var(--font-mono);
-		font-size: 0.78rem;
-		color: var(--color-ink-200);
-	}
-
-	.chat {
-		display: flex;
-		flex-direction: column;
-		gap: 0.45rem;
-		max-height: 18rem;
-		overflow-y: auto;
-		padding: 0.5rem;
-		background: var(--color-bg);
-		border: 1px solid var(--color-rule);
-		border-radius: 0.4rem;
-	}
-	.chat-msg {
-		padding: 0.45rem 0.65rem;
-		border-radius: 0.4rem;
+	.diagram :global(.hero) {
+		height: auto;
+		border-radius: 0.6rem;
+		overflow: hidden;
 		background: var(--color-paper);
-		border: 1px solid var(--color-rule);
+		display: block;
 	}
-	.chat-msg[data-role='user'] {
-		border-color: color-mix(in oklch, var(--accent-ink) 50%, var(--color-rule));
+	.diagram :global(.hero img) {
+		position: static;
+		width: 100%;
+		height: auto;
+		display: block;
 	}
-	.chat-role {
-		font-family: var(--font-mono);
-		font-size: 0.66rem;
-		text-transform: uppercase;
-		letter-spacing: 0.14em;
-		color: var(--color-ink-300);
-		margin-bottom: 0.2rem;
+	.diagram :global(.hero .caption) {
+		display: none;
 	}
-	.chat-msg p {
+	.diagram figcaption {
+		margin-top: 0.55rem;
+		text-align: center;
+		font-style: italic;
+		font-size: 0.8rem;
+		color: var(--color-fg-muted);
+	}
+
+	.howto {
 		margin: 0;
-		font-family: var(--font-prose);
-		font-size: 0.92rem;
-		color: var(--color-ink-100);
-		line-height: 1.55;
+		padding-left: 1.1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		font-size: 0.86rem;
+		line-height: 1.5;
+		color: var(--color-fg-muted);
+	}
+	.howto strong {
+		color: var(--color-fg);
+	}
+
+	/* Keep the vertical chat graph compact + centered instead of filling the panel. */
+	.graph-wrap :global(svg[aria-label='Agent graph']) {
+		display: block;
+		height: 300px;
+		width: auto;
+		max-width: 100%;
+		margin: 0 auto;
+	}
+	.howto :global(svg) {
+		display: inline;
+		vertical-align: -2px;
+		color: var(--accent);
+	}
+	.howto code {
+		font-family: var(--font-mono);
+		font-size: 0.82em;
+		color: var(--accent-ink);
 	}
 </style>

@@ -28,6 +28,17 @@ export interface HostedModel {
 	 * `getModel` branches on this so it never sends a parameter the API rejects.
 	 */
 	reasoning: boolean;
+	/**
+	 * Some newer models deprecate the `temperature` parameter and 400 if it's sent
+	 * (e.g. Claude Opus 4.8). `getModel` omits temperature for these.
+	 */
+	noTemperature?: boolean;
+	/**
+	 * Newer Anthropic models replace the `thinking: { type: 'enabled', budget_tokens }`
+	 * API with adaptive thinking — `thinking: { type: 'adaptive' }` + `output_config.effort`
+	 * (e.g. Claude Opus 4.8). Sending the old `enabled` shape 400s. `getModel` branches on this.
+	 */
+	adaptiveThinking?: boolean;
 	contextTokens: number;
 	maxOutputTokens?: number;
 	/** Relative price band across the hosted lineup — robust to exact-price drift. */
@@ -78,6 +89,8 @@ export const CLAUDE_MODELS: HostedModel[] = [
 		provider: 'anthropic',
 		tier: 'frontier',
 		reasoning: false,
+		noTemperature: true,
+		adaptiveThinking: true,
 		contextTokens: 1_000_000,
 		maxOutputTokens: 128_000,
 		costTier: 'high',
