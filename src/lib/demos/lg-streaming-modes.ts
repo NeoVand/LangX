@@ -141,9 +141,10 @@ export interface PaintOptions {
 export async function buildPaintGraph(opts: PaintOptions = {}) {
 	const passes = Math.max(1, opts.passes ?? 2);
 	// Thinking turns the dial up: reasoning models (GPT-5.x) get high effort; Anthropic/Gemini
-	// get extended thinking. Off → low effort so it starts fast (the caption uses 'minimal').
+	// get extended thinking. Off → low effort so it starts fast. ('low' is the safe floor — some
+	// models, e.g. GPT-5.5, reject 'minimal'/'none', so we keep the caption at 'low' too.)
 	const effort = opts.thinking ? 'high' : 'low';
-	const writer = await getModel({ maxTokens: 40, reasoningEffort: 'minimal' });
+	const writer = await getModel({ maxTokens: 40, reasoningEffort: 'low' });
 	const artist = await getModel({ maxTokens: 600, thinking: opts.thinking, reasoningEffort: effort });
 	const critic = await getModel({ maxTokens: 200, thinking: opts.thinking, reasoningEffort: effort });
 

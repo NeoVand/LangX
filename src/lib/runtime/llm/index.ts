@@ -104,7 +104,7 @@ export async function getModel(opts: GetModelOptions = {}): Promise<BaseChatMode
 		};
 		if (opts.thinking) {
 			if (adaptive) {
-				// Adaptive thinking: depth is set by output_config.effort, not a token budget,
+				// Adaptive thinking: depth is set by outputConfig.effort, not a token budget,
 				// and temperature is omitted (these models lock it). max_tokens needs headroom
 				// for the private reasoning plus the visible answer.
 				const effort =
@@ -113,8 +113,8 @@ export async function getModel(opts: GetModelOptions = {}): Promise<BaseChatMode
 					...base,
 					maxTokens: Math.max(opts.maxTokens ?? 1024, 3072),
 					thinking: { type: 'adaptive' },
-					output_config: { effort }
-				} as never);
+					outputConfig: { effort }
+				});
 			}
 			// Extended thinking: max_tokens must exceed the thinking budget. Temperature,
 			// where the model still accepts it, must be 1; locked models take none.
