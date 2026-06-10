@@ -498,9 +498,13 @@ for await (const [ns, mode, data] of await graph.stream(input, {
 		<figure class="diagram">
 			<HeroImage
 				id="subgraphs-nested"
-				alt="A cutaway brass node-box revealing a complete miniature flowchart-machine working inside, while the outer pipeline stays simple."
+				alt="An infographic poster: from outside, the pipeline shows one plain investigate node; a lens reveals the five-station machine running inside it, retry loop and all."
 			/>
-			<figcaption>One node outside — a complete graph inside. Encapsulation is the whole idea.</figcaption>
+			<figcaption>
+				The parent ships one <code>investigate</code> step. Under the lens: the five-node pipeline
+				that actually runs — retry loop included — plus state (<code>query</code>,
+				<code>pages</code>, <code>rounds</code>) the parent never sees.
+			</figcaption>
 		</figure>
 
 		<Slide title="Two ways in" variant="code-first">
@@ -521,9 +525,13 @@ for await (const [ns, mode, data] of await graph.stream(input, {
 		<figure class="diagram">
 			<HeroImage
 				id="subgraphs-boundary"
-				alt="Two machines with different cartridge shapes meet at a boundary, where an adapter mechanism reshapes state passing through in both directions."
+				alt="A two-panel poster: shared-keys machines coupling directly, and different-schema machines joined through an adapter that translates state at the boundary."
 			/>
-			<figcaption>Different schemas meet at the boundary — the transform node is the adapter.</figcaption>
+			<figcaption>
+				In the Bureau, <code>synthesize</code> takes door №1 — its channels are a subset of the
+				parent's, so the compiled graph slots straight in. Each investigator takes door №2: a
+				<code>Send</code> payload goes in, field notes come out.
+			</figcaption>
 		</figure>
 
 		<Slide variant="pull-quote">
