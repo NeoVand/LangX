@@ -24,6 +24,10 @@ const aliases: Record<string, string> = {
 	reducers: 'reducer',
 	subgraphs: 'subgraph',
 	subagents: 'subagent',
+	namespaces: 'Namespace',
+	namespace: 'Namespace',
+	'orchestrator worker': 'Orchestrator-worker',
+	'orchestrator-worker': 'Orchestrator-worker',
 	skills: 'skill',
 	runnables: 'Runnable',
 	lcel: 'LCEL',
@@ -682,8 +686,20 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'Subgraph',
 		chapter: 'langgraph',
-		short: 'Compiled graph used as a node in another graph.',
-		long: 'Encapsulate a workflow (RAG mini-graph, research pipeline) and drop it in as one step. Runnable at the LangChain layer; subgraph at the LangGraph layer.'
+		short: 'A compiled graph used as a node inside another graph.',
+		long: 'Encapsulation for agents: a whole workflow — loops, branches, private state — looks like ONE node from outside. Two ways in: add the compiled graph directly when it shares state keys with the parent, or call it inside a node function and translate state at the boundary. Subgraphs inherit the parent\'s checkpointer, so interrupts and time travel keep working inside them.'
+	},
+	{
+		term: 'Namespace',
+		chapter: 'langgraph',
+		short: 'The path that says WHICH graph a stream chunk came from.',
+		long: 'Stream a graph with subgraphs: true and every chunk arrives as [namespace, mode, data]. An empty namespace is the parent; ["investigate:<task>"] means "inside the investigate subgraph, in that specific parallel branch". It is how a UI can light up the inner nodes of N subgraphs running at once.'
+	},
+	{
+		term: 'Orchestrator-worker',
+		chapter: 'langgraph',
+		short: 'One node plans the work; N spawned workers do it in parallel.',
+		long: 'The pattern behind Send fan-out: an orchestrator decides how many pieces the job splits into at runtime, dispatches one worker per piece with a private payload, and a fan-in step gathers the merged results. When each worker is a whole subgraph, you have the architecture deep agents are built on.'
 	},
 	{
 		term: 'Superstep',

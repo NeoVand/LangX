@@ -121,7 +121,7 @@ export const chapters: Chapter[] = [
 			{
 				slug: 'subgraphs',
 				title: 'Subgraphs',
-				subtitle: 'Compose graphs as nodes.'
+				subtitle: 'The capstone: a whole graph inside a node.'
 			}
 		]
 	},
