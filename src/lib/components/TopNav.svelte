@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { app } from '$lib/state/app.svelte';
+	import { nav, isDetour } from '$lib/state/nav.svelte';
 	import { chapters } from '$lib/curriculum';
 	import ParrotMark from './ParrotMark.svelte';
 	import Icon from './Icon.svelte';
-	import { Link2, VectorSquare, Bot, Menu, X } from '@lucide/svelte';
+	import { Link2, VectorSquare, Bot, Menu, X, ArrowLeft } from '@lucide/svelte';
 
 	const navIcon: Record<string, typeof Bot> = {
 		langchain: Link2,
@@ -13,6 +14,9 @@
 	};
 
 	const path = $derived(page.url.pathname);
+	// On detour pages (setup, glossary, the model explorer) offer a way back to
+	// wherever the reader came from — the root layout keeps `nav.backTo` current.
+	const showBack = $derived(isDetour(path));
 	const hasKey = $derived(
 		!!(app.keys.openai || app.keys.anthropic || app.keys.google)
 	);
@@ -52,6 +56,12 @@
 	</div>
 
 	<div class="actions">
+		{#if showBack}
+			<a class="action back" href={nav.backTo} title="Return to where you were">
+				<ArrowLeft size={15} strokeWidth={2} />
+				<span>Back</span>
+			</a>
+		{/if}
 		<a class="action" class:active={path === '/glossary'} href="/glossary">
 			<Icon name="list" size={15} />
 			<span>Glossary</span>
@@ -89,6 +99,12 @@
 {#if menuOpen}
 	<button class="menu-backdrop" aria-label="Close menu" onclick={() => (menuOpen = false)}></button>
 	<div class="nav-menu" role="menu">
+		{#if showBack}
+			<a class="menu-item back" href={nav.backTo} role="menuitem">
+				<ArrowLeft size={16} strokeWidth={2} />
+				<span>Back</span>
+			</a>
+		{/if}
 		{#each chapters as ch (ch.id)}
 			{@const Cmp = navIcon[ch.id]}
 			<a
@@ -249,6 +265,18 @@
 		color: var(--color-cream-0);
 	}
 
+	/* the detour-page Back button — bordered so it reads as "leave", not a tab */
+	.action.back {
+		border: 1px solid color-mix(in oklch, var(--color-fg) 16%, transparent);
+		border-radius: 999px;
+		color: var(--color-cream-1);
+	}
+	.action.back:hover {
+		border-color: var(--color-accent-langchain);
+		color: var(--color-accent-langchain);
+		background: transparent;
+	}
+
 	.dot-on,
 	.dot-off {
 		width: 7px;
@@ -354,6 +382,10 @@
 		}
 		.actions .action {
 			display: none;
+		}
+		/* keep the escape hatch visible even when the other actions collapse */
+		.actions .action.back {
+			display: inline-flex;
 		}
 		.hamburger {
 			display: inline-flex;

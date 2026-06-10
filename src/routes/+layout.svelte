@@ -2,6 +2,7 @@
 	import './layout.css';
 	import TopNav from '$lib/components/TopNav.svelte';
 	import { detectWebGpu, markVisited } from '$lib/state/app.svelte';
+	import { trackRoute } from '$lib/state/nav.svelte';
 	import { page } from '$app/state';
 
 	let { children } = $props();
@@ -12,6 +13,7 @@
 
 	$effect(() => {
 		markVisited(page.url.pathname);
+		trackRoute(page.url.pathname);
 	});
 
 	// Favicon is set once in app.html (the parrot mark) — no per-route override here,
