@@ -116,7 +116,7 @@ export const chapters: Chapter[] = [
 			{
 				slug: 'send-fanout',
 				title: 'Send & fan-out',
-				subtitle: 'Map-reduce inside a graph.'
+				subtitle: 'One node spawns N parallel workers.'
 			},
 			{
 				slug: 'subgraphs',
