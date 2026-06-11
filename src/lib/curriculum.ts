@@ -146,12 +146,12 @@ export const chapters: Chapter[] = [
 			{
 				slug: 'virtual-fs',
 				title: 'Virtual filesystem',
-				subtitle: 'ls, read, write, edit, glob, grep.'
+				subtitle: 'The Bug Hunt: grep, read, edit, verify.'
 			},
 			{
 				slug: 'todos',
-				title: 'Planning with write_todos',
-				subtitle: 'Externalized to-do lists.'
+				title: 'The plan board',
+				subtitle: 'Plan mode, recitation, live replanning.'
 			},
 			{
 				slug: 'backends',

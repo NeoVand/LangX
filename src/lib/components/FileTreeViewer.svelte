@@ -8,14 +8,25 @@
 		backend?: string;
 	}
 
+	/** Per-file activity badge: how the agent has touched this file. */
+	export type FileMark = 'hit' | 'read' | 'edited';
+
 	interface Props {
 		files: VirtualFile[];
 		title?: string;
 		/** When set (and the file exists), auto-select this path. */
 		focus?: string | null;
+		/** Optional per-path activity marks rendered as colored dots in the tree. */
+		marks?: Record<string, FileMark>;
 	}
 
-	let { files, title = 'Virtual filesystem', focus = null }: Props = $props();
+	let { files, title = 'Virtual filesystem', focus = null, marks = {} }: Props = $props();
+
+	const MARK_TITLE: Record<FileMark, string> = {
+		hit: 'grep matched in this file',
+		read: 'the agent read this file',
+		edited: 'the agent changed this file'
+	};
 
 	let selected = $state<string | null>(null);
 	let lastFocus = $state<string | null>(null);
@@ -111,6 +122,10 @@
 							>
 								<span class="icon">·</span>
 								<span class="name">{item.node.name}</span>
+								{#if marks[item.node.path]}
+									<span class="mark {marks[item.node.path]}" title={MARK_TITLE[marks[item.node.path]]}
+									></span>
+								{/if}
 								{#if item.node.file?.backend}
 									<span class="backend">{item.node.file.backend}</span>
 								{/if}
@@ -260,6 +275,22 @@
 		color: var(--accent);
 		text-transform: uppercase;
 		letter-spacing: 0.04em;
+	}
+
+	.mark {
+		width: 0.42rem;
+		height: 0.42rem;
+		border-radius: 50%;
+		flex-shrink: 0;
+	}
+	.mark.hit {
+		background: color-mix(in oklch, var(--accent) 45%, transparent);
+	}
+	.mark.read {
+		background: var(--accent);
+	}
+	.mark.edited {
+		background: var(--color-accent-warning);
 	}
 
 	.content {

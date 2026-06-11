@@ -26,6 +26,7 @@
 
 	function callPreview(name: string, args: Record<string, unknown>): string {
 		if (typeof args.path === 'string') return args.path;
+		if (typeof args.pattern === 'string') return args.pattern;
 		if (typeof args.subagent === 'string')
 			return `${args.subagent} — ${String(args.description ?? '').slice(0, 60)}`;
 		if (Array.isArray(args.todos)) {

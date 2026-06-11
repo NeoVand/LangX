@@ -848,6 +848,12 @@ export const glossary: GlossaryEntry[] = [
 		long: 'Skills list names + one-liners in prompt; load_skill expands body only when relevant. Keeps prompt small with large addressable catalog.'
 	},
 	{
+		term: 'Recitation',
+		chapter: 'deepagents',
+		short: 'Re-reading the plan every turn, so the goal never scrolls away.',
+		long: 'Long runs fail by forgetting: the original goal drifts out of the recent context. Because the todo board lives in state and is re-presented to the model on every turn, the agent effectively recites its plan before each step — the same trick Claude Code uses. write_todos’ replace-the-whole-list semantics doubles down: each update restates the entire job. Cheap insurance against goal drift.'
+	},
+	{
 		term: 'Scoped interpreter',
 		chapter: 'deepagents',
 		short: 'In-process JS without DOM, shell, or network.',
