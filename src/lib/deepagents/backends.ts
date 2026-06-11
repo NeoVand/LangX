@@ -43,6 +43,11 @@ export class StateBackend implements BackendProtocol {
 	}
 }
 
+/** Node fallback for StoreBackend: in-memory per-scope maps. Durable storage
+ *  needs the browser's IndexedDB (or a real BaseStore in production) — but the
+ *  downloaded demos should still run end to end. */
+const nodeStore = new Map<string, Map<string, string>>();
+
 /**
  * Files live in IndexedDB via Dexie under a named scope.
  * Survives reloads, simulating a real Store backend.
@@ -56,7 +61,22 @@ export class StoreBackend implements BackendProtocol {
 	}
 
 	private async db() {
-		if (!browser) throw new Error('StoreBackend requires the browser.');
+		if (!browser) {
+			const mem = nodeStore.get(this.scope) ?? new Map<string, string>();
+			nodeStore.set(this.scope, mem);
+			return {
+				getFile: async (_s: string, path: string) =>
+					mem.has(path) ? { path, content: mem.get(path)! } : undefined,
+				putFile: async (_s: string, path: string, content: string) => {
+					mem.set(path, content);
+				},
+				deleteFile: async (_s: string, path: string) => {
+					mem.delete(path);
+				},
+				listFiles: async () =>
+					[...mem.entries()].map(([path, content]) => ({ path, content }))
+			};
+		}
 		const { listFiles, getFile, putFile, deleteFile } = await import('$lib/storage/dexie');
 		return { listFiles, getFile, putFile, deleteFile };
 	}
@@ -90,8 +110,9 @@ export interface CompositeRoute {
 }
 
 /**
- * Routes file operations to a backend by path-prefix. The first matching
- * route wins, with `default` used as a fallback.
+ * Routes file operations to a backend by path-prefix. The LONGEST matching
+ * prefix wins (official CompositeBackend semantics — so `/memories/projects/`
+ * can shadow `/memories/`), with `fallback` as the default route.
  */
 export class CompositeBackend implements BackendProtocol {
 	name = 'composite';
@@ -100,11 +121,14 @@ export class CompositeBackend implements BackendProtocol {
 
 	private route(path: string): BackendProtocol {
 		const norm = path.startsWith('/') ? path : '/' + path;
+		let best: { backend: BackendProtocol; len: number } | null = null;
 		for (const r of this.routes) {
 			const prefix = r.prefix.startsWith('/') ? r.prefix : '/' + r.prefix;
-			if (norm.startsWith(prefix)) return r.backend;
+			if (norm.startsWith(prefix) && (!best || prefix.length > best.len)) {
+				best = { backend: r.backend, len: prefix.length };
+			}
 		}
-		return this.fallback;
+		return best?.backend ?? this.fallback;
 	}
 
 	async read(path: string) {

@@ -156,7 +156,7 @@ export const chapters: Chapter[] = [
 			{
 				slug: 'backends',
 				title: 'Backends',
-				subtitle: 'State, Store, and Composite.'
+				subtitle: 'The Observatory: an atlas that outlives the thread.'
 			},
 			{
 				slug: 'permissions',

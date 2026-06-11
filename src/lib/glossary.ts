@@ -755,7 +755,13 @@ export const glossary: GlossaryEntry[] = [
 		term: 'CompositeBackend',
 		chapter: 'deepagents',
 		short: 'Routes paths to different backends by prefix.',
-		long: 'Route /memories/ → StoreBackend, everything else → StateBackend. One tool surface; policy decides durability vs scratch space.'
+		long: 'Route /atlas/ → durable StoreBackend, everything else → StateBackend. The LONGEST matching prefix wins (so /memories/projects/ can shadow /memories/), unmatched paths take the default route — which also carries the harness’s own internal files. One tool surface; the path decides durability.'
+	},
+	{
+		term: 'ContextHubBackend',
+		chapter: 'deepagents',
+		short: 'A backend where every write is a versioned commit.',
+		long: 'Official backend (v0.6) that stores agent files as LangSmith Hub commits — each write_file/edit_file creates a new version, so an agent’s files carry their full history. The “git for agent memory” option; needs a LANGSMITH_API_KEY.'
 	},
 	{
 		term: 'Context compaction',
