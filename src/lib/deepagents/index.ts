@@ -24,7 +24,8 @@ import {
 	type DeepAgentStateType,
 	type Todo,
 	type VirtualFile,
-	type SubAgentReport
+	type SubAgentReport,
+	type AsyncTaskRecord
 } from './state';
 import {
 	StateBackend,
@@ -37,7 +38,14 @@ import { evaluate } from './permissions';
 import { assembleSystemPrompt } from './prompt';
 import { createWriteTodosTool } from './tools/todos';
 import { buildFilesystemTools } from './tools/filesystem';
-import { createTaskTool, type SubAgentSpec } from './tools/task';
+import {
+	createTaskTool,
+	withGeneralPurpose,
+	type SubAgentSpec,
+	type ChildEvent,
+	type ChildTool
+} from './tools/task';
+import { createAsyncTaskEngine, type AsyncTaskEngine } from './async-tasks';
 import { createLoadSkillTool, type Skill } from './skills';
 import { compact, defaultCompaction, type CompactionConfig } from './compaction';
 import type { Tracer } from '$lib/runtime/tracer';
@@ -53,7 +61,10 @@ export interface DeepAgentOptions {
 	instructions?: string;
 	backend?: BackendProtocol;
 	permissions?: FilesystemPermission[];
+	/** Sync subagents for the task tool. Pass [] to get just the auto general-purpose one. */
 	subagents?: SubAgentSpec[];
+	/** Background subagents — adds the five async-task tools (start/check/update/cancel/list). */
+	asyncSubagents?: SubAgentSpec[];
 	skills?: Skill[];
 	memorySummary?: string;
 	compaction?: Partial<CompactionConfig>;
@@ -91,6 +102,8 @@ export interface HarnessInterrupt {
 	tool: string;
 	args: Record<string, unknown>;
 	id?: string;
+	/** What summoned the human: an interruptOn tool name, or a permission rule. */
+	reason?: 'tool' | 'permission';
 }
 
 export type InterruptibleResult =
@@ -113,6 +126,7 @@ interface RunSnapshot {
 	files: VirtualFile[];
 	subagentReports: DeepAgentStateType['subagentReports'];
 	summarizationEvents: DeepAgentStateType['summarizationEvents'];
+	asyncTasks: AsyncTaskRecord[];
 }
 
 export function createDeepAgent(opts: DeepAgentOptions): CompiledDeepAgent {
@@ -121,12 +135,13 @@ export function createDeepAgent(opts: DeepAgentOptions): CompiledDeepAgent {
 	const permissions = opts.permissions ?? [];
 	const tracer = opts.tracer;
 
-	let snapshot: RunSnapshot = {
+	const snapshot: RunSnapshot = {
 		messages: [],
 		todos: [],
 		files: [],
 		subagentReports: [],
-		summarizationEvents: []
+		summarizationEvents: [],
+		asyncTasks: []
 	};
 	const subscribers = new Set<(state: DeepAgentStateType) => void>();
 
@@ -151,17 +166,67 @@ export function createDeepAgent(opts: DeepAgentOptions): CompiledDeepAgent {
 		}
 	});
 
-	const taskTool = (opts.subagents?.length ?? 0) > 0
-		? createTaskTool({
-				subagents: opts.subagents!,
-				onSpawn: (name) => tracer?.emit('subagent_spawn', name, { name }),
-				onReturn: (report) => {
-					snapshot.subagentReports = [...snapshot.subagentReports, report];
-					tracer?.emit('subagent_return', report.name, {
-						name: report.name,
-						summary: report.summary,
-						durationMs: report.durationMs
-					});
+	// Live child activity — streamed through the tracer so cockpit UIs can show
+	// each subagent working, even though the parent's transcript never will.
+	const onChildEvent = (ev: ChildEvent) => {
+		if (ev.type === 'spawn') {
+			tracer?.emit('subagent_spawn', ev.agent, { name: ev.agent, ...ev.data });
+		} else if (ev.type === 'tool') {
+			tracer?.emit('tool_call', `${ev.agent} → ${ev.detail}`, { agent: ev.agent, ...ev.data });
+			// A child may have just written a file — refresh the shared workspace view.
+			void backend.list().then((files) => {
+				snapshot.files = files;
+				notify();
+			});
+		} else if (ev.type === 'done') {
+			if (ev.data?.async) {
+				tracer?.emit('subagent_return', ev.agent, { name: ev.agent, ...ev.data, summary: ev.detail });
+			}
+			void backend.list().then((files) => {
+				snapshot.files = files;
+				notify();
+			});
+		} else if (ev.type === 'error') {
+			tracer?.emit('error', `${ev.agent}: ${ev.detail}`, { agent: ev.agent, ...ev.data });
+		}
+	};
+
+	const parentCustomTools = (opts.tools ?? []) as unknown as ChildTool[];
+	const taskTool =
+		opts.subagents != null
+			? createTaskTool({
+					subagents: opts.subagents,
+					model: opts.model,
+					backend,
+					parentTools: parentCustomTools,
+					permissions,
+					onSpawn: (name, description) =>
+						tracer?.emit('subagent_spawn', name, { name, description }),
+					onChildEvent,
+					onReturn: (report) => {
+						snapshot.subagentReports = [...snapshot.subagentReports, report];
+						tracer?.emit('subagent_return', report.name, {
+							name: report.name,
+							summary: report.summary,
+							durationMs: report.durationMs,
+							steps: report.steps,
+							toolCalls: report.toolCalls
+						});
+					}
+				})
+			: null;
+
+	const asyncEngine: AsyncTaskEngine | null = (opts.asyncSubagents?.length ?? 0) > 0
+		? createAsyncTaskEngine({
+				subagents: opts.asyncSubagents!,
+				model: opts.model,
+				backend,
+				parentTools: parentCustomTools,
+				permissions,
+				onChildEvent,
+				onChange: (tasks) => {
+					snapshot.asyncTasks = tasks;
+					notify();
 				}
 			})
 		: null;
@@ -177,9 +242,20 @@ export function createDeepAgent(opts: DeepAgentOptions): CompiledDeepAgent {
 		writeTodos as unknown as AnyTool,
 		...(fsTools as unknown as AnyTool[]),
 		...(taskTool ? [taskTool as unknown as AnyTool] : []),
+		...((asyncEngine?.createTools() ?? []) as unknown as AnyTool[]),
 		...(loadSkillTool ? [loadSkillTool as unknown as AnyTool] : [])
 	];
 	const tools: AnyTool[] = [...builtin, ...(opts.tools ?? [])];
+
+	// What the system prompt advertises: the sync roster (with the auto-added
+	// general-purpose subagent) plus background agents, marked as such.
+	const promptRoster: { name: string; description: string }[] = [
+		...(opts.subagents != null ? withGeneralPurpose(opts.subagents) : []),
+		...(opts.asyncSubagents ?? []).map((s) => ({
+			name: s.name,
+			description: `(background — launch with start_async_task) ${s.description}`
+		}))
+	];
 	const toolByName = new Map(tools.map((t) => [(t as { name: string }).name, t]));
 
 	const interruptOn = new Set(opts.interruptOn ?? []);
@@ -196,6 +272,9 @@ export function createDeepAgent(opts: DeepAgentOptions): CompiledDeepAgent {
 			snapshot.files = state.files.length ? state.files : await backend.list();
 			snapshot.subagentReports = state.subagentReports;
 			snapshot.summarizationEvents = state.summarizationEvents;
+			// The engine is the live truth for background tasks; graph state only
+			// catches up when a tool turn persists a fresh snapshot of it.
+			snapshot.asyncTasks = asyncEngine ? asyncEngine.snapshot() : state.asyncTasks;
 			notify();
 
 			const compactionResult = await compact(
@@ -222,7 +301,7 @@ export function createDeepAgent(opts: DeepAgentOptions): CompiledDeepAgent {
 				snapshot.todos,
 				snapshot.files,
 				opts.skills,
-				opts.subagents,
+				promptRoster,
 				opts.memorySummary
 			);
 
@@ -256,13 +335,28 @@ export function createDeepAgent(opts: DeepAgentOptions): CompiledDeepAgent {
 			//
 			// PASS 1 — all interrupt() calls, SYNCHRONOUSLY, before any await: the
 			// browser async-context shim only carries the graph context up to the
-			// first await, so gating must happen before any tool executes.
+			// first await, so gating must happen before any tool executes. Two
+			// things can summon the human here: an interruptOn tool name, or a
+			// filesystem permission rule in 'interrupt' mode.
 			const synthesized = new Map<number, ToolMessage>();
 			for (let i = 0; i < calls.length; i++) {
 				const tc = calls[i];
-				if (!interruptOn.has(tc.name)) continue;
-				tracer?.emit('interrupt', `pause for ${tc.name}`, { name: tc.name, args: tc.args });
-				const decision = normalizeResume(interrupt({ tool: tc.name, args: tc.args, id: tc.id }));
+				let gate: HarnessInterrupt | null = null;
+				if (interruptOn.has(tc.name)) {
+					gate = { tool: tc.name, args: tc.args, id: tc.id, reason: 'tool' };
+				} else if (tc.name === 'write_file' || tc.name === 'edit_file') {
+					const path = (tc.args as { path?: string }).path ?? '';
+					if (evaluate(permissions, 'write', path).decision === 'interrupt') {
+						gate = { tool: tc.name, args: tc.args, id: tc.id, reason: 'permission' };
+					}
+				}
+				if (!gate) continue;
+				tracer?.emit('interrupt', `pause for ${tc.name}`, {
+					name: tc.name,
+					args: tc.args,
+					reason: gate.reason
+				});
+				const decision = normalizeResume(interrupt(gate));
 				if (decision.type === 'reject') {
 					tracer?.emit('resume', `rejected ${tc.name}`);
 					synthesized.set(
@@ -299,41 +393,48 @@ export function createDeepAgent(opts: DeepAgentOptions): CompiledDeepAgent {
 			}
 
 			// PASS 2 — execute everything that wasn't answered by the human.
+			const runCall = async (tc: (typeof calls)[number]): Promise<ToolMessage> => {
+				if (tc.name === 'write_file' || tc.name === 'edit_file') {
+					const path = (tc.args as { path?: string }).path;
+					if (path && evaluate(permissions, 'write', path).decision === 'deny') {
+						tracer?.emit('error', 'permission denied', { path, op: 'write' });
+					}
+				}
+				const t = toolByName.get(tc.name);
+				if (!t) {
+					return new ToolMessage({ content: `Unknown tool: ${tc.name}`, tool_call_id: tc.id ?? '', name: tc.name });
+				}
+				try {
+					const result = await (t as { invoke: (a: unknown) => Promise<unknown> }).invoke(tc.args);
+					const content = typeof result === 'string' ? result : JSON.stringify(result);
+					return new ToolMessage({ content, tool_call_id: tc.id ?? '', name: tc.name });
+				} catch (e) {
+					return new ToolMessage({
+						content: `Tool ${tc.name} failed: ${e instanceof Error ? e.message : String(e)}`,
+						tool_call_id: tc.id ?? '',
+						name: tc.name
+					});
+				}
+			};
+
+			// Sibling `task` calls start before anything is awaited, so the children
+			// genuinely OVERLAP — the official "parallel but blocking" shape: the
+			// supervisor waits, the subagents run concurrently. Everything else
+			// executes in declaration order, and ToolMessage order is preserved.
+			const startedTasks = new Map<number, Promise<ToolMessage>>();
+			for (let i = 0; i < calls.length; i++) {
+				if (!synthesized.has(i) && calls[i].name === 'task') {
+					startedTasks.set(i, runCall(calls[i]));
+				}
+			}
 			const out: ToolMessage[] = [];
 			for (let i = 0; i < calls.length; i++) {
-				const tc = calls[i];
 				const answered = synthesized.get(i);
 				if (answered) {
 					out.push(answered);
 					continue;
 				}
-				if (tc.name === 'write_file' || tc.name === 'edit_file') {
-					const path = (tc.args as { path?: string }).path;
-					if (path) {
-						const decision = evaluate(permissions, 'write', path);
-						if (!decision.allowed) {
-							tracer?.emit('error', 'permission denied', { path, op: 'write' });
-						}
-					}
-				}
-				const t = toolByName.get(tc.name);
-				if (!t) {
-					out.push(new ToolMessage({ content: `Unknown tool: ${tc.name}`, tool_call_id: tc.id ?? '', name: tc.name }));
-					continue;
-				}
-				try {
-					const result = await (t as { invoke: (a: unknown) => Promise<unknown> }).invoke(tc.args);
-					const content = typeof result === 'string' ? result : JSON.stringify(result);
-					out.push(new ToolMessage({ content, tool_call_id: tc.id ?? '', name: tc.name }));
-				} catch (e) {
-					out.push(
-						new ToolMessage({
-							content: `Tool ${tc.name} failed: ${e instanceof Error ? e.message : String(e)}`,
-							tool_call_id: tc.id ?? '',
-							name: tc.name
-						})
-					);
-				}
+				out.push(await (startedTasks.get(i) ?? runCall(calls[i])));
 			}
 
 			// Stale plan board? Nudge through the channel models actually read —
@@ -362,7 +463,10 @@ export function createDeepAgent(opts: DeepAgentOptions): CompiledDeepAgent {
 				messages: out,
 				files: snapshot.files,
 				todos: snapshot.todos,
-				subagentReports: newReports
+				subagentReports: newReports,
+				// Persist the ledger into graph state — officially asyncTasks is its own
+				// channel precisely so compaction can never orphan a running task.
+				asyncTasks: asyncEngine ? asyncEngine.snapshot() : []
 			};
 		})
 		.addEdge(START, 'agent')
@@ -379,7 +483,8 @@ export function createDeepAgent(opts: DeepAgentOptions): CompiledDeepAgent {
 			todos: snapshot.todos,
 			files: snapshot.files,
 			subagentReports: snapshot.subagentReports,
-			summarizationEvents: snapshot.summarizationEvents
+			summarizationEvents: snapshot.summarizationEvents,
+			asyncTasks: snapshot.asyncTasks
 		};
 		for (const fn of subscribers) fn(snap);
 	}
@@ -390,6 +495,7 @@ export function createDeepAgent(opts: DeepAgentOptions): CompiledDeepAgent {
 		snapshot.files = result.files;
 		snapshot.subagentReports = result.subagentReports;
 		snapshot.summarizationEvents = result.summarizationEvents;
+		snapshot.asyncTasks = asyncEngine ? asyncEngine.snapshot() : result.asyncTasks;
 		notify();
 	}
 
@@ -454,7 +560,8 @@ export function createDeepAgent(opts: DeepAgentOptions): CompiledDeepAgent {
 				todos: snapshot.todos,
 				files: snapshot.files,
 				subagentReports: snapshot.subagentReports,
-				summarizationEvents: snapshot.summarizationEvents
+				summarizationEvents: snapshot.summarizationEvents,
+				asyncTasks: asyncEngine ? asyncEngine.snapshot() : snapshot.asyncTasks
 			};
 		},
 		subscribe(fn) {
@@ -470,7 +577,7 @@ function withSystem(
 	todos: Todo[],
 	files: VirtualFile[],
 	skills: Skill[] | undefined,
-	subagents: SubAgentSpec[] | undefined,
+	subagents: { name: string; description: string }[] | undefined,
 	memorySummary: string | undefined
 ): BaseMessage[] {
 	const system = assembleSystemPrompt({
@@ -478,7 +585,7 @@ function withSystem(
 		todos,
 		files,
 		skills: skills?.map((s) => ({ name: s.name, description: s.description })),
-		subagents: subagents?.map((s) => ({ name: s.name, description: s.description })),
+		subagents: subagents?.length ? subagents : undefined,
 		memorySummary
 	});
 	const sysMsg = new SystemMessage(system);
@@ -490,5 +597,11 @@ function withSystem(
 
 export { StateBackend, StoreBackend, CompositeBackend };
 export { assembleSystemPrompt, BASE_AGENT_PROMPT } from './prompt';
-export type { Todo, VirtualFile, SubAgentReport, DeepAgentStateType };
+export { evaluate, matchPath } from './permissions';
+export type { PermissionMode, PermissionResult } from './permissions';
+export { withGeneralPurpose, runChildAgent, createTaskTool } from './tools/task';
+export type { ChildEvent, ChildTool, ChildRunOptions, ChildRunResult } from './tools/task';
+export { createAsyncTaskEngine } from './async-tasks';
+export type { AsyncTaskEngine, AsyncEngineHooks } from './async-tasks';
+export type { Todo, VirtualFile, SubAgentReport, AsyncTaskRecord, DeepAgentStateType };
 export type { BackendProtocol, FilesystemPermission, Skill, SubAgentSpec, CompactionConfig };

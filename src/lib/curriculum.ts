@@ -161,12 +161,12 @@ export const chapters: Chapter[] = [
 			{
 				slug: 'permissions',
 				title: 'Filesystem permissions',
-				subtitle: 'First-match-wins allow / deny.'
+				subtitle: 'Allow, deny, or summon a human.'
 			},
 			{
 				slug: 'subagents',
 				title: 'Subagents',
-				subtitle: 'Delegation via the task tool.'
+				subtitle: 'The Clockwork Troupe: parallel wrights, one async arranger.'
 			},
 			{
 				slug: 'skills',

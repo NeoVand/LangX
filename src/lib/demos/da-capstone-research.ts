@@ -58,9 +58,9 @@ Follow this recipe exactly:
    - Save to /memories/
 
 2. write_file('/scratch/sub_questions.md', <3 numbered sub-questions about the topic>) — then update todos.
-3. For each of the three sub-questions, call task({ subagent: 'researcher', description: <sub-question> }). Update todos as you go.
-4. task({ subagent: 'writer',  description: 'Write a 1-page brief on "${t}" citing the researcher findings.' })
-5. task({ subagent: 'critic',  description: 'Critique the brief.' })
+3. For each of the three sub-questions, call task({ subagent_type: 'researcher', description: <sub-question> }). Update todos as you go.
+4. task({ subagent_type: 'writer',  description: 'Write a 1-page brief on "${t}" citing the researcher findings.' })
+5. task({ subagent_type: 'critic',  description: 'Critique the brief.' })
 6. write_file('/memories/${t
 	.replace(/\s+/g, '-')
 	.toLowerCase()

@@ -1,12 +1,17 @@
+export type PermissionMode = 'allow' | 'deny' | 'interrupt';
+
 export interface FilesystemPermission {
 	operations: ('read' | 'write')[];
 	paths: string[];
-	mode: 'allow' | 'deny';
+	mode: PermissionMode;
 }
 
 export interface PermissionResult {
-	allowed: boolean;
+	/** What the first matching rule says — 'allow' when no rule matches. */
+	decision: PermissionMode;
 	matchedRule: FilesystemPermission | null;
+	/** Index of the matched rule (handy for UIs); -1 when no rule matched. */
+	ruleIndex: number;
 	reason?: string;
 }
 
@@ -33,21 +38,24 @@ export function matchPath(glob: string, path: string): boolean {
 }
 
 /**
- * First-match-wins evaluator. The first rule whose operation and path glob
- * match wins; if no rule matches, the action is allowed by default.
+ * First-match-wins evaluator — declaration order IS the policy. The first
+ * rule whose operation and path glob both match decides: allow, deny, or
+ * interrupt (route the operation to a human). If no rule matches, the
+ * operation is allowed — supply a final catch-all deny for a closed posture.
  */
 export function evaluate(
 	rules: FilesystemPermission[],
 	op: 'read' | 'write',
 	path: string
 ): PermissionResult {
-	for (const rule of rules) {
+	for (let i = 0; i < rules.length; i++) {
+		const rule = rules[i];
 		if (!rule.operations.includes(op)) continue;
-		const matched = rule.paths.some((p) => matchPath(p, path));
-		if (matched) {
+		if (rule.paths.some((p) => matchPath(p, path))) {
 			return {
-				allowed: rule.mode === 'allow',
+				decision: rule.mode,
 				matchedRule: rule,
+				ruleIndex: i,
 				reason:
 					rule.mode === 'deny'
 						? `Denied by rule ${JSON.stringify(rule.paths)} (${op}).`
@@ -55,5 +63,5 @@ export function evaluate(
 			};
 		}
 	}
-	return { allowed: true, matchedRule: null };
+	return { decision: 'allow', matchedRule: null, ruleIndex: -1 };
 }

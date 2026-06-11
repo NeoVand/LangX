@@ -20,10 +20,12 @@ function ensureAllowed(
 	op: 'read' | 'write',
 	path: string
 ) {
-	const decision = evaluate(permissions, op, path);
-	if (!decision.allowed) {
-		throw new Error(decision.reason ?? `Permission denied for ${op} on ${path}.`);
+	const result = evaluate(permissions, op, path);
+	if (result.decision === 'deny') {
+		throw new Error(result.reason ?? `Permission denied for ${op} on ${path}.`);
 	}
+	// 'interrupt' reaching execution means the human already approved it at
+	// the gate pass — the operation proceeds normally.
 }
 
 async function emitChange(hooks: FilesystemToolHooks) {

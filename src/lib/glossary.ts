@@ -96,6 +96,13 @@ const aliases: Record<string, string> = {
 	planning: 'Planning',
 	'sub-agent': 'Subagent',
 	'sub-agents': 'Subagent',
+	'async subagents': 'Async subagent',
+	'start_async_task': 'Async subagent',
+	'check_async_task': 'Async subagent',
+	'update_async_task': 'Async subagent',
+	'cancel_async_task': 'Async subagent',
+	'list_async_tasks': 'Async subagent',
+	asynctasks: 'Async subagent',
 	'__interrupt__': '__interrupt__',
 	tool_calls: 'tool_calls',
 	tool_call_id: 'tool_call_id',
@@ -844,8 +851,8 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'Permissions',
 		chapter: 'deepagents',
-		short: 'Declarative allow/deny for filesystem ops.',
-		long: 'Rules { operations, paths, mode } evaluated first-match-wins before tool runs. Permissions lesson blocks destructive writes while allowing reads.'
+		short: 'Declarative rules judging every file op: allow, deny, or summon a human.',
+		long: 'Rules { operations, paths, mode } evaluated first-match-wins before any read or write executes. Three verbs: allow (it runs), deny (a readable error the agent can adapt to), interrupt (the run checkpoints and a human approves, edits, or rejects that exact operation). Subagents inherit the parent’s rules — but replace them entirely if they declare their own.'
 	},
 	{
 		term: 'Progressive disclosure',
@@ -887,7 +894,13 @@ export const glossary: GlossaryEntry[] = [
 		term: 'Subagent',
 		chapter: 'deepagents',
 		short: 'Ephemeral child agent with isolated context.',
-		long: 'Configured by name, description, prompt, optional tools/model. task() runs to completion, returns one report — parent never sees internal messages.'
+		long: 'Declared by name, description and its OWN systemPrompt (never inherited). tools REPLACE the parent\'s when set; model and permissions inherit unless overridden; the filesystem is shared. The parent sees one report, never the child\'s transcript.'
+	},
+	{
+		term: 'Async subagent',
+		chapter: 'deepagents',
+		short: 'Background child agent on its own thread.',
+		long: 'start_async_task returns a task id immediately; check/update/cancel/list manage it while the conversation continues. update_async_task interrupts and restarts the child with its history plus new orders — same id. The ledger lives in the asyncTasks state channel so compaction can\'t orphan running work.'
 	},
 	{
 		term: 'Summarization',
@@ -898,8 +911,8 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'task',
 		chapter: 'deepagents',
-		short: 'Tool spawning a named subagent; returns summary.',
-		long: 'task({ subagent: "researcher", description: "..." }) — isolated child run, single concise report back. Subagents lesson and research capstone core delegation primitive.'
+		short: 'Tool spawning a named subagent; returns one report.',
+		long: 'task({ subagent_type, description }) — the brief must be self-contained; the child can\'t see the conversation. Several task calls in ONE assistant message run in parallel, but the supervisor blocks until all report. A general-purpose subagent is auto-added to every roster.'
 	},
 	{
 		term: 'Virtual filesystem',
@@ -1644,8 +1657,8 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'first-match-wins',
 		chapter: 'deepagents',
-		short: 'Permission rule: earliest matching glob+operation decides allow/deny.',
-		long: 'evaluate() in permissions.ts stops at the first rule whose operations and paths match — permissions lesson orders deny-before-allow rules so .env and secrets/** block writes.'
+		short: 'The earliest matching rule decides — declaration order IS the policy.',
+		long: 'The evaluator walks the permission list top to bottom and stops at the first rule whose operation AND glob both match; rules below it are never consulted, and no match at all means allowed. Consequence: an allow ** above your denies silences everything beneath it — order your list by distrust, and end with a catch-all deny for a closed posture.'
 	},
 	{
 		term: 'CompositeRoute',
