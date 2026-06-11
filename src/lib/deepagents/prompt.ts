@@ -1,19 +1,25 @@
 import { SystemMessage } from '@langchain/core/messages';
 import type { Todo, VirtualFile } from './state';
 
-export const BASE_AGENT_PROMPT = `You are an autonomous engineering agent operating inside a sandboxed harness.
+/**
+ * Mirrors the register of the official deepagents BASE_AGENT_PROMPT ("You are a
+ * Deep Agent…", Core Behavior / Doing Tasks), condensed for browser-sized runs.
+ * In the official package each middleware injects its own tool guidance; here we
+ * fold the essentials into one block the reader can see whole.
+ */
+export const BASE_AGENT_PROMPT = `You are a Deep Agent, an AI assistant that helps users accomplish tasks using tools.
 
-# Tools
-- write_todos — break a complex task into a checklist and keep it up to date.
-- ls / read_file / write_file / edit_file / glob / grep — operate on a virtual filesystem.
-- task — delegate a self-contained subtask to a named subagent.
+# Core behavior
+- NEVER add unnecessary preamble. Don't say "I'll now do X" — just do it.
+- Prioritize accuracy over validating the user's beliefs.
 
-# Operating principles
-- Plan before you act on anything non-trivial.
-- Prefer reading and writing files for any output that is longer than a paragraph.
-- Mark tasks in_progress while you work on them and completed when done.
-- Delegate research-heavy or context-heavy work to a subagent so the parent context stays small.
-- Never reveal internal scratch files unless the user asks.`;
+# Doing tasks
+- Understand first, act second: read what is there before changing it.
+- Plan anything non-trivial with write_todos and keep statuses honest — in_progress while you work, completed when done.
+- Prefer files over chat: write drafts, notes and any output longer than a paragraph to the filesystem (ls / read_file / write_file / edit_file / glob / grep).
+- Delegate context-heavy work to a subagent with task, so this conversation stays small.
+- Verify — check your work against what was asked, not against your own output. Your first attempt is rarely correct: iterate.
+- Keep working until the task is fully complete.`;
 
 export interface AssemblePromptOpts {
 	user?: string;
@@ -27,8 +33,10 @@ export interface AssemblePromptOpts {
 
 export function assembleSystemPrompt(opts: AssemblePromptOpts): string {
 	const parts: string[] = [];
-	parts.push('# BASE\n' + BASE_AGENT_PROMPT);
+	// Official assembly order: USER first, then BASE, then SUFFIX — your
+	// instructions outrank the harness's own.
 	if (opts.user && opts.user.trim()) parts.push('# USER\n' + opts.user.trim());
+	parts.push('# BASE\n' + BASE_AGENT_PROMPT);
 
 	const middle: string[] = [];
 	if (opts.subagents?.length) {
@@ -52,7 +60,14 @@ export function assembleSystemPrompt(opts: AssemblePromptOpts): string {
 		const block = opts.todos
 			.map((t) => `- [${t.status}] ${t.content}`)
 			.join('\n');
-		middle.push('## Active plan\n' + block);
+		const open = opts.todos.filter((t) => t.status !== 'completed').length;
+		middle.push(
+			'## Active plan\n' +
+				block +
+				(open > 0
+					? '\n(If any step above is already done, call write_todos NOW with the full updated list before anything else.)'
+					: '')
+		);
 	}
 	if (opts.files && opts.files.length) {
 		const list = opts.files.map((f) => `- ${f.path}`).join('\n');

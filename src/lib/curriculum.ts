@@ -141,7 +141,7 @@ export const chapters: Chapter[] = [
 			{
 				slug: 'harness',
 				title: 'The harness',
-				subtitle: 'createDeepAgent and middleware assembly.'
+				subtitle: 'The big picture: a brief becomes a playable game.'
 			},
 			{
 				slug: 'virtual-fs',

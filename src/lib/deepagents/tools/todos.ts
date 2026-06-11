@@ -24,7 +24,7 @@ export function createWriteTodosTool(hooks: TodosToolHooks) {
 		{
 			name: 'write_todos',
 			description:
-				'Replace the active to-do list with the provided plan. Use to plan, mark steps in_progress, and mark them completed. Always keep one step in_progress while working.',
+				'Replace the active to-do list with the provided plan (the FULL list, every call). Call it to plan, and call it AGAIN each time a step finishes: mark that step completed and the next in_progress. A board where nothing is ever completed means you forgot this.',
 			schema: z.object({
 				todos: z
 					.array(

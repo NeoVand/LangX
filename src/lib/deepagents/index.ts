@@ -6,7 +6,6 @@ import {
 	Command,
 	interrupt
 } from '@langchain/langgraph/web';
-import { ToolNode } from '@langchain/langgraph/prebuilt';
 import {
 	AIMessage,
 	HumanMessage,
@@ -48,6 +47,9 @@ export type AnyTool = StructuredToolInterface | StructuredTool | ToolInterface;
 export interface DeepAgentOptions {
 	model: BaseChatModel;
 	tools?: AnyTool[];
+	/** Your instructions — composed FIRST, ahead of the base prompt (official order). */
+	systemPrompt?: string;
+	/** @deprecated alias for `systemPrompt` (the official option name). */
 	instructions?: string;
 	backend?: BackendProtocol;
 	permissions?: FilesystemPermission[];
@@ -58,6 +60,31 @@ export interface DeepAgentOptions {
 	interruptOn?: string[];
 	tracer?: Tracer;
 	maxIterations?: number;
+}
+
+/** One human decision at an interrupt — the official four verbs. */
+export type HitlDecision =
+	| { type: 'approve' }
+	| { type: 'edit'; args: Record<string, unknown> }
+	| { type: 'reject'; message?: string }
+	| { type: 'respond'; message: string };
+
+/**
+ * Accept the official resume shape — `{ decisions: [...] }` — as well as a bare
+ * decision, plus the legacy `{ decision: 'approve' | … }` form older demos send.
+ */
+function normalizeResume(value: unknown): HitlDecision {
+	const v = value as
+		| { decisions?: HitlDecision[] }
+		| HitlDecision
+		| { decision?: 'approve' | 'reject' | 'edit'; args?: Record<string, unknown>; reason?: string };
+	if (v && typeof v === 'object' && 'decisions' in v && Array.isArray(v.decisions) && v.decisions[0])
+		return v.decisions[0];
+	if (v && typeof v === 'object' && 'type' in v) return v as HitlDecision;
+	const legacy = v as { decision?: 'approve' | 'reject' | 'edit'; args?: Record<string, unknown>; reason?: string };
+	if (legacy?.decision === 'edit' && legacy.args) return { type: 'edit', args: legacy.args };
+	if (legacy?.decision === 'reject') return { type: 'reject', message: legacy.reason };
+	return { type: 'approve' };
 }
 
 export interface HarnessInterrupt {
@@ -153,9 +180,11 @@ export function createDeepAgent(opts: DeepAgentOptions): CompiledDeepAgent {
 		...(loadSkillTool ? [loadSkillTool as unknown as AnyTool] : [])
 	];
 	const tools: AnyTool[] = [...builtin, ...(opts.tools ?? [])];
-	const toolNode = new ToolNode(tools as never);
+	const toolByName = new Map(tools.map((t) => [(t as { name: string }).name, t]));
 
 	const interruptOn = new Set(opts.interruptOn ?? []);
+	// Rounds since the agent last touched the plan — drives the stale-board reminder.
+	let roundsSinceTodos = 0;
 
 	const checkpointer = new MemorySaver();
 
@@ -189,7 +218,7 @@ export function createDeepAgent(opts: DeepAgentOptions): CompiledDeepAgent {
 
 			messages = withSystem(
 				messages,
-				opts.instructions ?? '',
+				opts.systemPrompt ?? opts.instructions ?? '',
 				snapshot.todos,
 				snapshot.files,
 				opts.skills,
@@ -212,41 +241,71 @@ export function createDeepAgent(opts: DeepAgentOptions): CompiledDeepAgent {
 		.addNode('tools', async (state) => {
 			tracer?.emit('node_start', 'tools');
 			const last = state.messages[state.messages.length - 1] as AIMessage;
+			const calls = last.tool_calls ?? [];
 
 			// Baseline so we can return ONLY the subagent reports produced during this
 			// tool turn — `subagentReports` uses an appending reducer, so returning the
 			// whole accumulated list would duplicate every prior report.
 			const reportsBaseline = snapshot.subagentReports.length;
+			roundsSinceTodos = calls.some((tc) => tc.name === 'write_todos') ? 0 : roundsSinceTodos + 1;
 
-			for (const tc of last.tool_calls ?? []) {
-				if (interruptOn.has(tc.name)) {
-					tracer?.emit('interrupt', `pause for ${tc.name}`, { name: tc.name, args: tc.args });
-					const decision = interrupt({
-						tool: tc.name,
-						args: tc.args,
-						id: tc.id
-					}) as {
-						decision: 'approve' | 'reject' | 'edit';
-						reason?: string;
-						args?: Record<string, unknown>;
-					};
-					if (decision.decision === 'reject') {
-						return {
-							messages: [
-								new ToolMessage({
-									content: `Tool ${tc.name} was rejected by the human reviewer${decision.reason ? `: ${decision.reason}` : '.'}`,
-									tool_call_id: tc.id ?? ''
-								})
-							]
-						};
-					}
-					if (decision.decision === 'edit' && decision.args) {
-						// Apply the human's edits in place so ToolNode runs the edited call.
-						tc.args = decision.args;
-						tracer?.emit('resume', `edited ${tc.name}`, decision.args);
-					} else {
-						tracer?.emit('resume', `approved ${tc.name}`);
-					}
+			// INVARIANT: every tool_call_id gets exactly one ToolMessage — including
+			// gated calls that the human rejects. Leaving a call unanswered makes the
+			// next model request a 400 (the official harness ships
+			// PatchToolCallsMiddleware for the same reason).
+			//
+			// PASS 1 — all interrupt() calls, SYNCHRONOUSLY, before any await: the
+			// browser async-context shim only carries the graph context up to the
+			// first await, so gating must happen before any tool executes.
+			const synthesized = new Map<number, ToolMessage>();
+			for (let i = 0; i < calls.length; i++) {
+				const tc = calls[i];
+				if (!interruptOn.has(tc.name)) continue;
+				tracer?.emit('interrupt', `pause for ${tc.name}`, { name: tc.name, args: tc.args });
+				const decision = normalizeResume(interrupt({ tool: tc.name, args: tc.args, id: tc.id }));
+				if (decision.type === 'reject') {
+					tracer?.emit('resume', `rejected ${tc.name}`);
+					synthesized.set(
+						i,
+						new ToolMessage({
+							content:
+								`The human reviewer REJECTED ${tc.name}${decision.message ? ` with this feedback: "${decision.message}"` : '.'} ` +
+								`Treat this as a change request: address the feedback (update your plan, make the changes, re-verify), ` +
+								`then call ${tc.name} again when ready. Do not stop here.`,
+							tool_call_id: tc.id ?? '',
+							name: tc.name
+						})
+					);
+				} else if (decision.type === 'respond') {
+					// The official fourth verb: don't run the tool — answer the agent instead.
+					tracer?.emit('resume', `responded to ${tc.name}`);
+					synthesized.set(
+						i,
+						new ToolMessage({
+							content:
+								`${tc.name} was NOT run. The human reviewer replied instead: "${decision.message}" ` +
+								`Act on their reply, then call ${tc.name} again when appropriate.`,
+							tool_call_id: tc.id ?? '',
+							name: tc.name
+						})
+					);
+				} else if (decision.type === 'edit' && decision.args) {
+					// Apply the human's edits in place so the edited call runs below.
+					tc.args = decision.args;
+					tracer?.emit('resume', `edited ${tc.name}`, decision.args);
+				} else {
+					tracer?.emit('resume', `approved ${tc.name}`);
+				}
+			}
+
+			// PASS 2 — execute everything that wasn't answered by the human.
+			const out: ToolMessage[] = [];
+			for (let i = 0; i < calls.length; i++) {
+				const tc = calls[i];
+				const answered = synthesized.get(i);
+				if (answered) {
+					out.push(answered);
+					continue;
 				}
 				if (tc.name === 'write_file' || tc.name === 'edit_file') {
 					const path = (tc.args as { path?: string }).path;
@@ -257,15 +316,39 @@ export function createDeepAgent(opts: DeepAgentOptions): CompiledDeepAgent {
 						}
 					}
 				}
+				const t = toolByName.get(tc.name);
+				if (!t) {
+					out.push(new ToolMessage({ content: `Unknown tool: ${tc.name}`, tool_call_id: tc.id ?? '', name: tc.name }));
+					continue;
+				}
+				try {
+					const result = await (t as { invoke: (a: unknown) => Promise<unknown> }).invoke(tc.args);
+					const content = typeof result === 'string' ? result : JSON.stringify(result);
+					out.push(new ToolMessage({ content, tool_call_id: tc.id ?? '', name: tc.name }));
+				} catch (e) {
+					out.push(
+						new ToolMessage({
+							content: `Tool ${tc.name} failed: ${e instanceof Error ? e.message : String(e)}`,
+							tool_call_id: tc.id ?? '',
+							name: tc.name
+						})
+					);
+				}
 			}
 
-			const result = (await toolNode.invoke(state)) as { messages: BaseMessage[] };
-			for (const m of result.messages ?? []) {
-				if (m instanceof ToolMessage) {
-					tracer?.emit('tool_result', `${m.tool_call_id}`, {
-						bytes: typeof m.content === 'string' ? m.content.length : 0
-					});
-				}
+			// Stale plan board? Nudge through the channel models actually read —
+			// appended to a tool result, the way real harnesses inject reminders.
+			if (roundsSinceTodos >= 2 && out.length && snapshot.todos.some((t) => t.status !== 'completed')) {
+				const lastOut = out[out.length - 1];
+				lastOut.content =
+					`${lastOut.content}\n\n[system-reminder] The plan board is stale — call write_todos with the ` +
+					`FULL updated list (finished steps marked completed, the current one in_progress) before continuing.`;
+			}
+
+			for (const m of out) {
+				tracer?.emit('tool_result', `${m.name ?? m.tool_call_id}`, {
+					bytes: typeof m.content === 'string' ? m.content.length : 0
+				});
 			}
 			snapshot.files = await backend.list();
 			tracer?.emit('node_end', 'tools');
@@ -276,7 +359,7 @@ export function createDeepAgent(opts: DeepAgentOptions): CompiledDeepAgent {
 			const newReports = snapshot.subagentReports.slice(reportsBaseline);
 			notify();
 			return {
-				...result,
+				messages: out,
 				files: snapshot.files,
 				todos: snapshot.todos,
 				subagentReports: newReports

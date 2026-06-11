@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Markdown from '$lib/components/Markdown.svelte';
+	import { highlight } from '$lib/runtime/highlight';
 
 	export interface VirtualFile {
 		path: string;
@@ -22,6 +23,14 @@
 	const sorted = $derived([...files].sort((a, b) => a.path.localeCompare(b.path)));
 	const current = $derived(sorted.find((f) => f.path === selected) ?? sorted[0]);
 	const isMarkdown = $derived(!!current && /\.(md|markdown)$/i.test(current.path));
+
+	const LANG_BY_EXT: Record<string, string> = {
+		html: 'html', htm: 'html', js: 'javascript', mjs: 'javascript', ts: 'typescript',
+		css: 'css', json: 'json', svelte: 'svelte', py: 'python', sh: 'bash', yml: 'yaml', yaml: 'yaml'
+	};
+	const lang = $derived(
+		current ? (LANG_BY_EXT[current.path.split('.').pop()?.toLowerCase() ?? ''] ?? 'plain') : 'plain'
+	);
 
 	$effect(() => {
 		// Honor an external focus request once per distinct value.
@@ -120,6 +129,14 @@
 					<div class="path">{current.path}</div>
 					{#if isMarkdown}
 						<Markdown source={current.content} />
+					{:else if lang !== 'plain'}
+						{#await highlight(current.content, lang)}
+							<pre>{current.content}</pre>
+						{:then html}
+							<div class="hl">{@html html}</div>
+						{:catch}
+							<pre>{current.content}</pre>
+						{/await}
 					{:else}
 						<pre>{current.content}</pre>
 					{/if}
@@ -173,6 +190,13 @@
 		display: grid;
 		grid-template-columns: minmax(0, 14rem) 1fr;
 		min-height: 9rem;
+		max-height: 22rem;
+		overflow: hidden;
+	}
+	/* Grid tracks grow with their content — each pane must cap & scroll itself,
+	   or long files just get clipped by the container. */
+	.layout > .tree,
+	.layout > .content {
 		max-height: 22rem;
 	}
 
@@ -256,6 +280,17 @@
 		line-height: 1.5;
 		color: var(--color-fg);
 		margin: 0;
+		white-space: pre-wrap;
+		word-break: break-word;
+	}
+
+	.hl :global(pre.shiki) {
+		margin: 0;
+		padding: 0;
+		background: transparent !important;
+		font-family: var(--font-mono);
+		font-size: 0.76rem;
+		line-height: 1.55;
 		white-space: pre-wrap;
 		word-break: break-word;
 	}
