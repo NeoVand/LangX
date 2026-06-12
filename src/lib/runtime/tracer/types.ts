@@ -17,6 +17,9 @@ export type TraceEventKind =
 	| 'summarization'
 	| 'interrupt'
 	| 'resume'
+	| 'skill_load'
+	| 'script_run'
+	| 'model_call'
 	| 'note'
 	| 'error';
 

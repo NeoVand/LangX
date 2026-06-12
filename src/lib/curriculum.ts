@@ -171,7 +171,7 @@ export const chapters: Chapter[] = [
 			{
 				slug: 'skills',
 				title: 'Skills (progressive disclosure)',
-				subtitle: 'SKILL.md catalogs.'
+				subtitle: 'The Support Desk: one question, three wardrobes.'
 			},
 			{
 				slug: 'compaction',

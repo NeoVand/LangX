@@ -46,7 +46,13 @@ import {
 	type ChildTool
 } from './tools/task';
 import { createAsyncTaskEngine, type AsyncTaskEngine } from './async-tasks';
-import { createLoadSkillTool, type Skill } from './skills';
+import {
+	scanSkillCatalog,
+	createRunScriptTool,
+	type SkillCatalogEntry
+} from './skills';
+import { buildPromptSections } from './prompt';
+import { approxTokens, totalMessageTokens } from './tokens';
 import { compact, defaultCompaction, type CompactionConfig } from './compaction';
 import type { Tracer } from '$lib/runtime/tracer';
 
@@ -65,7 +71,12 @@ export interface DeepAgentOptions {
 	subagents?: SubAgentSpec[];
 	/** Background subagents — adds the five async-task tools (start/check/update/cancel/list). */
 	asyncSubagents?: SubAgentSpec[];
-	skills?: Skill[];
+	/**
+	 * Skill SOURCE PATHS on the backend (official shape), e.g. ['/skills/'].
+	 * Each is scanned for `<dir>/SKILL.md`; only frontmatter ships in the
+	 * prompt — the agent read_file()s the body on demand (progressive disclosure).
+	 */
+	skills?: string[];
 	memorySummary?: string;
 	compaction?: Partial<CompactionConfig>;
 	interruptOn?: string[];
@@ -163,6 +174,10 @@ export function createDeepAgent(opts: DeepAgentOptions): CompiledDeepAgent {
 		},
 		onOp: ({ tool, path, result }) => {
 			tracer?.emit('fs_op', `${tool} ${path ?? ''}`.trim(), result ? { result } : undefined);
+			// Level 2 of progressive disclosure, observed: the agent opened a manual.
+			if (tool === 'read_file' && path?.endsWith('/SKILL.md')) {
+				tracer?.emit('skill_load', path, { path });
+			}
 		}
 	});
 
@@ -231,19 +246,20 @@ export function createDeepAgent(opts: DeepAgentOptions): CompiledDeepAgent {
 			})
 		: null;
 
-	const loadSkillTool = (opts.skills?.length ?? 0) > 0
-		? createLoadSkillTool({
-				skills: opts.skills!,
-				onLoad: (name) => tracer?.emit('note', `load_skill ${name}`)
-			})
-		: null;
+	// Level 3 of progressive disclosure: skills may ship scripts/ — give the
+	// agent a way to run them. (Officially: sandbox backends or interpreter
+	// middleware; this is the browser stand-in.)
+	const runScriptTool = createRunScriptTool({
+		backend,
+		onRun: (path, ok) => tracer?.emit('script_run', path, { path, ok })
+	});
 
 	const builtin: AnyTool[] = [
 		writeTodos as unknown as AnyTool,
 		...(fsTools as unknown as AnyTool[]),
 		...(taskTool ? [taskTool as unknown as AnyTool] : []),
 		...((asyncEngine?.createTools() ?? []) as unknown as AnyTool[]),
-		...(loadSkillTool ? [loadSkillTool as unknown as AnyTool] : [])
+		runScriptTool as unknown as AnyTool
 	];
 	const tools: AnyTool[] = [...builtin, ...(opts.tools ?? [])];
 
@@ -261,6 +277,8 @@ export function createDeepAgent(opts: DeepAgentOptions): CompiledDeepAgent {
 	const interruptOn = new Set(opts.interruptOn ?? []);
 	// Rounds since the agent last touched the plan — drives the stale-board reminder.
 	let roundsSinceTodos = 0;
+	// Counts model calls across the run — labels the context-anatomy trace events.
+	let modelRound = 0;
 
 	const checkpointer = new MemorySaver();
 
@@ -295,15 +313,42 @@ export function createDeepAgent(opts: DeepAgentOptions): CompiledDeepAgent {
 				tracer?.emit('eviction', `evicted ${compactionResult.evictedFiles} large tool results`);
 			}
 
-			messages = withSystem(
-				messages,
-				opts.systemPrompt ?? opts.instructions ?? '',
-				snapshot.todos,
-				snapshot.files,
-				opts.skills,
-				promptRoster,
-				opts.memorySummary
-			);
+			// Level 1 of progressive disclosure: re-scan the catalog each round, so
+			// even skills the agent wrote mid-run show up (the skill-creator pattern).
+			const skillCatalog: SkillCatalogEntry[] =
+				(opts.skills?.length ?? 0) > 0 ? await scanSkillCatalog(backend, opts.skills!) : [];
+
+			const promptOpts = {
+				user: opts.systemPrompt ?? opts.instructions ?? '',
+				todos: snapshot.todos,
+				files: snapshot.files,
+				skills: skillCatalog.map((s) => ({
+					name: s.name,
+					description: s.description,
+					file: s.file
+				})),
+				subagents: promptRoster.length ? promptRoster : undefined,
+				memorySummary: opts.memorySummary
+			};
+			messages = withSystem(messages, promptOpts);
+
+			// Context anatomy for this exact model call — what the model is about to
+			// read, priced section by section. Drives the lesson context meters.
+			modelRound += 1;
+			const sections = buildPromptSections(promptOpts).map((s) => ({
+				key: s.key,
+				label: s.label,
+				tokens: approxTokens(s.text)
+			}));
+			const systemTokens = sections.reduce((t, s) => t + s.tokens, 0);
+			const conversationTokens = totalMessageTokens(messages.slice(1));
+			tracer?.emit('model_call', `round ${modelRound}`, {
+				round: modelRound,
+				sections,
+				systemTokens,
+				conversationTokens,
+				totalTokens: systemTokens + conversationTokens
+			});
 
 			const modelWithTools = (
 				opts.model as unknown as { bindTools: (t: AnyTool[]) => BaseChatModel }
@@ -573,22 +618,9 @@ export function createDeepAgent(opts: DeepAgentOptions): CompiledDeepAgent {
 
 function withSystem(
 	messages: BaseMessage[],
-	instructions: string,
-	todos: Todo[],
-	files: VirtualFile[],
-	skills: Skill[] | undefined,
-	subagents: { name: string; description: string }[] | undefined,
-	memorySummary: string | undefined
+	promptOpts: Parameters<typeof assembleSystemPrompt>[0]
 ): BaseMessage[] {
-	const system = assembleSystemPrompt({
-		user: instructions,
-		todos,
-		files,
-		skills: skills?.map((s) => ({ name: s.name, description: s.description })),
-		subagents: subagents?.length ? subagents : undefined,
-		memorySummary
-	});
-	const sysMsg = new SystemMessage(system);
+	const sysMsg = new SystemMessage(assembleSystemPrompt(promptOpts));
 	if (messages[0] instanceof SystemMessage) {
 		return [sysMsg, ...messages.slice(1)];
 	}
@@ -596,7 +628,9 @@ function withSystem(
 }
 
 export { StateBackend, StoreBackend, CompositeBackend };
-export { assembleSystemPrompt, BASE_AGENT_PROMPT } from './prompt';
+export { assembleSystemPrompt, buildPromptSections, BASE_AGENT_PROMPT } from './prompt';
+export type { PromptSection } from './prompt';
+export { parseSkillFrontmatter, scanSkillCatalog, createRunScriptTool } from './skills';
 export { evaluate, matchPath } from './permissions';
 export type { PermissionMode, PermissionResult } from './permissions';
 export { withGeneralPurpose, runChildAgent, createTaskTool } from './tools/task';
@@ -604,4 +638,4 @@ export type { ChildEvent, ChildTool, ChildRunOptions, ChildRunResult } from './t
 export { createAsyncTaskEngine } from './async-tasks';
 export type { AsyncTaskEngine, AsyncEngineHooks } from './async-tasks';
 export type { Todo, VirtualFile, SubAgentReport, AsyncTaskRecord, DeepAgentStateType };
-export type { BackendProtocol, FilesystemPermission, Skill, SubAgentSpec, CompactionConfig };
+export type { BackendProtocol, FilesystemPermission, SkillCatalogEntry, SubAgentSpec, CompactionConfig };

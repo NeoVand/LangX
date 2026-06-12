@@ -30,6 +30,9 @@
 		summarization: 'summ',
 		interrupt: 'pause',
 		resume: 'resume',
+		skill_load: 'skill',
+		script_run: 'script',
+		model_call: 'model',
 		note: 'note',
 		error: 'err'
 	};

@@ -25,57 +25,100 @@ export interface AssemblePromptOpts {
 	user?: string;
 	todos?: Todo[];
 	files?: VirtualFile[];
-	skills?: { name: string; description: string }[];
+	/** Skill catalog entries — level 1 of progressive disclosure. */
+	skills?: { name: string; description: string; file?: string }[];
 	memorySummary?: string;
 	subagents?: { name: string; description: string }[];
 	suffix?: string;
 }
 
-export function assembleSystemPrompt(opts: AssemblePromptOpts): string {
-	const parts: string[] = [];
+export interface PromptSection {
+	key: 'user' | 'base' | 'subagents' | 'skills' | 'memory' | 'plan' | 'files' | 'suffix';
+	label: string;
+	text: string;
+}
+
+/**
+ * The prompt, section by section — same content assembleSystemPrompt joins,
+ * exposed individually so context meters can price each part of every round.
+ */
+export function buildPromptSections(opts: AssemblePromptOpts): PromptSection[] {
+	const sections: PromptSection[] = [];
 	// Official assembly order: USER first, then BASE, then SUFFIX — your
 	// instructions outrank the harness's own.
-	if (opts.user && opts.user.trim()) parts.push('# USER\n' + opts.user.trim());
-	parts.push('# BASE\n' + BASE_AGENT_PROMPT);
+	if (opts.user && opts.user.trim())
+		sections.push({ key: 'user', label: 'Your instructions', text: '# USER\n' + opts.user.trim() });
+	sections.push({ key: 'base', label: 'Base harness prompt', text: '# BASE\n' + BASE_AGENT_PROMPT });
 
-	const middle: string[] = [];
 	if (opts.subagents?.length) {
-		middle.push(
-			'## Available subagents\n' +
-				opts.subagents
-					.map((s) => `- ${s.name}: ${s.description}`)
-					.join('\n')
-		);
+		sections.push({
+			key: 'subagents',
+			label: 'Subagent roster',
+			text:
+				'## Available subagents\n' +
+				opts.subagents.map((s) => `- ${s.name}: ${s.description}`).join('\n')
+		});
 	}
 	if (opts.skills?.length) {
-		middle.push(
-			'## Skill catalog (load on demand)\n' +
-				opts.skills.map((s) => `- ${s.name}: ${s.description}`).join('\n')
-		);
+		sections.push({
+			key: 'skills',
+			label: 'Skill catalog',
+			text:
+				'## Skill catalog (progressive disclosure)\n' +
+				'One line per skill. When a task matches a description, FIRST read the SKILL.md with read_file, then follow it exactly.\n' +
+				opts.skills
+					.map((s) => `- ${s.name}: ${s.description}${s.file ? ` (procedure: ${s.file})` : ''}`)
+					.join('\n')
+		});
 	}
 	if (opts.memorySummary && opts.memorySummary.trim()) {
-		middle.push('## Persistent memory\n' + opts.memorySummary.trim());
+		sections.push({
+			key: 'memory',
+			label: 'Persistent memory',
+			text: '## Persistent memory\n' + opts.memorySummary.trim()
+		});
 	}
 	if (opts.todos && opts.todos.length) {
-		const block = opts.todos
-			.map((t) => `- [${t.status}] ${t.content}`)
-			.join('\n');
+		const block = opts.todos.map((t) => `- [${t.status}] ${t.content}`).join('\n');
 		const open = opts.todos.filter((t) => t.status !== 'completed').length;
-		middle.push(
-			'## Active plan\n' +
+		sections.push({
+			key: 'plan',
+			label: 'Active plan',
+			text:
+				'## Active plan\n' +
 				block +
 				(open > 0
 					? '\n(If any step above is already done, call write_todos NOW with the full updated list before anything else.)'
 					: '')
-		);
+		});
 	}
 	if (opts.files && opts.files.length) {
-		const list = opts.files.map((f) => `- ${f.path}`).join('\n');
-		middle.push('## Files in workspace\n' + list);
+		sections.push({
+			key: 'files',
+			label: 'Workspace file list',
+			text: '## Files in workspace\n' + opts.files.map((f) => `- ${f.path}`).join('\n')
+		});
 	}
-	if (middle.length) parts.push('# MIDDLEWARE\n' + middle.join('\n\n'));
+	if (opts.suffix && opts.suffix.trim())
+		sections.push({ key: 'suffix', label: 'Suffix', text: '# SUFFIX\n' + opts.suffix.trim() });
+	return sections;
+}
 
-	if (opts.suffix && opts.suffix.trim()) parts.push('# SUFFIX\n' + opts.suffix.trim());
+export function assembleSystemPrompt(opts: AssemblePromptOpts): string {
+	const sections = buildPromptSections(opts);
+	const parts: string[] = [];
+	let middlewareOpen = false;
+	for (const s of sections) {
+		if (s.key === 'user' || s.key === 'base' || s.key === 'suffix') {
+			parts.push(s.text);
+			middlewareOpen = false;
+		} else if (!middlewareOpen) {
+			parts.push('# MIDDLEWARE\n' + s.text);
+			middlewareOpen = true;
+		} else {
+			parts[parts.length - 1] += '\n\n' + s.text;
+		}
+	}
 	return parts.join('\n\n');
 }
 

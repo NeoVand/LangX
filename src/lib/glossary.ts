@@ -821,8 +821,8 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'load_skill',
 		chapter: 'deepagents',
-		short: 'Tool fetching a skill full body on demand.',
-		long: 'Agent sees only skill names/descriptions in prompt; load_skill("cite") returns full SKILL.md as tool result — progressive disclosure in one call.'
+		short: 'A tool that does not exist — skills load via read_file.',
+		long: 'A common misconception: the official package ships NO load_skill tool. Only frontmatter goes in the prompt; the agent read_file()s SKILL.md when a task matches, then its scripts/ and references/ on demand. The filesystem itself is the disclosure mechanism.'
 	},
 	{
 		term: 'MCP',
@@ -857,8 +857,8 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'Progressive disclosure',
 		chapter: 'deepagents',
-		short: 'Ship metadata; load full content on demand.',
-		long: 'Skills list names + one-liners in prompt; load_skill expands body only when relevant. Keeps prompt small with large addressable catalog.'
+		short: 'Three levels: catalog line → manual → resources.',
+		long: 'Level 1: only frontmatter {name, description} ships in the system prompt — a few tokens per skill, always in view. Level 2: the agent read_file()s the SKILL.md body when a task matches its description. Level 3: the manual points at scripts/references/assets, fetched on demand. A whole shelf of expertise at near-zero standing cost.'
 	},
 	{
 		term: 'Recitation',
@@ -875,8 +875,8 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'Skill',
 		chapter: 'deepagents',
-		short: 'SKILL.md file with on-demand expertise.',
-		long: 'Description in system prompt; full markdown body loaded via load_skill when agent decides it is relevant. Skills lesson builds a small catalog.'
+		short: 'A directory of expertise, loaded only when the task matches.',
+		long: 'A folder on the backend — SKILL.md (frontmatter + procedure) plus optional scripts/, references/ and assets/. Only the one-line description ships in the system prompt; the agent reads the rest on demand. Skills change behavior without spending standing context — wardrobe, not memory.'
 	},
 	{
 		term: 'StateBackend',
@@ -1711,8 +1711,14 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'SKILL.md',
 		chapter: 'deepagents',
-		short: 'Markdown skill file loaded on demand by load_skill.',
-		long: 'skills/ directory holds SKILL.md per skill — catalog shows description only; load_skill(name) injects full body into context per progressive disclosure pattern.'
+		short: 'The manual at the root of every skill directory.',
+		long: 'YAML frontmatter (name ≤64 chars, MUST match the directory name; description ≤1024 chars, keyword-rich — it is the activation trigger) above a markdown procedure. Keep bodies under ~5k tokens; push detail into references/ and deterministic logic into scripts/, referenced one level deep.'
+	},
+	{
+		term: 'run_script',
+		chapter: 'deepagents',
+		short: 'Execute a skill-shipped script instead of improvising logic.',
+		long: 'Level 3 of progressive disclosure: a skill\'s scripts/ hold deterministic helpers (money math, date rules, format linters) the model should never compute by hand. Officially these run in sandbox backends or as QuickJS interpreter skills (metadata.entrypoint → await import("@/skills/…")); this harness\'s run_script(path, input) is the browser stand-in.'
 	},
 	{
 		term: 'fetch_chunk',
