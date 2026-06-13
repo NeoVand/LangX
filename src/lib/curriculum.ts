@@ -181,12 +181,12 @@ export const chapters: Chapter[] = [
 			{
 				slug: 'hitl',
 				title: 'Human-in-the-loop',
-				subtitle: 'interruptOn and the approval queue.'
+				subtitle: 'The Greenhouse: approve, edit, reject, respond.'
 			},
 			{
 				slug: 'capstone-research',
 				title: 'Capstone — Deep Research',
-				subtitle: 'Plan, delegate, summarize, publish.'
+				subtitle: 'Plan, approve, research real sources, cite.'
 			},
 			{
 				slug: 'capstone-data-science',

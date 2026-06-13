@@ -9,12 +9,13 @@
 		name: string;
 		args: Record<string, unknown>;
 		description?: string;
-		allowedDecisions: ('approve' | 'edit' | 'reject')[];
+		allowedDecisions: ('approve' | 'edit' | 'reject' | 'respond')[];
 	}
 	type ReviewDecision =
 		| { type: 'approve' }
 		| { type: 'edit'; editedAction: { name: string; args: Record<string, unknown> } }
-		| { type: 'reject'; message?: string };
+		| { type: 'reject'; message?: string }
+		| { type: 'respond'; message: string };
 
 	let {
 		pending,
@@ -26,12 +27,14 @@
 		onDecision: (d: ReviewDecision) => void;
 	} = $props();
 
-	let mode = $state<'view' | 'edit' | 'reject'>('view');
+	let mode = $state<'view' | 'edit' | 'reject' | 'respond'>('view');
 	// Editable copies of the proposed args, seeded when the human chooses "Edit".
 	let draft = $state<Record<string, string>>({});
 	let rejectMsg = $state('');
+	let respondMsg = $state('');
 
-	const allow = (d: 'approve' | 'edit' | 'reject') => pending.allowedDecisions.includes(d);
+	const allow = (d: 'approve' | 'edit' | 'reject' | 'respond') =>
+		pending.allowedDecisions.includes(d);
 
 	function startEdit() {
 		draft = Object.fromEntries(Object.entries(pending.args).map(([k, v]) => [k, String(v)]));
@@ -74,13 +77,23 @@
 	</dl>
 
 	{#if mode === 'reject'}
-		<label class="reject-field">
+		<label class="msg-field">
 			<span>Message to the agent (why you're rejecting)</span>
 			<textarea
 				bind:value={rejectMsg}
 				rows="2"
 				disabled={busy}
-				placeholder="e.g. Per policy, damaged-in-transit items are replaced, not refunded."
+				placeholder="e.g. Don't spray bed 4 — pick off the aphids by hand instead."
+			></textarea>
+		</label>
+	{:else if mode === 'respond'}
+		<label class="msg-field">
+			<span>Your reply (the tool does NOT run — the agent reads this)</span>
+			<textarea
+				bind:value={respondMsg}
+				rows="2"
+				disabled={busy}
+				placeholder="e.g. Plant herbs in bed 3, not flowers."
 			></textarea>
 		</label>
 	{/if}
@@ -98,8 +111,20 @@
 			{#if allow('reject')}
 				<button class="act reject" onclick={() => (mode = 'reject')} disabled={busy}>Reject…</button>
 			{/if}
+			{#if allow('respond')}
+				<button class="act" onclick={() => (mode = 'respond')} disabled={busy}>Respond…</button>
+			{/if}
 		{:else if mode === 'edit'}
 			<button class="act approve" onclick={confirmEdit} disabled={busy}>Approve edited</button>
+			<button class="act" onclick={() => (mode = 'view')} disabled={busy}>Cancel</button>
+		{:else if mode === 'respond'}
+			<button
+				class="act"
+				onclick={() => onDecision({ type: 'respond', message: respondMsg.trim() })}
+				disabled={busy || !respondMsg.trim()}
+			>
+				Send reply
+			</button>
 			<button class="act" onclick={() => (mode = 'view')} disabled={busy}>Cancel</button>
 		{:else}
 			<button
@@ -187,17 +212,17 @@
 		font-size: 0.76rem;
 	}
 
-	.reject-field {
+	.msg-field {
 		display: block;
 		margin-top: 0.7rem;
 	}
-	.reject-field span {
+	.msg-field span {
 		display: block;
 		font-size: 0.74rem;
 		color: var(--color-ink-300);
 		margin-bottom: 0.3rem;
 	}
-	.reject-field textarea {
+	.msg-field textarea {
 		width: 100%;
 		box-sizing: border-box;
 	}

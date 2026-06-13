@@ -144,13 +144,14 @@ export const hitlToolSpecs = [
 export type ReviewDecision =
 	| { type: 'approve' }
 	| { type: 'edit'; editedAction: { name: string; args: Record<string, unknown> } }
-	| { type: 'reject'; message?: string };
+	| { type: 'reject'; message?: string }
+	| { type: 'respond'; message: string };
 
 export interface PendingAction {
 	name: string;
 	args: Record<string, unknown>;
 	description?: string;
-	allowedDecisions: ('approve' | 'edit' | 'reject')[];
+	allowedDecisions: ('approve' | 'edit' | 'reject' | 'respond')[];
 }
 
 // ── The agent graph: model → (gated) tools → model → … ──────────────────────
@@ -240,7 +241,7 @@ interface ActionReq {
 }
 interface ReviewCfg {
 	actionName: string;
-	allowedDecisions: ('approve' | 'edit' | 'reject')[];
+	allowedDecisions: ('approve' | 'edit' | 'reject' | 'respond')[];
 }
 
 type SupportAgent = ReturnType<typeof buildAgent>;

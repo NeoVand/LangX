@@ -252,7 +252,7 @@ export const glossary: GlossaryEntry[] = [
 		term: 'HITL',
 		chapter: 'general',
 		short: 'Human-in-the-loop — pause, review, resume.',
-		long: 'Graph or harness pauses at a sensitive step, surfaces proposed tool args to a human, and continues only after approve/edit/reject via Command({ resume }). Deep Agents uses interruptOn; LangGraph uses interrupt().'
+		long: 'For actions a model should not take unreviewed, the run halts at the tool, shows a human the proposed call, and continues only on their decision — one of four verbs: approve, edit, reject, respond. The whole run is checkpointed while it waits. Deep Agents gates tools with interruptOn; LangGraph uses the lower-level interrupt().'
 	},
 	{
 		term: 'JSON schema',
@@ -627,8 +627,26 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'Pregel',
 		chapter: 'langgraph',
-		short: 'Bulk-synchronous parallel model for supersteps.',
-		long: 'Google Pregel pattern: nodes run concurrently within a superstep, emit updates, runtime merges, next superstep begins. LangGraph runtime is Pregel-flavored.'
+		short: 'The runtime under LangGraph — supersteps in the bulk-synchronous-parallel style.',
+		long: 'LangGraph executes graphs the way Google\'s Pregel executes graph algorithms, following the bulk-synchronous-parallel (BSP) model: in each "superstep" every active node runs concurrently, emits its state updates, and the runtime merges them at a barrier before the next superstep begins. That barrier is why concurrent updates to a channel need a reducer. The deep-research capstone can fetch the docs page and the Wikipedia article on BSP to explain it from first principles.'
+	},
+	{
+		term: 'Context quarantine',
+		chapter: 'deepagents',
+		short: 'Isolating a sub-task in its own context window so it never crowds the parent.',
+		long: 'The reason subagents exist. A reading- or search-heavy sub-task can pull thousands of tokens; run it in the parent\'s window and the original goal drifts. A subagent does that work in a FRESH context and returns only a short summary — the dozens of tool calls that produced it never touch the parent. It is the single most important idea behind deep-research agents.'
+	},
+	{
+		term: 'Source grounding',
+		chapter: 'deepagents',
+		short: 'Every claim in the output traces back to a real, cited source.',
+		long: 'A research agent earns trust by showing its work, not by sounding confident. Grounding means each read registers a numbered source in a shared registry, and every non-trivial sentence in the report carries its [S#] — so a reader can follow any claim to the exact page it came from. The opposite is a fluent answer you cannot verify.'
+	},
+	{
+		term: 'Deep research',
+		chapter: 'deepagents',
+		short: 'Plan → approve → research in parallel → synthesize a cited report.',
+		long: 'The capstone agent pattern: a lead decomposes a question into sub-questions, gets the plan approved by a human, fans out one researcher subagent per sub-question over real sources, and synthesizes a report where every claim is cited. It composes the whole harness — planning, subagents, human-in-the-loop, the filesystem, and compaction — into one product.'
 	},
 	{
 		term: 'Super-step',
@@ -815,8 +833,14 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'interruptOn',
 		chapter: 'deepagents',
-		short: 'Per-tool map of which tools pause for human approval.',
-		long: 'humanInTheLoopMiddleware / createDeepAgent take interruptOn as an object: { issue_refund: { allowedDecisions: ["approve","edit","reject"] }, lookup_order: false }. true (or a config) gates a tool; false auto-approves it. The graph pauses on a gated call, surfaces the args, and resumes with Command({ resume }).'
+		short: 'The one-liner that puts a tool behind a human gate.',
+		long: 'createDeepAgent({ interruptOn }) names which tools pause for a human. A tool set to true offers all four decisions; { allowedDecisions: [...] } restricts the verbs by risk; false (or omission) never gates. The harness pauses on a gated call, surfaces the tool and its args, and resumes only on Command({ resume: { decisions } }). Requires a checkpointer.'
+	},
+	{
+		term: 'allowedDecisions',
+		chapter: 'deepagents',
+		short: 'Which of the four verbs a gated tool offers — risk-tiering.',
+		long: 'Part of an interruptOn entry: { allowedDecisions: ["approve","reject"] } means the human can only approve or reject this tool — no editing, no responding. Use it to tier tools by blast radius: a harsh, irreversible action (pesticide, wire transfer) gets a yes/no, while a routine one gets all four. An ask-user tool is typically respond-only.'
 	},
 	{
 		term: 'load_skill',

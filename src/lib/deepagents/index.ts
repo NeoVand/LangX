@@ -79,9 +79,43 @@ export interface DeepAgentOptions {
 	skills?: string[];
 	memorySummary?: string;
 	compaction?: Partial<CompactionConfig>;
-	interruptOn?: string[];
+	/**
+	 * Which tools pause for a human. Either a flat list (all four decisions
+	 * allowed), or the official per-tool map letting you tier tools by risk:
+	 *   { water: true, spray_pesticide: { allowedDecisions: ['approve'] } }
+	 */
+	interruptOn?: InterruptOnConfig;
 	tracer?: Tracer;
 	maxIterations?: number;
+}
+
+export type HitlDecisionType = 'approve' | 'edit' | 'reject' | 'respond';
+export interface InterruptToolConfig {
+	/** Which verbs the human is offered for this tool. Defaults to all four. */
+	allowedDecisions?: HitlDecisionType[];
+	/** Human-readable note shown on the approval card. */
+	description?: string;
+}
+export type InterruptOnConfig = string[] | Record<string, boolean | InterruptToolConfig>;
+
+const ALL_DECISIONS: HitlDecisionType[] = ['approve', 'edit', 'reject', 'respond'];
+
+/** Fold either accepted shape into one Map the tools node reads. */
+export function normalizeInterruptOn(
+	cfg: InterruptOnConfig | undefined
+): Map<string, { allowedDecisions: HitlDecisionType[]; description?: string }> {
+	const m = new Map<string, { allowedDecisions: HitlDecisionType[]; description?: string }>();
+	if (!cfg) return m;
+	if (Array.isArray(cfg)) {
+		for (const name of cfg) m.set(name, { allowedDecisions: ALL_DECISIONS });
+		return m;
+	}
+	for (const [name, v] of Object.entries(cfg)) {
+		if (v === false) continue;
+		if (v === true) m.set(name, { allowedDecisions: ALL_DECISIONS });
+		else m.set(name, { allowedDecisions: v.allowedDecisions ?? ALL_DECISIONS, description: v.description });
+	}
+	return m;
 }
 
 /** One human decision at an interrupt — the official four verbs. */
@@ -115,6 +149,10 @@ export interface HarnessInterrupt {
 	id?: string;
 	/** What summoned the human: an interruptOn tool name, or a permission rule. */
 	reason?: 'tool' | 'permission';
+	/** Verbs the host should offer for this pause (risk-tiered per tool). */
+	allowedDecisions?: HitlDecisionType[];
+	/** Human-readable note about the gated action, for the approval card. */
+	description?: string;
 }
 
 export type InterruptibleResult =
@@ -274,7 +312,7 @@ export function createDeepAgent(opts: DeepAgentOptions): CompiledDeepAgent {
 	];
 	const toolByName = new Map(tools.map((t) => [(t as { name: string }).name, t]));
 
-	const interruptOn = new Set(opts.interruptOn ?? []);
+	const interruptOn = normalizeInterruptOn(opts.interruptOn);
 	// Rounds since the agent last touched the plan — drives the stale-board reminder.
 	let roundsSinceTodos = 0;
 	// Counts model calls across the run — labels the context-anatomy trace events.
@@ -402,7 +440,15 @@ export function createDeepAgent(opts: DeepAgentOptions): CompiledDeepAgent {
 				const tc = calls[i];
 				let gate: HarnessInterrupt | null = null;
 				if (interruptOn.has(tc.name)) {
-					gate = { tool: tc.name, args: tc.args, id: tc.id, reason: 'tool' };
+					const cfg = interruptOn.get(tc.name)!;
+					gate = {
+						tool: tc.name,
+						args: tc.args,
+						id: tc.id,
+						reason: 'tool',
+						allowedDecisions: cfg.allowedDecisions,
+						description: cfg.description
+					};
 				} else if (tc.name === 'write_file' || tc.name === 'edit_file') {
 					const path = (tc.args as { path?: string }).path ?? '';
 					if (evaluate(permissions, 'write', path).decision === 'interrupt') {
@@ -561,7 +607,16 @@ export function createDeepAgent(opts: DeepAgentOptions): CompiledDeepAgent {
 	function readInterrupt(result: Record<string, unknown>): HarnessInterrupt | null {
 		const ints = result['__interrupt__'] as Array<{ value?: HarnessInterrupt }> | undefined;
 		const v = ints?.[0]?.value;
-		return v ? { tool: v.tool, args: v.args ?? {}, id: v.id } : null;
+		return v
+			? {
+					tool: v.tool,
+					args: v.args ?? {},
+					id: v.id,
+					reason: v.reason,
+					allowedDecisions: v.allowedDecisions,
+					description: v.description
+				}
+			: null;
 	}
 
 	return {
