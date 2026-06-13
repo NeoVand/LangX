@@ -20,6 +20,7 @@ export type TraceEventKind =
 	| 'skill_load'
 	| 'script_run'
 	| 'model_call'
+	| 'context_snapshot'
 	| 'note'
 	| 'error';
 

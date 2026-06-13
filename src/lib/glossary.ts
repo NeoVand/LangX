@@ -749,8 +749,8 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'Argument truncation',
 		chapter: 'deepagents',
-		short: 'Replace repeated tool args with placeholders.',
-		long: 'Compaction tier: identical args across many calls become "<as before>" to save tokens without dropping the fact that the tool ran.'
+		short: 'Replace a repeated tool argument with a placeholder.',
+		long: 'The cheapest compaction move: when the same long argument appears across many tool calls, every copy after the first becomes "<as before>". You save the tokens without losing the fact that the tool ran with that input.'
 	},
 	{
 		term: 'BackendProtocol',
@@ -773,8 +773,8 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'Context compaction',
 		chapter: 'deepagents',
-		short: 'Automatic shrinking of conversation context.',
-		long: 'Pipeline: evict large tool blobs to files → truncate redundant args → summarize old turns → overflow recovery if still over budget. Compaction lesson runs all tiers visibly.'
+		short: 'Keeping the window small without losing the past.',
+		long: 'As a run grows, the harness shrinks the window in tiers, cheapest first: evict bulky tool results to files → trim repeated arguments → summarize the older middle turns → and if it still will not fit, raise rather than silently drop the system prompt. The raw material moves to the filesystem, so nothing is lost — only relocated.'
 	},
 	{
 		term: 'createDeepAgent',
@@ -797,14 +797,14 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'Eviction',
 		chapter: 'deepagents',
-		short: 'Move oversized tool output to a virtual file.',
-		long: 'Model sees short preview + path; read_file retrieves full content on demand. First compaction tier before summarization.'
+		short: 'Move an oversized tool output to a file, leave a pointer.',
+		long: 'Officially called offloading: a tool result past a size threshold (~20,000 tokens in the real harness) is written to the backend and replaced in context by a file path plus a short preview (the first ten lines). The model reads the full content back with read_file only if it needs it. Big log dumps and search results stop drowning the window.'
 	},
 	{
 		term: 'Goal drift',
 		chapter: 'deepagents',
-		short: 'Agent forgets original goal after summarization.',
-		long: 'Declares done early or re-asks answered questions — key failure mode the needle-in-a-haystack compaction eval probes for.'
+		short: 'The original task scrolls out of the window and is forgotten.',
+		long: 'The failure mode that makes naïve "drop the oldest messages" compaction dangerous: once the opening instructions leave the context, the agent quietly substitutes a new goal that fits what it can still see — declaring done early, re-asking answered questions, or in the Incident Room, rolling back the wrong service. Faithful summarization (keep the intent) is the guard against it.'
 	},
 	{
 		term: 'Harness',
@@ -839,14 +839,14 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'Needle-in-a-haystack',
 		chapter: 'deepagents',
-		short: 'Compaction eval: hide fact early, test recall after shrink.',
-		long: 'Plant tiny fact in turn 1, force compaction, verify agent still retrieves it from /conversation_history/ or evicted file path.'
+		short: 'Plant a small fact early, bury it, test recall.',
+		long: 'The standard way to prove compaction is faithful: drop one critical fact into an early turn, force the window to fill and compact, then check the agent can still act on it — from the summary card, or by reading it back out of /conversation_history/. In the Incident Room the needle is the brief’s scope and the 14:00 deadline.'
 	},
 	{
 		term: 'Overflow recovery',
 		chapter: 'deepagents',
-		short: 'Fail loudly when context still exceeds maxTokens.',
-		long: 'After eviction, arg trim, and summarization — if budget blown, raise error instead of silently dropping system prompt. Last compaction tier.'
+		short: 'The safety valve: raise rather than truncate blindly.',
+		long: 'The last tier. If a turn still will not fit after eviction, argument trimming, and summarization, the harness raises instead of silently dropping the system prompt or recent context. Officially this is the ContextOverflowError fallback — summarize and retry — and failing loudly beats a model that quietly forgot who it is.'
 	},
 	{
 		term: 'Permissions',
@@ -905,8 +905,14 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'Summarization',
 		chapter: 'deepagents',
-		short: 'Replace old history with LLM summary.',
-		long: 'Shrinks active context; raw history appended to /conversation_history/ on disk. Risk: goal drift if summary drops task-critical constraints.'
+		short: 'Fold the older middle turns into one faithful summary card.',
+		long: 'The real SummarizationMiddleware fires at ~85% of the model’s max input tokens, preserves roughly the most recent 10%, and replaces the rest with a structured summary — session intent, artifacts created, next steps. The raw turns are written to /conversation_history/ so they’re still retrievable. Keep the intent and you avoid goal drift; drop it and the agent forgets its task.'
+	},
+	{
+		term: 'max_input_tokens',
+		chapter: 'deepagents',
+		short: 'The model’s input budget — what compaction measures against.',
+		long: 'Each model has a profiled maximum number of input tokens. Summarization triggers at ~85% of it and preserves ~10%; when no profile is available the harness falls back to a 170,000-token trigger and keeps the last 6 messages. The lesson demo shrinks this budget to a few hundred tokens so the same machinery fires on screen in a few turns.'
 	},
 	{
 		term: 'task',

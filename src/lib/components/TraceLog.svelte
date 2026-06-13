@@ -33,6 +33,7 @@
 		skill_load: 'skill',
 		script_run: 'script',
 		model_call: 'model',
+		context_snapshot: 'ctx',
 		note: 'note',
 		error: 'err'
 	};

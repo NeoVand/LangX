@@ -29,23 +29,36 @@ export const defaultCompaction: CompactionConfig = {
 /**
  * Tier 1: walk the message list and replace any oversized ToolMessage content
  * with a path + short preview, writing the original content into the virtual FS.
+ *
+ * `protectTail` leaves the most recent N messages untouched — the official
+ * "preserve recent context" principle. Without it, a tool result is evicted on
+ * the very next round, before the model can extract its fact, and the model
+ * re-reads the pointer in an endless thrash.
  */
 export async function evictLargeToolResults(
 	messages: BaseMessage[],
 	backend: BackendProtocol,
 	cfg: CompactionConfig,
+	protectTail = 0,
 	emit?: (path: string, originalLen: number) => void
 ): Promise<{ messages: BaseMessage[]; evicted: number }> {
 	let evicted = 0;
+	const cutoff = messages.length - protectTail; // indices >= cutoff are protected
 	const out: BaseMessage[] = [];
-	for (const m of messages) {
-		if (m instanceof ToolMessage && typeof m.content === 'string' && m.content.length >= cfg.largeToolResultMin) {
+	for (let idx = 0; idx < messages.length; idx++) {
+		const m = messages[idx];
+		if (
+			idx < cutoff &&
+			m instanceof ToolMessage &&
+			typeof m.content === 'string' &&
+			m.content.length >= cfg.largeToolResultMin
+		) {
 			const path = `/large_tool_results/${m.tool_call_id}-${Date.now()}.txt`;
 			await backend.write(path, m.content);
 			evicted += 1;
 			emit?.(path, m.content.length);
 			const preview = m.content.slice(0, 200).replace(/\s+/g, ' ');
-			const summary = `[Tool result evicted to ${path}] ${preview}…\n\n(use read_file ${path} to fetch full output, ${m.content.length} bytes)`;
+			const summary = `[Tool result evicted to ${path}] ${preview}…\n\n(the full ${m.content.length}-byte output is on disk; read_file ${path} only if you still need a detail not already in your notes)`;
 			out.push(
 				new ToolMessage({
 					content: summary,
@@ -63,8 +76,12 @@ export async function evictLargeToolResults(
  * Tier 2: truncate redundant identical tool *arguments* in older AIMessages.
  * This is the "argument truncation" tier — the same field repeated across
  * messages gets replaced with `<as before>` after its first appearance.
+ * Pass `stats` to learn whether anything was actually replaced this pass.
  */
-export function truncateRepeatedArguments(messages: BaseMessage[]): BaseMessage[] {
+export function truncateRepeatedArguments(
+	messages: BaseMessage[],
+	stats?: { replaced: number }
+): BaseMessage[] {
 	const seen = new Map<string, string>();
 	return messages.map((m) => {
 		if (!(m instanceof AIMessage) || !m.tool_calls?.length) return m;
@@ -75,6 +92,7 @@ export function truncateRepeatedArguments(messages: BaseMessage[]): BaseMessage[
 				const stringified = JSON.stringify(v);
 				if (seen.get(key) === stringified && stringified.length > 80) {
 					newArgs[k] = '<as before>';
+					if (stats) stats.replaced += 1;
 				} else {
 					newArgs[k] = v;
 					seen.set(key, stringified);
@@ -170,8 +188,59 @@ function safeBoundary(messages: BaseMessage[], desired: number, floor: number): 
 export interface CompactionResult {
 	messages: BaseMessage[];
 	evictedFiles: number;
+	trimmed: boolean;
 	summarized: boolean;
 	event: SummarizationEvent | null;
+}
+
+/** One message as it sits in the live window — the unit the context tape draws. */
+export interface ContextItem {
+	role: 'system' | 'human' | 'ai' | 'tool';
+	/** normal | pointer (evicted tool result) | summary (collapsed middle) | toolcall. */
+	variant: 'normal' | 'pointer' | 'summary' | 'toolcall';
+	tokens: number;
+	label: string;
+}
+
+function shortLabel(content: unknown, fallback: string): string {
+	const text = typeof content === 'string' ? content : '';
+	const clean = text.replace(/\s+/g, ' ').trim();
+	if (!clean) return fallback;
+	return clean.length > 52 ? clean.slice(0, 51) + '…' : clean;
+}
+
+/**
+ * Classify each message in the current window so the lesson can render it —
+ * sizes by token count, and flags the two compaction artifacts (the evicted
+ * tool-result pointer, and the summary card that replaced the middle).
+ */
+export function describeContext(messages: BaseMessage[]): ContextItem[] {
+	return messages.map((m) => {
+		const tokens = messageTokens(m);
+		if (m instanceof SystemMessage) {
+			return { role: 'system', variant: 'normal', tokens, label: 'system prompt' };
+		}
+		if (m instanceof HumanMessage) {
+			return { role: 'human', variant: 'normal', tokens, label: shortLabel(m.content, 'user message') };
+		}
+		if (m instanceof ToolMessage) {
+			const text = typeof m.content === 'string' ? m.content : '';
+			if (text.startsWith('[Tool result evicted to')) {
+				return { role: 'tool', variant: 'pointer', tokens, label: 'evicted → /large_tool_results/' };
+			}
+			return { role: 'tool', variant: 'normal', tokens, label: `${m.name ?? 'tool'} result` };
+		}
+		const ai = m as AIMessage;
+		const text = typeof ai.content === 'string' ? ai.content : '';
+		if (text.startsWith('[Summary of')) {
+			const n = text.match(/\[Summary of (\d+)/)?.[1] ?? '?';
+			return { role: 'ai', variant: 'summary', tokens, label: `summary of ${n} messages` };
+		}
+		if (ai.tool_calls?.length) {
+			return { role: 'ai', variant: 'toolcall', tokens, label: ai.tool_calls.map((t) => t.name).join(', ') };
+		}
+		return { role: 'ai', variant: 'normal', tokens, label: shortLabel(ai.content, 'assistant reply') };
+	});
 }
 
 /**
@@ -187,15 +256,25 @@ export async function compact(
 ): Promise<CompactionResult> {
 	let total = totalMessageTokens(messages);
 	let evictedFiles = 0;
+	let trimmed = false;
 
 	if (total >= (cfg.maxTokens * cfg.evictThresholdPct) / 100) {
-		const { messages: m1, evicted } = await evictLargeToolResults(messages, backend, cfg);
+		// Protect the recent tail so a just-read result survives long enough to be
+		// used; only older bulk evicts to disk.
+		const { messages: m1, evicted } = await evictLargeToolResults(
+			messages,
+			backend,
+			cfg,
+			cfg.historyKeep
+		);
 		messages = m1;
 		evictedFiles = evicted;
 	}
 
 	if (total >= (cfg.maxTokens * cfg.evictThresholdPct) / 100) {
-		messages = truncateRepeatedArguments(messages);
+		const stats = { replaced: 0 };
+		messages = truncateRepeatedArguments(messages, stats);
+		trimmed = stats.replaced > 0;
 	}
 
 	total = totalMessageTokens(messages);
@@ -208,7 +287,7 @@ export async function compact(
 		summarized = !!event;
 	}
 
-	return { messages, evictedFiles, summarized, event };
+	return { messages, evictedFiles, trimmed, summarized, event };
 }
 
 export function bytesPerMsg(messages: BaseMessage[]) {

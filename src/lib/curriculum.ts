@@ -176,7 +176,7 @@ export const chapters: Chapter[] = [
 			{
 				slug: 'compaction',
 				title: 'Context compaction',
-				subtitle: 'Eviction, summarization, overflow recovery.'
+				subtitle: 'The Incident Room: read a mountain, keep the needle.'
 			},
 			{
 				slug: 'hitl',

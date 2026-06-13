@@ -53,7 +53,7 @@ import {
 } from './skills';
 import { buildPromptSections } from './prompt';
 import { approxTokens, totalMessageTokens } from './tokens';
-import { compact, defaultCompaction, type CompactionConfig } from './compaction';
+import { compact, defaultCompaction, describeContext, type CompactionConfig } from './compaction';
 import type { Tracer } from '$lib/runtime/tracer';
 
 export type AnyTool = StructuredToolInterface | StructuredTool | ToolInterface;
@@ -350,6 +350,20 @@ export function createDeepAgent(opts: DeepAgentOptions): CompiledDeepAgent {
 				totalTokens: systemTokens + conversationTokens
 			});
 
+			// The window, message by message, plus which compaction tiers fired to
+			// produce it — the per-round feed the context-tape visualization scrubs.
+			tracer?.emit('context_snapshot', `round ${modelRound}`, {
+				round: modelRound,
+				total: systemTokens + conversationTokens,
+				max: compaction.maxTokens,
+				items: describeContext(messages),
+				tiers: {
+					evict: compactionResult.evictedFiles > 0,
+					trim: compactionResult.trimmed,
+					summarize: !!compactionResult.event
+				}
+			});
+
 			const modelWithTools = (
 				opts.model as unknown as { bindTools: (t: AnyTool[]) => BaseChatModel }
 			).bindTools(tools);
@@ -633,6 +647,8 @@ export type { PromptSection } from './prompt';
 export { parseSkillFrontmatter, scanSkillCatalog, createRunScriptTool } from './skills';
 export { evaluate, matchPath } from './permissions';
 export type { PermissionMode, PermissionResult } from './permissions';
+export { describeContext, compact } from './compaction';
+export type { ContextItem, CompactionResult } from './compaction';
 export { withGeneralPurpose, runChildAgent, createTaskTool } from './tools/task';
 export type { ChildEvent, ChildTool, ChildRunOptions, ChildRunResult } from './tools/task';
 export { createAsyncTaskEngine } from './async-tasks';

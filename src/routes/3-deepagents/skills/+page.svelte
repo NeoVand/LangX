@@ -27,6 +27,7 @@
 		type Verdict
 	} from '$lib/demos/da-skills';
 	import skillsSrc from '$lib/demos/da-skills.ts?raw';
+	import skillsSkill from '$lib/demos/skills/deepagents-skills.md?raw';
 	import type { DemoManifest } from '$lib/demos/download';
 
 	const demoSource: DemoManifest = {
@@ -35,6 +36,7 @@
 		summary:
 			'One refund request, three identical agents: no skills, all procedures crammed into the prompt, and a progressive-disclosure skill catalog. A deterministic inspector stamps each reply.',
 		entries: [{ path: 'lib/demos/da-skills.ts', code: skillsSrc }],
+		skill: skillsSkill,
 		runner: `import { buildClerk, CUSTOMER_REQUEST, inspectRefundReply } from './lib/demos/da-skills';
 
 for (const variant of ['bare', 'crammed', 'skilled'] as const) {
@@ -848,6 +850,22 @@ run_script({
 
 	.diagram {
 		margin: 2.2rem 0;
+	}
+	.diagram :global(.hero) {
+		height: auto;
+		border-radius: 0.6rem;
+		overflow: hidden;
+		background: var(--color-paper);
+		display: block;
+	}
+	.diagram :global(.hero img) {
+		position: static;
+		width: 100%;
+		height: auto;
+		display: block;
+	}
+	.diagram :global(.hero .caption) {
+		display: none;
 	}
 	.diagram figcaption {
 		margin-top: 0.6rem;
