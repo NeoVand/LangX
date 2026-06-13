@@ -67,6 +67,7 @@
 		"@langchain/textsplitters": "^1.0.1",
 		"@lucide/svelte": "^1.17.0",
 		"@observablehq/plot": "^0.6.17",
+		"arquero": "^8.0.3",
 		"classnames": "^2.5.1",
 		"d3": "^7.9.0",
 		"d3-sankey": "^0.12.3",
@@ -83,6 +84,7 @@
 		"onnxruntime-web": "1.23.0",
 		"pdfjs-dist": "^5.7.284",
 		"shiki": "^4.1.0",
+		"simple-statistics": "^7.9.0",
 		"undici": "^8.3.0",
 		"zod": "^4.4.3"
 	}

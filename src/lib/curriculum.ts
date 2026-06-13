@@ -191,7 +191,7 @@ export const chapters: Chapter[] = [
 			{
 				slug: 'capstone-data-science',
 				title: 'Capstone — Data Science',
-				subtitle: 'CSV in, scoped JS interpreter, report out.'
+				subtitle: 'The Analytical Engine: data in, the Mill computes, a report out.'
 			},
 			{
 				slug: 'beyond',

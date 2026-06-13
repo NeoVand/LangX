@@ -87,7 +87,7 @@ const aliases: Record<string, string> = {
 	write_file: 'write_file',
 	edit_file: 'edit_file',
 	interrupt: 'Interrupt',
-	'create_deep_agent': 'createDeepAgent',
+	create_deep_agent: 'createDeepAgent',
 	'create deep agent': 'createDeepAgent',
 	'system prompt': 'System prompt',
 	backend: 'Backend',
@@ -97,13 +97,13 @@ const aliases: Record<string, string> = {
 	'sub-agent': 'Subagent',
 	'sub-agents': 'Subagent',
 	'async subagents': 'Async subagent',
-	'start_async_task': 'Async subagent',
-	'check_async_task': 'Async subagent',
-	'update_async_task': 'Async subagent',
-	'cancel_async_task': 'Async subagent',
-	'list_async_tasks': 'Async subagent',
+	start_async_task: 'Async subagent',
+	check_async_task: 'Async subagent',
+	update_async_task: 'Async subagent',
+	cancel_async_task: 'Async subagent',
+	list_async_tasks: 'Async subagent',
 	asynctasks: 'Async subagent',
-	'__interrupt__': '__interrupt__',
+	__interrupt__: '__interrupt__',
 	tool_calls: 'tool_calls',
 	tool_call_id: 'tool_call_id',
 	runnablesequence: 'RunnableSequence',
@@ -138,8 +138,8 @@ const aliases: Record<string, string> = {
 	observableplot: 'Observable Plot',
 	jssandbox: 'JsSandbox',
 	'web worker': 'Web Worker',
-	'webgpu': 'WebGPU',
-	'webassembly': 'WebAssembly',
+	webgpu: 'WebGPU',
+	webassembly: 'WebAssembly',
 	'transformers.js': 'Transformers.js',
 	'api key': 'API key',
 	localstorage: 'localStorage',
@@ -634,7 +634,7 @@ export const glossary: GlossaryEntry[] = [
 		term: 'Context quarantine',
 		chapter: 'deepagents',
 		short: 'Isolating a sub-task in its own context window so it never crowds the parent.',
-		long: 'The reason subagents exist. A reading- or search-heavy sub-task can pull thousands of tokens; run it in the parent\'s window and the original goal drifts. A subagent does that work in a FRESH context and returns only a short summary — the dozens of tool calls that produced it never touch the parent. It is the single most important idea behind deep-research agents.'
+		long: "The reason subagents exist. A reading- or search-heavy sub-task can pull thousands of tokens; run it in the parent's window and the original goal drifts. A subagent does that work in a FRESH context and returns only a short summary — the dozens of tool calls that produced it never touch the parent. It is the single most important idea behind deep-research agents."
 	},
 	{
 		term: 'Source grounding',
@@ -712,7 +712,7 @@ export const glossary: GlossaryEntry[] = [
 		term: 'Subgraph',
 		chapter: 'langgraph',
 		short: 'A compiled graph used as a node inside another graph.',
-		long: 'Encapsulation for agents: a whole workflow — loops, branches, private state — looks like ONE node from outside. Two ways in: add the compiled graph directly when it shares state keys with the parent, or call it inside a node function and translate state at the boundary. Subgraphs inherit the parent\'s checkpointer, so interrupts and time travel keep working inside them.'
+		long: "Encapsulation for agents: a whole workflow — loops, branches, private state — looks like ONE node from outside. Two ways in: add the compiled graph directly when it shares state keys with the parent, or call it inside a node function and translate state at the boundary. Subgraphs inherit the parent's checkpointer, so interrupts and time travel keep working inside them."
 	},
 	{
 		term: 'Namespace',
@@ -918,13 +918,13 @@ export const glossary: GlossaryEntry[] = [
 		term: 'Subagent',
 		chapter: 'deepagents',
 		short: 'Ephemeral child agent with isolated context.',
-		long: 'Declared by name, description and its OWN systemPrompt (never inherited). tools REPLACE the parent\'s when set; model and permissions inherit unless overridden; the filesystem is shared. The parent sees one report, never the child\'s transcript.'
+		long: "Declared by name, description and its OWN systemPrompt (never inherited). tools REPLACE the parent's when set; model and permissions inherit unless overridden; the filesystem is shared. The parent sees one report, never the child's transcript."
 	},
 	{
 		term: 'Async subagent',
 		chapter: 'deepagents',
 		short: 'Background child agent on its own thread.',
-		long: 'start_async_task returns a task id immediately; check/update/cancel/list manage it while the conversation continues. update_async_task interrupts and restarts the child with its history plus new orders — same id. The ledger lives in the asyncTasks state channel so compaction can\'t orphan running work.'
+		long: "start_async_task returns a task id immediately; check/update/cancel/list manage it while the conversation continues. update_async_task interrupts and restarts the child with its history plus new orders — same id. The ledger lives in the asyncTasks state channel so compaction can't orphan running work."
 	},
 	{
 		term: 'Summarization',
@@ -942,7 +942,7 @@ export const glossary: GlossaryEntry[] = [
 		term: 'task',
 		chapter: 'deepagents',
 		short: 'Tool spawning a named subagent; returns one report.',
-		long: 'task({ subagent_type, description }) — the brief must be self-contained; the child can\'t see the conversation. Several task calls in ONE assistant message run in parallel, but the supervisor blocks until all report. A general-purpose subagent is auto-added to every roster.'
+		long: "task({ subagent_type, description }) — the brief must be self-contained; the child can't see the conversation. Several task calls in ONE assistant message run in parallel, but the supervisor blocks until all report. A general-purpose subagent is auto-added to every roster."
 	},
 	{
 		term: 'Virtual filesystem',
@@ -1765,14 +1765,14 @@ export const glossary: GlossaryEntry[] = [
 	{
 		term: 'compute',
 		chapter: 'deepagents',
-		short: 'Capstone tool: run JS in scoped Worker with csv pre-bound.',
-		long: 'compute({ code }) calls JsSandbox.run(code, { csv }) — no DOM/network; returns JSON-serializable aggregates for the data-science capstone report pipeline.'
+		short: 'Capstone tool (the Mill): run TypeScript in a sandboxed Worker over the dataset.',
+		long: "compute({ code }) runs the agent's snippet in a Web Worker with no DOM and no network, with a dataframe toolkit in scope — data (rows), table (Arquero), aq/op, and ss (simple-statistics). Returns a JSON value. The data-science capstone's browser stand-in for the official code-interpreter middleware."
 	},
 	{
 		term: 'plot',
 		chapter: 'deepagents',
-		short: 'Capstone tool: Observable Plot chart → SVG in virtual FS.',
-		long: 'plot({ mark, data, x, y, title }) renders bar/line/dot via @observablehq/plot and write_file to /reports/figures/n.svg referenced from the markdown report.'
+		short: 'Capstone tool (the Plotter): Observable Plot chart → SVG in the Store.',
+		long: 'plot({ mark, x, y, color?, xScale?, … }) renders a scatter / bar / line chart via @observablehq/plot and write_files the SVG to /reports/figures/ — shown in the Plotter gallery and referenced from the markdown report. Aggregate in the Mill first, then plot.'
 	},
 	{
 		term: 'Observable Plot',
@@ -1967,6 +1967,48 @@ export const glossary: GlossaryEntry[] = [
 		chapter: 'deepagents',
 		short: 'Externalized multi-step plan the agent can audit and update.',
 		long: 'Harness planning middleware + write_todos persist Todo[] in state and inject ## Active plan into the system prompt — keeps long-horizon tasks from living only in chat memory.'
+	},
+	{
+		term: 'Dataframe',
+		chapter: 'deepagents',
+		short: 'A table of typed columns with verbs to filter, group, and aggregate.',
+		long: 'The core abstraction of tabular data work: rows and named, typed columns you transform with verbs (filter, group-by, rollup, join) instead of looping by hand. pandas in Python; Arquero or Danfo.js in the browser. A data-science agent reasons about a dataframe, not raw rows.'
+	},
+	{
+		term: 'Code interpreter',
+		chapter: 'deepagents',
+		short: 'A tool that runs code the model writes, in a sandbox, and returns the result.',
+		long: 'Lets an agent COMPUTE answers — arithmetic, statistics, sorting, parsing — instead of guessing them, which are exactly the operations LLMs are least reliable at. Deep Agents ships a QuickJS eval interpreter; our browser harness runs the agent\'s code in a sandboxed Web Worker (the "Mill"). Enforce limits at the sandbox, not the prompt.'
+	},
+	{
+		term: 'Schema profiling',
+		chapter: 'general',
+		short: "Inspecting a dataset's shape before analysing it.",
+		long: "The first move of any data scientist: read each column's type (numeric / categorical / temporal / identifier), its distinct-value count and range, and how much is missing. Profiling tells you which questions the data can even answer — and which columns can't carry an argument because they are half empty."
+	},
+	{
+		term: 'Exploratory data analysis',
+		chapter: 'general',
+		short: 'The open-ended first pass: profile, summarise, visualise, hunt for patterns.',
+		long: 'EDA is the investigative stage before any model or claim — profiling columns, aggregating by group, plotting distributions and relationships, and flagging anomalies. The goal is to let the data raise the questions, then answer them with computed numbers rather than hunches.'
+	},
+	{
+		term: 'Correlation',
+		chapter: 'general',
+		short: 'A −1…+1 measure of how tightly two quantities move together.',
+		long: 'Pearson correlation (r) summarises linear association: +1 lockstep up, −1 lockstep down, 0 none. It is association, not cause — a strong r still needs a plausible mechanism and a check for confounders, and it can hide a curved relationship (income predicts longevity strongly only on a log scale).'
+	},
+	{
+		term: 'Regression',
+		chapter: 'general',
+		short: 'Fit a line that predicts one variable from others; read its slope and R².',
+		long: "Linear regression fits y ≈ m·x + b. The slope m says how much y moves per unit of x, in the data's own units; R² says how much of y's variation the line explains. A steep slope with a low R² is a weak claim — report both, and treat the rows the model gets most wrong as findings, not noise."
+	},
+	{
+		term: "Simpson's paradox",
+		chapter: 'general',
+		short: 'A trend across a whole dataset can reverse inside its subgroups.',
+		long: 'The classic data-science trap: an aggregate relationship flips when you condition on a group. Penguin bill length and depth correlate negatively across all birds but positively within each species. The lesson — always check the relationship per group before you commit to the headline.'
 	}
 ];
 
