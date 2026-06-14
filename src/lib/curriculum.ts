@@ -195,8 +195,8 @@ export const chapters: Chapter[] = [
 			},
 			{
 				slug: 'beyond',
-				title: 'Beyond V1',
-				subtitle: 'Production sandboxes, managed deployments, what we skipped.'
+				title: 'Beyond this course',
+				subtitle: 'The frontier: the real package, sandboxes, deployment, tuning.'
 			}
 		]
 	}

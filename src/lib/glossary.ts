@@ -201,7 +201,77 @@ const aliases: Record<string, string> = {
 	superstep: 'Super-step',
 	supersteps: 'Super-step',
 	'durable execution': 'Durable execution',
-	provenance: 'Provenance'
+	provenance: 'Provenance',
+	// ── The Model lesson (how LLMs work) ──
+	'next-token prediction': 'Next-token prediction',
+	'next token prediction': 'Next-token prediction',
+	'next token': 'Next-token prediction',
+	autoregressive: 'Autoregressive',
+	'auto-regressive': 'Autoregressive',
+	transformer: 'Transformer',
+	transformers: 'Transformer',
+	'token embeddings': 'Token embedding',
+	'positional encoding': 'Positional encoding',
+	'positional embedding': 'Positional encoding',
+	'positional embeddings': 'Positional encoding',
+	rope: 'Rotary positional embedding',
+	'rotary embedding': 'Rotary positional embedding',
+	'rotary embeddings': 'Rotary positional embedding',
+	'rotary positional embedding': 'Rotary positional embedding',
+	attention: 'Attention',
+	'self attention': 'Self-attention',
+	'self-attention': 'Self-attention',
+	query: 'Query, Key, Value',
+	queries: 'Query, Key, Value',
+	key: 'Query, Key, Value',
+	value: 'Query, Key, Value',
+	qkv: 'Query, Key, Value',
+	'q/k/v': 'Query, Key, Value',
+	'scaled dot product attention': 'Scaled dot-product attention',
+	'scaled dot-product attention': 'Scaled dot-product attention',
+	'attention head': 'Multi-head attention',
+	'attention heads': 'Multi-head attention',
+	heads: 'Multi-head attention',
+	'multihead attention': 'Multi-head attention',
+	'multi-head attention': 'Multi-head attention',
+	'causal mask': 'Causal mask',
+	'causal masking': 'Causal mask',
+	masking: 'Causal mask',
+	masked: 'Causal mask',
+	softmax: 'Softmax',
+	logit: 'Logits',
+	logits: 'Logits',
+	unembedding: 'Logits',
+	'nucleus sampling': 'Top-p sampling',
+	'top-p': 'Top-p sampling',
+	'top p': 'Top-p sampling',
+	topp: 'Top-p sampling',
+	'top-p sampling': 'Top-p sampling',
+	'greedy decoding': 'Greedy decoding',
+	greedy: 'Greedy decoding',
+	mlp: 'Multi-layer perceptron',
+	'feed-forward': 'Multi-layer perceptron',
+	'feed forward': 'Multi-layer perceptron',
+	feedforward: 'Multi-layer perceptron',
+	ffn: 'Multi-layer perceptron',
+	'feed-forward network': 'Multi-layer perceptron',
+	'multi-layer perceptron': 'Multi-layer perceptron',
+	gelu: 'GELU',
+	'residual stream': 'Residual stream',
+	'residual connection': 'Residual stream',
+	'residual connections': 'Residual stream',
+	residuals: 'Residual stream',
+	'skip connection': 'Residual stream',
+	'layer normalization': 'Layer normalization',
+	'layer norm': 'Layer normalization',
+	layernorm: 'Layer normalization',
+	'layer-norm': 'Layer normalization',
+	weights: 'Parameters',
+	weight: 'Parameters',
+	parameter: 'Parameters',
+	parameters: 'Parameters',
+	vocab: 'Vocabulary',
+	vocabulary: 'Vocabulary'
 };
 
 export const glossary: GlossaryEntry[] = [
@@ -307,6 +377,140 @@ export const glossary: GlossaryEntry[] = [
 		chapter: 'general',
 		short: 'How a model takes action instead of only answering.',
 		long: 'You give the model typed tools; instead of replying with text it can reply with a tool call — the name of a tool plus the arguments to run it with. Your code executes the call and returns the result, and the model carries on. It is the mechanism that turns a text generator into something that can look things up, query data, and change the world.'
+	},
+
+	// ── How models work · the Model lesson ──────────────────────────────────
+	{
+		term: 'Next-token prediction',
+		chapter: 'general',
+		short: 'The one task a language model is trained to do.',
+		long: 'A language model does exactly one thing: given a stretch of text, predict which token comes next. Everything else — answering questions, writing code, holding a conversation — is that single skill applied over and over, each predicted token appended and fed back in. Train a big enough network on enough text to do this well, and fluent language falls out as a side effect.'
+	},
+	{
+		term: 'Autoregressive',
+		chapter: 'general',
+		short: 'Generating one token at a time, each conditioned on all the text so far.',
+		long: 'The model writes left to right: it predicts one token, appends it to the input, and runs again for the next. "Auto-regressive" means each step regresses on its own previous outputs. This is why generation feels like typing, why longer replies cost more, and why streaming is natural — the tokens genuinely arrive one at a time.'
+	},
+	{
+		term: 'Transformer',
+		chapter: 'general',
+		short: 'The neural-network architecture behind modern language models.',
+		long: 'Introduced in 2017 ("Attention Is All You Need"), the transformer replaced step-by-step recurrence with attention, letting every token look at every other token in parallel. A modern LLM is a tall stack of identical transformer blocks — each an attention layer plus a small feed-forward network — with embeddings entering at the bottom and next-token scores leaving the top. GPT, Claude, Llama: all transformers.'
+	},
+	{
+		term: 'Token embedding',
+		chapter: 'general',
+		short: 'The vector a token becomes before the network can reason about it.',
+		long: 'A model cannot do math on the word "cat", so each token id is looked up in a big learned table and replaced by a list of numbers (768 of them in GPT-2, thousands in larger models). That vector is the token’s starting meaning; as it rises through the layers, attention and feed-forward steps keep rewriting it until it carries enough context to predict what comes next.'
+	},
+	{
+		term: 'Positional encoding',
+		chapter: 'general',
+		short: 'How the model is told the order of the tokens.',
+		long: 'Attention looks at all tokens at once, so on its own it has no sense of sequence — "dog bites man" and "man bites dog" would look identical. Positional encoding folds each token’s position into its representation so order survives. The original transformer added fixed sine/cosine waves; modern models mostly use rotary embeddings (RoPE) instead.'
+	},
+	{
+		term: 'Rotary positional embedding',
+		chapter: 'general',
+		short: 'RoPE — the position scheme most 2026 LLMs use.',
+		long: 'Instead of adding a position signal to the embedding, RoPE rotates each token’s query and key vectors by an angle that grows with position. The elegant consequence: the attention score between two tokens ends up depending on their relative distance, not their absolute spots. That generalizes better to long contexts, which is why RoPE and its variants replaced the original sinusoidal scheme in most modern models.'
+	},
+	{
+		term: 'Attention',
+		chapter: 'general',
+		short: 'The mechanism that lets each token pull in information from others.',
+		long: 'Attention is how a token gathers context. For each token the model asks "which earlier tokens matter to me, and how much?", then mixes those tokens’ information together weighted by that relevance. It is what lets "it" find its antecedent, or a verb find its subject — the core operation that made transformers work.'
+	},
+	{
+		term: 'Self-attention',
+		chapter: 'general',
+		short: 'Attention where tokens attend to each other within the same sequence.',
+		long: '"Self" means the queries, keys, and values all come from the same sequence — every token attends to the others around it, rather than to some separate input. Each token forms a query (what it is looking for), every token offers a key (what it has) and a value (what it would contribute); the queries and keys set the weights, and the values get mixed accordingly.'
+	},
+	{
+		term: 'Query, Key, Value',
+		chapter: 'general',
+		short: 'The three roles each token plays in attention.',
+		long: 'Attention is built from three projections of every token’s vector. The Query is what this token is looking for; each Key advertises what another token offers; the Value is the information that token will actually contribute. A token’s query is compared against all keys to get weights, and those weights mix the values — search terms (queries) matched against labels (keys) to retrieve content (values).'
+	},
+	{
+		term: 'Scaled dot-product attention',
+		chapter: 'general',
+		short: 'The exact formula attention uses: softmax(QKᵀ/√dₖ)·V.',
+		long: 'For each query, take its dot product with every key to score relevance, divide by √(head dimension) to keep the numbers from blowing up, apply softmax to turn the scores into weights that sum to 1, then use those weights to average the values. That one line — softmax(QKᵀ/√dₖ)·V — is the whole engine, run in parallel for every token.'
+	},
+	{
+		term: 'Multi-head attention',
+		chapter: 'general',
+		short: 'Running attention several times in parallel, each head on its own subspace.',
+		long: 'One attention pattern is limiting, so the model splits its vectors into several "heads" (12 in GPT-2) that each do scaled dot-product attention independently. One head might track grammatical subjects, another nearby words, another long-range references; their outputs are concatenated back together. Many specialised glances instead of one blurry average.'
+	},
+	{
+		term: 'Causal mask',
+		chapter: 'general',
+		short: 'The rule that a token may only attend to itself and earlier tokens.',
+		long: 'Because the model is trained to predict the next token, it must never peek at the answer. The causal mask blanks out the upper triangle of the attention matrix — every future position is set to −∞ before softmax, so it receives zero weight. This is what keeps generation left-to-right and lets the model train on every position of a sentence at once.'
+	},
+	{
+		term: 'Softmax',
+		chapter: 'general',
+		short: 'Turns a list of raw scores into a probability distribution.',
+		long: 'Softmax exponentiates each score and divides by the total, so the outputs are all positive and sum to 1. It appears twice in a transformer: inside attention (turning relevance scores into mixing weights) and at the very end (turning the final logits into next-token probabilities). Larger inputs get disproportionately more weight — which is exactly what temperature later tunes.'
+	},
+	{
+		term: 'Logits',
+		chapter: 'general',
+		short: 'The raw, un-normalized next-token scores the model outputs.',
+		long: 'At the top of the stack the model produces one number per vocabulary token — the logits. They are not yet probabilities (they can be negative and don’t sum to anything tidy); softmax converts them. Sampling controls like temperature and top-k act on the logits before that softmax, which is how you steer the model between cautious and creative.'
+	},
+	{
+		term: 'Top-p sampling',
+		chapter: 'general',
+		short: 'Nucleus sampling — keep the smallest set of tokens whose probability sums past p.',
+		long: 'Rather than keeping a fixed number of candidates (top-k), top-p keeps just enough of the most likely tokens to cover, say, 90% of the probability mass, then samples from those. The pool grows when the model is unsure and shrinks when it is confident — often a better behaviour than a hard count. Also called nucleus sampling.'
+	},
+	{
+		term: 'Greedy decoding',
+		chapter: 'general',
+		short: 'Always pick the single most likely next token.',
+		long: 'The simplest decoding rule: take the top logit every step, no randomness. Greedy decoding is repeatable and safe for tasks with one right answer, but it tends toward bland, repetitive text — which is why most generation samples from the distribution (with temperature and top-k/top-p) instead.'
+	},
+	{
+		term: 'Multi-layer perceptron',
+		chapter: 'general',
+		short: 'The feed-forward network in each transformer block (MLP / FFN).',
+		long: 'After attention mixes information between tokens, each token is processed on its own by a small two-layer network: expand to about 4× the width, apply a nonlinearity (GELU), then compress back. Much of the model’s learned "knowledge" is thought to live here — attention moves information around, the MLP transforms it. Also called the feed-forward network.'
+	},
+	{
+		term: 'GELU',
+		chapter: 'general',
+		short: 'The smooth activation function used inside the MLP.',
+		long: 'GELU (Gaussian Error Linear Unit) is the nonlinearity between the MLP’s expand and compress steps. Like a softened ReLU, it passes large positive values through and squashes negatives toward zero along a smooth curve. Without a nonlinearity here the two linear layers would collapse into one and the network could not learn complex functions.'
+	},
+	{
+		term: 'Residual stream',
+		chapter: 'general',
+		short: 'The running vector each block reads from and writes back into.',
+		long: 'Every block adds its output to its input rather than replacing it: x → x + attention(x) → that + mlp(…). The effect is a "residual stream" running the full height of the model that each layer nudges. It keeps gradients flowing in very deep networks and lets the model make incremental edits to a token’s meaning instead of rebuilding it from scratch each layer.'
+	},
+	{
+		term: 'Layer normalization',
+		chapter: 'general',
+		short: 'Re-centres and re-scales a vector to keep the numbers stable.',
+		long: 'Before each attention and MLP step the token vector is normalized — shifted and scaled so its values sit in a consistent range — then given a learned scale and shift. Without it, activations in a deep stack drift and training becomes unstable. Plumbing rather than intelligence, but transformers do not train without it.'
+	},
+	{
+		term: 'Parameters',
+		chapter: 'general',
+		short: 'The learned weights — the numbers training actually sets.',
+		long: 'Parameters (or weights) are every number in the embedding tables, attention projections, and MLP layers — the things gradient descent adjusts during training. "A 7-billion-parameter model" counts them. They are frozen once training ends; inference just runs your tokens through these fixed numbers.'
+	},
+	{
+		term: 'Vocabulary',
+		chapter: 'general',
+		short: 'The fixed set of tokens a model can read and produce.',
+		long: 'A tokenizer carves text into a fixed inventory of tokens — about 50,257 for GPT-2, larger for modern models. The model’s final layer outputs one logit per vocabulary entry, so the vocabulary is literally the set of things it can say in one step. Rare words get split into several tokens; common words are usually one.'
 	},
 
 	// ── LangChain ───────────────────────────────────────────────────────────
@@ -2009,6 +2213,24 @@ export const glossary: GlossaryEntry[] = [
 		chapter: 'general',
 		short: 'A trend across a whole dataset can reverse inside its subgroups.',
 		long: 'The classic data-science trap: an aggregate relationship flips when you condition on a group. Penguin bill length and depth correlate negatively across all birds but positively within each species. The lesson — always check the relationship per group before you commit to the headline.'
+	},
+	{
+		term: 'Harness profile',
+		chapter: 'deepagents',
+		short: 'A bundle of per-model defaults that tunes the harness for a given LLM.',
+		long: 'Profiles are registered packages of model-specific defaults — prompt tweaks, extra middleware, tool exclusions — keyed by provider or provider:model. They let one harness get the best out of very different models (Anthropic, OpenAI, and open-weight ones like Kimi/GLM/DeepSeek). The point: the harness is a tunable performance layer, not just plumbing — the docs report harness-only changes moving gpt-5.2-codex from 52.8% to 66.5% on a benchmark.'
+	},
+	{
+		term: 'Streaming',
+		chapter: 'deepagents',
+		short: 'Typed event projections from a running agent (streamEvents v3).',
+		long: "Deep Agents' streamEvents (v3) exposes typed projections of a run as it happens — stream.messages, stream.toolCalls, and stream.subagents (each child with its own messages/toolCalls, nested). A UI subscribes to the projection it needs for a live cockpit. LangX hand-built the same idea with a tracer + AgentFeed so you can see the mechanism; the real package gives it to you typed and for free."
+	},
+	{
+		term: 'Delta channels',
+		chapter: 'deepagents',
+		short: 'Checkpoints stored as diffs, not full snapshots.',
+		long: 'Instead of writing the entire state on every checkpoint, delta channels persist only what changed since the last one — cutting checkpoint storage by 10–100× (a 5.27 GB coding session compressed to 129 MB in one published example). The agent loop is unchanged; the saver just stops duplicating unchanged state.'
 	}
 ];
 

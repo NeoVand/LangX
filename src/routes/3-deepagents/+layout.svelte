@@ -6,11 +6,10 @@
 	let { children } = $props();
 	const chapter = chapterById('deepagents');
 	const isIntro = $derived(page.url.pathname === chapter.base);
-	const isRecap = $derived(page.url.pathname.endsWith('/recap'));
-	const isLesson = $derived(!isIntro && !isRecap);
+	const isLesson = $derived(!isIntro);
 </script>
 
-<div class="chapter-shell" class:lesson={isLesson}>
+<div class="chapter-shell">
 	<div class="chapter-content">
 		{@render children?.()}
 	</div>
@@ -21,33 +20,30 @@
 
 <style>
 	.chapter-shell {
+		/* Full-height shell pulled up under the 60px frosted sticky nav so page content
+		   — the lesson panes, and the landing's lesson column — scrolls UNDER it; each
+		   scrolling pane adds top padding to clear the nav at rest. position:relative
+		   anchors the frosted footer that lesson content scrolls under. */
 		display: flex;
 		flex-direction: column;
-		min-height: calc(100vh - 60px);
-	}
-	.chapter-content {
-		flex: 1;
-		min-height: 0;
-	}
-	.chapter-shell.lesson {
-		/* Full-height shell pulled up under the 60px frosted nav so BOTH panes scroll
-		   under it; each pane's content adds top padding to clear the nav at rest.
-		   position:relative anchors the frosted footer that content scrolls under. */
 		height: 100vh;
 		margin-top: -60px;
 		min-height: 0;
 		position: relative;
 	}
-	.chapter-shell.lesson .chapter-content {
+	.chapter-content {
+		flex: 1;
+		min-height: 0;
 		overflow: hidden;
 	}
 	@media (max-width: 960px) {
-		.chapter-shell.lesson {
+		/* Narrow: content stacks and the page scrolls naturally under the sticky nav. */
+		.chapter-shell {
 			height: auto;
 			margin-top: 0;
 			min-height: calc(100vh - 60px);
 		}
-		.chapter-shell.lesson .chapter-content {
+		.chapter-content {
 			overflow: visible;
 		}
 	}

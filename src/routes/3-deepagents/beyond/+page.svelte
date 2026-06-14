@@ -2,170 +2,247 @@
 	import Lesson from '$lib/components/Lesson.svelte';
 	import Slide from '$lib/components/Slide.svelte';
 	import Term from '$lib/components/Term.svelte';
-	import Panel from '$lib/components/Panel.svelte';
+	import HeroImage from '$lib/components/HeroImage.svelte';
+	import ReadMore from '$lib/components/ReadMore.svelte';
 </script>
 
 <svelte:head>
-	<title>Beyond V1 · LangX</title>
+	<title>Beyond this course · LangX</title>
 </svelte:head>
 
 <Lesson
-	title="Beyond V1"
-	eyebrow="Level 3 · what's next"
+	title="Beyond this course"
+	eyebrow="Level 3 · Lesson 12 · The road ahead"
 	hero={{
 		id: 'l3-beyond',
-		alt: 'A horizon view: finished workshop, half-built bridge, mountain peaks beyond'
+		alt: 'The workshop doors thrown open onto a vast dawn frontier of grander machinery; the automatons we met stand on the threshold, looking out'
 	}}
 >
 	{#snippet motivation()}
-		What we built is V1. Production lives beyond — managed sandboxes, <Term t="Subagent">multi-agent</Term> deployments, <Term t="LangSmith">observability</Term>. Here's the map.
+		You built the whole <Term t="Harness">harness</Term> by hand, in a browser tab — every gear visible.
+		This is the map of the country that begins where the workshop ends.
 	{/snippet}
 
 	{#snippet intro()}
 		<p>
-			LangX V1 covers the full conceptual surface of <Term t="LangChain">LangChain</Term>, <Term t="LangGraph">LangGraph</Term>, and <Term t="Deep Agent">Deep Agents</Term>,
-			but it makes a few deliberate trade-offs to keep everything running in a single static
-			tab. This page names them so you know which dotted lines in the <Term t="Harness">harness</Term> architecture are still
-			worth crossing.
+			There is no demo on this page, and nothing left to wire. Instead, a closing tour: the parts of
+			the real <Term t="Deep Agent">Deep Agents</Term> world this course deliberately stood in for, the
+			doors each lesson opens onto, and the documentation to walk through next. You already know the shapes
+			— what changes from here is the substrate underneath them.
 		</p>
 	{/snippet}
 
 	{#snippet narrative()}
-		<Slide eyebrow="Why this slide deck exists" title="V1 is a map, not a destination" variant="dropcap">
+		<Slide eyebrow="What you built" title="The whole harness, glass-box" variant="dropcap">
 			<p>
-				A teaching environment is a deliberate simplification. Every "this is good enough"
-				you have read in this chapter — a <Term t="Web Worker">Web Worker</Term> as a sandbox, <Term t="IndexedDB">IndexedDB</Term> as durable
-				storage, deterministic stand-ins for browser <Term t="tool">tools</Term> — was the right call for a
-				single static tab. None of them are the right call for a production deployment.
+				Across this level you assembled a complete agent harness and watched every part of it work:
+				the <a href="/3-deepagents/virtual-fs">virtual filesystem</a>, the
+				<a href="/3-deepagents/todos">plan board</a>, pluggable
+				<a href="/3-deepagents/backends">backends</a>,
+				<a href="/3-deepagents/permissions">permissions</a>,
+				<a href="/3-deepagents/subagents">subagents</a>,
+				<a href="/3-deepagents/skills">skills</a>,
+				<a href="/3-deepagents/compaction">context compaction</a>, and a
+				<a href="/3-deepagents/hitl">human in the loop</a> — then pointed all of it at two real jobs
+				in the <a href="/3-deepagents/capstone-research">research</a> and
+				<a href="/3-deepagents/capstone-data-science">data-science</a> capstones.
 			</p>
 			<p>
-				The <Term t="Harness">harness</Term> shape, though, is. The pieces you have configured here — <Term t="createDeepAgent"><code>createDeepAgent</code></Term>, <Term t="Backend">backends</Term>, <Term t="Permissions">permissions</Term>, <Term t="Subagent">subagents</Term> — are the same
-				pieces a production deployment ships. What changes is the substrate underneath
-				each. Below is the substrate-by-substrate map.
+				Keep one mental model as you leave: the stack is layered.
+				<Term t="LangGraph">LangGraph</Term> is the runtime; <Term t="create_agent"
+					>create_agent</Term
+				>
+				is a minimal agent on top of it; <Term t="Deep Agent">Deep Agents</Term> is a more opinionated
+				harness on top of that — same building blocks, with a filesystem, subagents, context management
+				and skills bundled in. The layers compose: any compiled graph is a valid subagent.
 			</p>
 		</Slide>
 
-		<Slide title="Real sandboxes (Modal · Daytona · Runloop)">
+		<Slide eyebrow="The real thing" title="Reach for the package you stood in for">
 			<p>
-				Production Deep Agents pair with a remote sandbox for code execution: a
-				containerised VM the agent can spin up, run a shell or notebook in, and tear down.
-				LangX swaps that for a Web Worker — a <Term t="Scoped interpreter" /> with no DOM
-				and no network. Same shape (postMessage in, results out), tighter scope.
+				<code>src/lib/deepagents/</code> is a deliberately small, observable re-implementation —
+				built so you could read every line and see inside. For real work, use the actual
+				<strong>deepagents</strong> package (JavaScript and Python). It is production-ready, built
+				on LangGraph, with first-class <Term t="LangSmith">LangSmith</Term> tracing — and as of 2026 it
+				even ships a <strong>browser entrypoint</strong>, so the "we had to build our own to run in
+				a tab" caveat no longer holds. You built a glass model of a real engine; now you can drive
+				the real one, and your map still fits.
 			</p>
-			<ul>
-				<li><strong><Term t="Modal">Modal</Term></strong> — sandboxes for full-language stacks (Python, Node, etc.).</li>
-				<li><strong><Term t="Daytona">Daytona</Term> / <Term t="Runloop">Runloop</Term></strong> — dev containers with persistent volumes.</li>
-				<li><strong><Term t="QuickJS">QuickJS</Term></strong> — pure-JS evaluation without a process.</li>
-			</ul>
 		</Slide>
 
-		<Slide title="Persistent backends">
+		<Slide eyebrow="Real execution" title="The Mill becomes a real sandbox">
 			<p>
-				In LangX, <Term t="StoreBackend"><code>StoreBackend</code></Term> is <Term t="Dexie">Dexie</Term>/<Term t="IndexedDB">IndexedDB</Term>. In production, it is
-				typically Postgres (via the LangGraph <Term t="PostgresSaver">Postgres</Term> checkpointer) or a managed store.
-				The <Term t="BackendProtocol"><code>BackendProtocol</code></Term> does not change — only the implementation does.
+				Our <a href="/3-deepagents/capstone-data-science">Mill</a> was a
+				<Term t="Web Worker">Web Worker</Term> — isolated, but tiny. Production agents run code in real
+				sandboxes — <Term t="Modal">Modal</Term>, <Term t="Daytona">Daytona</Term>,
+				<Term t="Runloop">Runloop</Term>, Deno, or LangSmith sandboxes — containerised environments
+				the agent spins up, runs a shell or notebook in, and tears down. For pure in-process
+				evaluation there is a <Term t="Code interpreter">code interpreter</Term> (<Term t="QuickJS"
+					>QuickJS</Term
+				>
+				<code>eval</code>) with parallel tool-calling and recursive workflows. Same idea as the Mill
+				— write code, run it, read the result — at full power.
 			</p>
-			<ul>
-				<li><strong>Postgres checkpoints</strong> — durable graph state across processes.</li>
-				<li><strong><Term t="FilesystemBackend">FilesystemBackend</Term></strong> — root the virtual FS on a real disk for code agents.</li>
-				<li><strong><Term t="LocalShellBackend">LocalShellBackend</Term></strong> — let the agent talk to a real shell, gated by permissions.</li>
-			</ul>
+		</Slide>
+
+		<Slide eyebrow="Real memory" title="From IndexedDB to durable, versioned state">
+			<p>
+				Our <Term t="StoreBackend">StoreBackend</Term> was IndexedDB. In production the
+				<Term t="BackendProtocol">BackendProtocol</Term> stays the same while the substrate grows up:
+				a
+				<Term t="PostgresSaver">Postgres checkpointer</Term> for durable graph state, a
+				<Term t="FilesystemBackend">FilesystemBackend</Term> or
+				<Term t="LocalShellBackend">LocalShellBackend</Term> for real disks and shells, and the
+				<Term t="ContextHubBackend">ContextHubBackend</Term>, which versions every write of an
+				agent's files like Git commits. Underneath, <Term t="Delta channels">delta channels</Term> store
+				checkpoints as diffs — shrinking a multi-gigabyte session to megabytes. Everything you learned
+				in <a href="/3-deepagents/backends">backends</a> and
+				<a href="/3-deepagents/compaction">compaction</a> carries straight over.
+			</p>
+		</Slide>
+
+		<figure class="diagram">
+			<HeroImage
+				id="da-beyond-map"
+				alt="An engraved explorer's chart of the territory past the workshop: labelled regions for sandboxes, managed deployment, harness profiles, streaming, the Agent Protocol, the Context Hub and evals, linked by glowing routes from the workshop's port."
+			/>
+			<figcaption>
+				A chart of the frontier: the territories that begin where the workshop ends.
+			</figcaption>
+		</figure>
+
+		<Slide eyebrow="Scaling out" title="Subagents that run while you sleep">
+			<p>
+				You watched <a href="/3-deepagents/subagents">subagents</a> run inline so you could see the
+				delegation happen. In a long-lived deployment they run in the <strong>background</strong>
+				over the <Term t="Agent Protocol">Agent Protocol</Term> — remote or co-deployed servers the parent
+				dispatches to and collects a final report from, without blocking. Their state lives in a dedicated
+				channel that survives <a href="/3-deepagents/compaction">compaction</a>, and you can steer a
+				running task mid-flight. The <Term t="task">task</Term> pattern is identical; only the distance
+				changes.
+			</p>
+		</Slide>
+
+		<Slide eyebrow="Tuning" title="The harness is a performance layer">
+			<p>
+				The biggest surprise past the workshop: the harness is not just plumbing — it is a
+				<strong>tunable</strong> layer. <Term t="Harness profile">Profiles</Term> bundle per-model defaults
+				so one harness gets the best out of very different LLMs, including open-weight ones. The docs
+				report that harness-layer changes <em>alone</em> moved a frontier coding model from 52.8% to
+				66.5% on a benchmark — no new model, just a better harness. Pair that with evals to measure
+				it, and the <a href="/3-deepagents/harness">harness</a> you configured becomes something you optimise.
+			</p>
+		</Slide>
+
+		<Slide eyebrow="Observability" title="Typed streaming and real tracing">
+			<p>
+				Our tracer and <strong>AgentFeed</strong> were a hand-built window into the run. The real
+				package gives you <Term t="Streaming">typed streaming</Term> — <code>streamEvents</code>
+				projections for messages, tool calls and each subagent — and <Term t="LangSmith"
+					>LangSmith</Term
+				>
+				for full tracing, evaluation and monitoring. The cockpit you saw in every lesson is exactly the
+				shape a production UI subscribes to; you just get it typed and for free.
+			</p>
+		</Slide>
+
+		<Slide eyebrow="Production" title="Ship it — and the products built on it">
+			<p>
+				To deploy, hand a managed runtime an agent file tree (<Term t="AGENTS.md">AGENTS.md</Term>,
+				<code>skills/</code>, <code>subagents/</code>,
+				<Term t="tools.json">tools.json</Term>), attach an <Term t="MCP">MCP</Term> server for tools,
+				and run threads with interrupts and HTTP streaming — the harness shape is identical, only the
+				target differs. And the same harness powers real products:
+				<strong>Deep Agents Code</strong>, a Claude-Code-style terminal agent;
+				<strong>Talon</strong>, a long-running local runtime with channel adapters (even WhatsApp)
+				and a cron scheduler; and <strong>Open SWE</strong>, an autonomous software engineer. You
+				have been building the thing they are made of.
+			</p>
+		</Slide>
+
+		<figure class="diagram">
+			<HeroImage
+				id="da-beyond-coda"
+				alt="An engraved commemorative plate: a brass archway inscribed with the journey's stages, a single automaton stepping through toward an amethyst dawn, carrying a music score, a sealed research dossier and a certified data-science report."
+			/>
+			<figcaption>
+				Onwards — through the arch of everything you wired, carrying what you made.
+			</figcaption>
+		</figure>
+
+		<Slide eyebrow="An honest footnote" title="Where the model bent the truth, on purpose">
+			<p>
+				A teaching build makes trades. Our compaction used a small char-budget where the real
+				harness summarises at 85% of the model's token window and offloads tool results past 20k
+				tokens; our
+				<Term t="task">task</Term> ran children in-process where production runs real graphs; our numbers
+				were tuned for a single tab. None of that changes the <em>shape</em> — which is the whole
+				point. The fastest way to be sure you understand the harness is to read its source: every
+				piece lives in <code>src/lib/deepagents/</code>, and re-implementing it yourself is the best
+				lesson left.
+			</p>
 		</Slide>
 
 		<Slide variant="pull-quote">
 			<p>
-				The pieces you wired up in this chapter are the same pieces a production team ships
-				— only the substrate underneath each one changes.
+				The capstones were dress rehearsals. You have the map and the muscle memory — now go build
+				the thing only you would think to build.
 			</p>
 		</Slide>
 
-		<Slide title="Managed Deep Agents (private preview)">
-			<p>
-				<Term t="LangSmith">LangSmith</Term>'s <code>/v1/deepagents</code> hosts the harness as a service: you ship an
-				agent file tree (<Term t="AGENTS.md"><code>AGENTS.md</code></Term>, <code>skills/</code>,
-				<code>subagents/</code>, <Term t="tools.json"><code>tools.json</code></Term>), point at an <Term t="MCP">MCP</Term> server, and the
-				platform runs threads with interrupts and streaming over HTTP. The harness shape is
-				identical; only the deploy target differs.
-			</p>
-		</Slide>
+		<ReadMore
+			links={[
+				{
+					label: 'Deep Agents — overview & quickstart',
+					href: 'https://docs.langchain.com/oss/javascript/deepagents/overview'
+				},
+				{
+					label: 'Deep Agents — going to production',
+					href: 'https://docs.langchain.com/oss/javascript/deepagents/going-to-production'
+				},
+				{
+					label: 'deepagents on GitHub (Python + JS)',
+					href: 'https://github.com/langchain-ai/deepagents'
+				},
+				{
+					label: 'LangGraph docs — the runtime underneath',
+					href: 'https://docs.langchain.com/oss/javascript/langgraph/overview'
+				},
+				{
+					label: 'LangSmith — tracing, evals, deployment',
+					href: 'https://docs.smith.langchain.com'
+				}
+			]}
+		/>
 
-		<Slide title="Background async subagents">
-			<p>
-				In a long-lived deployment, <Term t="Subagent">subagents</Term> can run in the background over the
-				<Term t="Agent Protocol">Agent Protocol</Term>:
-				the parent does not block on a child's full transcript; it just receives a final
-				report. Static-site LangX runs them inline so you can watch the trace; the
-				<Term t="task"><code>task</code></Term> delegation pattern is the same either way.
-			</p>
-		</Slide>
-
-		<Slide title="Tool ecosystem">
-			<p>
-				Real agents use <Term t="MCP" /> servers and integrations (<Term t="Tavily">Tavily</Term>, <Term t="Browserbase">Browserbase</Term>,
-				Linear, Slack, Datadog, GitHub). LangX includes deterministic stand-ins so the
-				lessons stay reproducible. Drop a real client in behind the same <code>tool()</code>
-				wrapper and the lesson code keeps working.
-			</p>
-		</Slide>
-
-		<Slide title="Where to go next">
-			<ul>
-				<li><a href="https://docs.langchain.com" target="_blank" rel="noopener">LangChain docs</a> — start with create_agent.</li>
-				<li><a href="https://langchain-ai.github.io/langgraph/" target="_blank" rel="noopener">LangGraph docs</a> — the graph reference.</li>
-				<li><a href="https://github.com/langchain-ai/deepagents" target="_blank" rel="noopener">Deep Agents (Python)</a> — the harness LangX ports.</li>
-				<li><a href="https://docs.smith.langchain.com" target="_blank" rel="noopener">LangSmith</a> — tracing, evals, deployments.</li>
-			</ul>
-			<p>
-				Read the source: every harness piece in this app lives in
-				<code>src/lib/deepagents/</code>. Re-implementing the harness is a great way to
-				learn it.
-			</p>
-		</Slide>
-
-		<Slide ornament>
-			<p>· built · documented · onwards ·</p>
-		</Slide>
-	{/snippet}
-
-	{#snippet demo()}
-		<Panel title="You finished LangX V1" subtitle="three layers, two capstones, one harness">
-			<p class="card">
-				Built entirely in your browser. From here it is plain LangChain, LangGraph, and
-				Deep Agents. The patterns you have seen are exactly the ones you'll meet in
-				production.
-			</p>
-			<p class="hint">
-				Press <kbd>P</kbd> to read this as slides, or jump back to the
-				<a href="/">landing page</a> to revisit a chapter.
-			</p>
-		</Panel>
+		<Slide variant="ornament">harness · capstones · the frontier · onwards</Slide>
 	{/snippet}
 </Lesson>
 
 <style>
-	.card {
-		margin: 0;
-		font-family: var(--font-prose);
-		font-size: 1rem;
-		line-height: 1.6;
-		color: var(--color-ink-100);
+	.diagram {
+		margin: 2.2rem 0;
 	}
-	.hint {
-		margin: 0.85rem 0 0;
-		font-family: var(--font-prose);
-		font-size: 0.9rem;
-		color: var(--color-ink-300);
-		font-style: italic;
+	.diagram :global(.hero) {
+		height: auto;
+		border-radius: 0.6rem;
+		overflow: hidden;
+		background: var(--color-paper);
+		display: block;
 	}
-	kbd {
-		font-family: var(--font-mono);
-		background: var(--color-bg);
-		border: 1px solid var(--color-rule);
-		border-radius: 0.3rem;
-		padding: 0.05rem 0.4rem;
-		font-size: 0.8em;
+	.diagram :global(.hero img) {
+		position: static;
+		width: 100%;
+		height: auto;
+		display: block;
 	}
-	a {
-		color: var(--accent-ink);
+	.diagram :global(.hero .caption) {
+		display: none;
+	}
+	.diagram figcaption {
+		margin-top: 0.6rem;
+		font-size: 0.85rem;
+		color: var(--color-fg-faint);
+		text-align: center;
 	}
 </style>

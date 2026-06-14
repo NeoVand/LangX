@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { app, toggleWorkshop, toggleBook } from '$lib/state/app.svelte';
+	import { app, toggleWorkshop, toggleBook, ui } from '$lib/state/app.svelte';
 	import Icon from './Icon.svelte';
-	import type { Chapter } from '$lib/curriculum';
+	import { chapters, type Chapter } from '$lib/curriculum';
 
 	interface Props {
 		chapter: Chapter;
@@ -16,10 +16,30 @@
 	const next = $derived(
 		idx >= 0 && idx < chapter.lessons.length - 1 ? chapter.lessons[idx + 1] : null
 	);
+
+	// The next level (chapter), for the end-of-chapter hand-off.
+	const chapterIdx = $derived(chapters.findIndex((c) => c.id === chapter.id));
+	const nextChapter = $derived(
+		chapterIdx >= 0 && chapterIdx < chapters.length - 1 ? chapters[chapterIdx + 1] : null
+	);
+
+	// Right-hand link: the next lesson → then the next chapter's landing page →
+	// then home (after the final chapter). No more "End of chapter" dead-end.
+	const rightHref = $derived(
+		next ? `${chapter.base}/${next.slug}` : nextChapter ? nextChapter.base : '/'
+	);
+	const rightRole = $derived(next ? 'next' : nextChapter ? 'next chapter' : 'finish');
+	const rightTitle = $derived(
+		next ? next.title : nextChapter ? nextChapter.title : 'Back to LangX'
+	);
 </script>
 
 <nav class="lesson-nav app-chrome">
-	<a class="link" class:disabled={!prev} href={prev ? `${chapter.base}/${prev.slug}` : chapter.base}>
+	<a
+		class="link"
+		class:disabled={!prev}
+		href={prev ? `${chapter.base}/${prev.slug}` : chapter.base}
+	>
 		<span class="dir">←</span>
 		<span class="lbl">
 			<span class="role">previous</span>
@@ -27,31 +47,35 @@
 		</span>
 	</a>
 
-	<div class="view-toggle" role="group" aria-label="Show panes">
-		<button
-			class="vt"
-			class:on={app.viewMode.book}
-			onclick={toggleBook}
-			title="Toggle the reading pane"
-			aria-pressed={app.viewMode.book}
-		>
-			<Icon name="book" size={15} />
-		</button>
-		<button
-			class="vt"
-			class:on={app.viewMode.workshop}
-			onclick={toggleWorkshop}
-			title="Toggle the demo pane"
-			aria-pressed={app.viewMode.workshop}
-		>
-			<Icon name="wrench" size={15} />
-		</button>
-	</div>
+	{#if ui.lessonHasDemo}
+		<div class="view-toggle" role="group" aria-label="Show panes">
+			<button
+				class="vt"
+				class:on={app.viewMode.book}
+				onclick={toggleBook}
+				title="Toggle the reading pane"
+				aria-pressed={app.viewMode.book}
+			>
+				<Icon name="book" size={15} />
+			</button>
+			<button
+				class="vt"
+				class:on={app.viewMode.workshop}
+				onclick={toggleWorkshop}
+				title="Toggle the demo pane"
+				aria-pressed={app.viewMode.workshop}
+			>
+				<Icon name="wrench" size={15} />
+			</button>
+		</div>
+	{:else}
+		<span></span>
+	{/if}
 
-	<a class="link right" href={next ? `${chapter.base}/${next.slug}` : `${chapter.base}/recap`}>
+	<a class="link right" href={rightHref}>
 		<span class="lbl">
-			<span class="role">{next ? 'next' : 'wrap up'}</span>
-			<span class="title">{next ? next.title : 'End of chapter'}</span>
+			<span class="role">{rightRole}</span>
+			<span class="title">{rightTitle}</span>
 		</span>
 		<span class="dir">→</span>
 	</a>

@@ -3,7 +3,7 @@
 	import HeroImage from './HeroImage.svelte';
 	import DemoSourceView from './DemoSourceView.svelte';
 	import Icon from './Icon.svelte';
-	import { app } from '$lib/state/app.svelte';
+	import { app, ui } from '$lib/state/app.svelte';
 	import { downloadDemo, downloadSkill, type DemoManifest } from '$lib/demos/download';
 
 	interface Props {
@@ -39,6 +39,16 @@
 		}
 	});
 
+	$effect(() => {
+		// Publish whether this lesson has a demo so the footer nav can hide the
+		// pane toggle on reading-only lessons (the finale). Reset to true on unmount
+		// so non-lesson routes keep the toggle.
+		ui.lessonHasDemo = hasDemo;
+		return () => {
+			ui.lessonHasDemo = true;
+		};
+	});
+
 	// Reveal the scrollbar only while actively scrolling; hide it ~800ms after.
 	function revealScrollbar(node: HTMLElement) {
 		let t: ReturnType<typeof setTimeout> | undefined;
@@ -61,30 +71,30 @@
 	{#if showBook}
 		<section class="narrative-pane reveal-scrollbar" use:revealScrollbar>
 			<div class="narrative-inner">
-			{#if eyebrow}
-				<div class="eyebrow font-display">{eyebrow}</div>
-			{/if}
-			<section data-slide class="title-slide">
-				{#if hero}
-					<div class="hero-frame">
-						<HeroImage id={hero.id} alt={hero.alt} />
-					</div>
+				{#if eyebrow}
+					<div class="eyebrow font-display">{eyebrow}</div>
 				{/if}
-				<h1 class="font-display">{title}</h1>
-				{#if motivation}
-					<p class="motivation font-prose">
-						{#if typeof motivation === 'string'}
-							{motivation}
-						{:else}
-							{@render motivation()}
-						{/if}
-					</p>
-				{/if}
-				{#if intro}
-					<div class="intro font-prose">{@render intro()}</div>
-				{/if}
-			</section>
-			{@render narrative()}
+				<section data-slide class="title-slide">
+					{#if hero}
+						<div class="hero-frame">
+							<HeroImage id={hero.id} alt={hero.alt} />
+						</div>
+					{/if}
+					<h1 class="font-display">{title}</h1>
+					{#if motivation}
+						<p class="motivation font-prose">
+							{#if typeof motivation === 'string'}
+								{motivation}
+							{:else}
+								{@render motivation()}
+							{/if}
+						</p>
+					{/if}
+					{#if intro}
+						<div class="intro font-prose">{@render intro()}</div>
+					{/if}
+				</section>
+				{@render narrative()}
 			</div>
 		</section>
 	{/if}
@@ -93,67 +103,67 @@
 		<aside class="demo-pane">
 			<div class="demo-inner reveal-scrollbar" class:flipped use:revealScrollbar>
 				{#if source}
-				<div class="demo-toolbar">
-					<span class="dt-label">{flipped ? 'Source · what the demo runs' : 'Live demo'}</span>
-					<div class="dt-actions">
-						<button
-							class="dt-btn"
-							class:active={flipped}
-							onclick={() => (flipped = !flipped)}
-							title="Flip between the live demo and its source code"
-						>
-						<Icon name={flipped ? 'arrowLeft' : 'eye'} size={14} />
-						{flipped ? 'Back to demo' : 'View source'}
-						</button>
-						<div class="dt-menu-wrap">
+					<div class="demo-toolbar">
+						<span class="dt-label">{flipped ? 'Source · what the demo runs' : 'Live demo'}</span>
+						<div class="dt-actions">
 							<button
 								class="dt-btn"
-								class:active={dlOpen}
-								onclick={() => (dlOpen = !dlOpen)}
-								aria-haspopup="menu"
-								aria-expanded={dlOpen}
-								title="Download this demo"
+								class:active={flipped}
+								onclick={() => (flipped = !flipped)}
+								title="Flip between the live demo and its source code"
 							>
-								<Icon name="download" size={14} />
-								Download
-								<Icon name="chevronDown" size={13} />
+								<Icon name={flipped ? 'arrowLeft' : 'eye'} size={14} />
+								{flipped ? 'Back to demo' : 'View source'}
 							</button>
-							{#if dlOpen}
+							<div class="dt-menu-wrap">
 								<button
-									class="dt-backdrop"
-									aria-label="Close menu"
-									onclick={() => (dlOpen = false)}
-								></button>
-								<div class="dt-menu" role="menu">
+									class="dt-btn"
+									class:active={dlOpen}
+									onclick={() => (dlOpen = !dlOpen)}
+									aria-haspopup="menu"
+									aria-expanded={dlOpen}
+									title="Download this demo"
+								>
+									<Icon name="download" size={14} />
+									Download
+									<Icon name="chevronDown" size={13} />
+								</button>
+								{#if dlOpen}
 									<button
-										class="dt-menu-item"
-										role="menuitem"
-										onclick={() => {
-											dlOpen = false;
-											if (source) downloadDemo(source);
-										}}
-									>
-										<span class="dmi-label">Source</span>
-										<span class="dmi-desc">runnable project · .zip</span>
-									</button>
-									{#if source.skill}
+										class="dt-backdrop"
+										aria-label="Close menu"
+										onclick={() => (dlOpen = false)}
+									></button>
+									<div class="dt-menu" role="menu">
 										<button
 											class="dt-menu-item"
 											role="menuitem"
 											onclick={() => {
 												dlOpen = false;
-												if (source) downloadSkill(source);
+												if (source) downloadDemo(source);
 											}}
 										>
-											<span class="dmi-label">Skill</span>
-											<span class="dmi-desc">SKILL.md · rebuild with AI</span>
+											<span class="dmi-label">Source</span>
+											<span class="dmi-desc">runnable project · .zip</span>
 										</button>
-									{/if}
-								</div>
-							{/if}
+										{#if source.skill}
+											<button
+												class="dt-menu-item"
+												role="menuitem"
+												onclick={() => {
+													dlOpen = false;
+													if (source) downloadSkill(source);
+												}}
+											>
+												<span class="dmi-label">Skill</span>
+												<span class="dmi-desc">SKILL.md · rebuild with AI</span>
+											</button>
+										{/if}
+									</div>
+								{/if}
+							</div>
 						</div>
 					</div>
-				</div>
 				{/if}
 				{#if source && flipped}
 					<div class="face source-face">

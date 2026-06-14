@@ -1,5 +1,9 @@
 import { browser } from '$app/environment';
-import { defaultModelFor, defaultEmbeddingModelFor, type HostedProvider } from '$lib/models/catalog';
+import {
+	defaultModelFor,
+	defaultEmbeddingModelFor,
+	type HostedProvider
+} from '$lib/models/catalog';
 
 const STORAGE_KEY = 'langx.app.v2';
 
@@ -245,6 +249,14 @@ function loadInitial(): AppState {
 }
 
 export const app = $state<AppState>(loadInitial());
+
+/**
+ * Ephemeral, non-persisted UI state for the current route. `lessonHasDemo` is set
+ * by the Lesson component each render so chrome outside the lesson (the footer nav)
+ * can tell whether a demo/workshop pane exists — and hide the pane toggle when it
+ * doesn't (e.g. the course finale, which is reading-only).
+ */
+export const ui = $state<{ lessonHasDemo: boolean }>({ lessonHasDemo: true });
 
 export function persist() {
 	if (!browser) return;
