@@ -271,7 +271,41 @@ const aliases: Record<string, string> = {
 	parameter: 'Parameters',
 	parameters: 'Parameters',
 	vocab: 'Vocabulary',
-	vocabulary: 'Vocabulary'
+	vocabulary: 'Vocabulary',
+	// ── How models are trained (the Model lesson preamble) ──
+	'neural network': 'Neural network',
+	'neural networks': 'Neural network',
+	'neural net': 'Neural network',
+	'deep learning': 'Deep learning',
+	'gradient descent': 'Gradient descent',
+	'loss function': 'Loss function',
+	loss: 'Loss function',
+	backpropagation: 'Backpropagation',
+	backprop: 'Backpropagation',
+	'pre-training': 'Pre-training',
+	pretraining: 'Pre-training',
+	'pre-train': 'Pre-training',
+	'self-supervised': 'Pre-training',
+	'self-supervised learning': 'Pre-training',
+	'unsupervised pre-training': 'Pre-training',
+	'supervised fine-tuning': 'Supervised fine-tuning',
+	sft: 'Supervised fine-tuning',
+	'fine-tuning': 'Supervised fine-tuning',
+	'fine-tune': 'Supervised fine-tuning',
+	rlhf: 'RLHF',
+	rlvr: 'RLVR',
+	'one-hot encoding': 'One-hot encoding',
+	'one-hot': 'One-hot encoding',
+	'one hot': 'One-hot encoding',
+	tokenization: 'Tokenization',
+	tokenizer: 'Tokenization',
+	tokenize: 'Tokenization',
+	'contextual embedding': 'Contextual embedding',
+	'contextual embeddings': 'Contextual embedding',
+	contextualization: 'Contextual embedding',
+	contextualize: 'Contextual embedding',
+	'word embedding': 'Word embedding',
+	'word embeddings': 'Word embedding'
 };
 
 export const glossary: GlossaryEntry[] = [
@@ -511,6 +545,86 @@ export const glossary: GlossaryEntry[] = [
 		chapter: 'general',
 		short: 'The fixed set of tokens a model can read and produce.',
 		long: 'A tokenizer carves text into a fixed inventory of tokens — about 50,257 for GPT-2, larger for modern models. The model’s final layer outputs one logit per vocabulary entry, so the vocabulary is literally the set of things it can say in one step. Rare words get split into several tokens; common words are usually one.'
+	},
+
+	// ── How models are trained (the Model lesson preamble) ──────────────────
+	{
+		term: 'Neural network',
+		chapter: 'general',
+		short: 'A web of simple units whose connections are tuned by training.',
+		long: 'A neural network is layers of simple "neurons", each computing a weighted sum of its inputs followed by a nonlinearity. Stack enough of them and tune the connection weights on data, and the network can approximate astonishingly complex functions — from recognising images to predicting the next word. A transformer is one particular, very effective neural-network design.'
+	},
+	{
+		term: 'Deep learning',
+		chapter: 'general',
+		short: 'Training many-layered neural networks on large data.',
+		long: 'Deep learning is machine learning with neural networks that are "deep" — many layers stacked so each builds on the features the previous one found. Depth, plus large datasets, plus a lot of compute, is what made modern AI — including language models — possible.'
+	},
+	{
+		term: 'Gradient descent',
+		chapter: 'general',
+		short: 'The optimization that learns the weights, one small step downhill.',
+		long: 'Training measures how wrong the model is with a loss, then nudges every weight a little in the direction that reduces it — the negative gradient. Repeat over billions of examples and the weights settle into values that make good predictions. It is the single algorithm behind essentially all deep learning.'
+	},
+	{
+		term: 'Loss function',
+		chapter: 'general',
+		short: 'A single number measuring how wrong the model is right now.',
+		long: 'Training needs a target to minimise. The loss compares the model’s prediction to the truth and returns one number — high when wrong, low when right. For a language model it measures how surprised the model was by the actual next token. Gradient descent exists to push this number down.'
+	},
+	{
+		term: 'Backpropagation',
+		chapter: 'general',
+		short: 'How the loss’s gradient is computed through every layer.',
+		long: 'Backpropagation applies the chain rule to send the error signal backward from the loss through every layer, working out how much each weight contributed to the mistake. Those gradients are what gradient descent then steps along — the engine that makes training deep networks feasible.'
+	},
+	{
+		term: 'Pre-training',
+		chapter: 'general',
+		short: 'The first, longest stage: learn language by predicting the next token.',
+		long: 'A model is first trained on an enormous pile of text with one self-supervised task — predict the next token — needing no human labels (the text is its own answer key). Out of this falls grammar, facts, reasoning patterns, and style. This is where the bulk of a model’s capability, and cost, lives.'
+	},
+	{
+		term: 'Supervised fine-tuning',
+		chapter: 'general',
+		short: 'Stage two: teach the pretrained model to follow instructions.',
+		long: 'A raw pretrained model just continues text; it is not yet a helpful assistant. Supervised fine-tuning (SFT) continues training on curated examples of instructions paired with good responses, so the model learns the format and behaviour of answering rather than merely completing.'
+	},
+	{
+		term: 'RLHF',
+		chapter: 'general',
+		short: 'Reinforcement learning from human feedback — align to what people prefer.',
+		long: 'After fine-tuning, humans rank competing responses; those rankings train a reward model, and reinforcement learning nudges the LLM toward answers people prefer — more helpful, honest, and harmless. RLHF is much of what separates a polished assistant from a raw text predictor.'
+	},
+	{
+		term: 'RLVR',
+		chapter: 'general',
+		short: 'Reinforcement learning from verifiable rewards — train on checkable correctness.',
+		long: 'For tasks with a checkable answer — math, code, proofs — you don’t need human preference: a program can verify whether the output is correct and reward it directly. RLVR uses that automatic signal to push reasoning models toward answers that actually work, and is central to recent gains on hard reasoning.'
+	},
+	{
+		term: 'One-hot encoding',
+		chapter: 'general',
+		short: 'Representing a token as a vector that is all zeros but one.',
+		long: 'The simplest way to feed a token id to a network: a vector as long as the vocabulary, with a 1 at the token’s slot and 0 everywhere else. It carries no notion of meaning — every two distinct tokens are equally far apart — which is exactly why a model immediately projects it into a dense embedding instead.'
+	},
+	{
+		term: 'Word embedding',
+		chapter: 'general',
+		short: 'A dense vector for a word, placing similar words nearby.',
+		long: 'A word embedding maps each word to a fixed list of numbers, learned so that words used in similar ways land near each other (measured by cosine similarity). It is the dense, meaningful alternative to a one-hot vector — the kind of representation that enters a language model. (See the word-embedding demo.)'
+	},
+	{
+		term: 'Tokenization',
+		chapter: 'general',
+		short: 'Splitting text into the model’s fixed vocabulary of tokens.',
+		long: 'Before a model sees text it is chopped into tokens by a tokenizer — usually byte-pair encoding, which keeps common words whole and splits rare ones into pieces. The tokenizer fixes the vocabulary and affects cost, since you pay per token. (See the tokenization demo.)'
+	},
+	{
+		term: 'Contextual embedding',
+		chapter: 'general',
+		short: 'A token’s vector after attention has folded in its context.',
+		long: 'A token’s input embedding is the same wherever it appears, but as it rises through the transformer’s layers, attention keeps rewriting it to absorb the surrounding words — so "bank" near "river" ends up with a different vector than "bank" near "money". By the top, each token’s vector is a context-aware summary used to predict what comes next.'
 	},
 
 	// ── LangChain ───────────────────────────────────────────────────────────

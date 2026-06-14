@@ -92,6 +92,25 @@ sparing copper flame accents. Fine cross-hatching, soft glow, patina. Balanced, 
 comfortable margins, nothing touching the edges. No legible numbers or words, no neon, no modern UI.
 ```
 
+## `model-training-stages` — poster · "The three stages of training" (4:3 landscape)
+
+```
+An antique engraving as a left-to-right triptych showing how a thinking-engine is built in three
+stages, each panel divided by a thin brass column. PANEL 1 (pre-training): a vast library / ocean of
+tiny engraved text-pages pouring into a large brass furnace-engine, which glows golden as it "reads"
+— the biggest, most luminous panel, conveying scale and raw learning. PANEL 2 (fine-tuning): the same
+engine, now smaller and more refined, being adjusted by a pair of calipers against a short rack of
+neat instruction-and-answer cards — precise, tidy, fewer elements. PANEL 3 (reinforcement): the engine
+presenting an output to a balance-scale, with a small approving check-stamp and a verifying gauge
+beside it (human preference + verifiable reward), nudging a dial toward "better". A faint golden thread
+of light runs through all three panels along the bottom, labelled by a tiny repeated next-token glyph,
+to show every stage rests on the same foundation. Deep warm near-black background (#0a0805 to
+#16110b), aged brass and golden-ochre (#d9a441) as the hero metal, sparing verdigris-green and
+copper-red accents on the gauges/stamps. Fine copperplate cross-hatching, patina, soft volumetric glow
+on the furnace. Balanced triptych, comfortable margins, nothing touching the edges. No legible text
+(small abstract glyphs only), no neon, no modern UI.
+```
+
 ---
 
 ### Where each lands in the lesson
@@ -99,7 +118,8 @@ comfortable margins, nothing touching the edges. No legible numbers or words, no
 | id | placement |
 |---|---|
 | `l1-model` | lesson hero (title slide) |
-| `model-embedding-space` | beside the "words → vectors" slide |
+| `model-training-stages` | beside the "three stages of training" slide |
+| `model-embedding-space` | beside the "from a token to its meaning" slide |
 | `model-attention-glance` | beside the "attention" slide |
-| `model-block-tower` | beside the "the block, repeated" slide |
+| `model-block-tower` | beside the "the same word, in context" slide (transformer overview) |
 | `model-sampling-dice` | beside the "logits → sampling" slide |
