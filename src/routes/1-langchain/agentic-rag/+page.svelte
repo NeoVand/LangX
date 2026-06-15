@@ -555,6 +555,27 @@ for await (const step of await agent.stream(
 	{/snippet}
 
 	{#snippet demo()}
+		<Panel title="Try it" subtitle="drop in docs, ask, watch it search and cite">
+			<ol class="howto">
+				<li>
+					<strong>Feed it documents.</strong> Use the <strong>+</strong> button under the chat to add a
+					PDF, Markdown, or text file — each is chunked and indexed in your browser. Tune the
+					<em>Configure</em> panel's embedding model or system prompt first if you like.
+				</li>
+				<li>
+					<strong>Ask something compound.</strong> Try a two-part or vaguely worded question — the
+					agent searches, judges the scores, rewords and re-searches when results are weak, and cites
+					each passage inline as <code>[S1]</code>, <code>[S2]</code>.
+				</li>
+				<li>
+					<strong>Look under the hood.</strong> The <em>Under the hood</em> panel plots your query on
+					the embedding map beside the passages it retrieved, lights up the
+					<code>model → search → model</code> loop, and lays out the full trail. Then ask a follow-up —
+					it remembers.
+				</li>
+			</ol>
+		</Panel>
+
 		<Panel title="Configure" subtitle="the agent's embedding model, instructions, and tools">
 			<label class="cfg-row">
 				<span class="cfg-label">
@@ -736,6 +757,20 @@ for await (const step of await agent.stream(
 </Lesson>
 
 <style>
+	.howto {
+		margin: 0;
+		padding-left: 1.1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		font-size: 0.86rem;
+		line-height: 1.5;
+		color: var(--color-fg-muted);
+	}
+	.howto strong {
+		color: var(--color-fg);
+	}
+
 	.diagram {
 		margin: 2rem 0;
 	}

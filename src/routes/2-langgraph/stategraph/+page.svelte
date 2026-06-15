@@ -375,6 +375,14 @@ const graph = new StateGraph(MessagesAnnotation)
 	{/snippet}
 
 	{#snippet demo()}
+		<Panel title="Try it" subtitle="hand-built ReAct, one super-step at a time">
+			<ol class="howto">
+				<li><strong>Pick a scenario, then run.</strong> Choose <em>Single tool, single hop</em> or <em>Two hops</em> — the prompt updates below — and hit <em>Run graph</em> to drive the real model and real tool calls.</li>
+				<li><strong>Trace the loop in the live graph.</strong> Watch agent ⇄ tools light up super-step by super-step. Hover any node or the conditional edge to see what it did and the exact state it wrote; step back and forth to replay.</li>
+				<li><strong>Read the shared state.</strong> The <em>Messages</em> panel is the graph's state — every step appends one message, so you can see each tool call and result accumulate into the final answer.</li>
+			</ol>
+		</Panel>
+
 		<Panel title="The question to answer" subtitle="real model, real tool calls — pick a scenario and run the loop">
 			<div class="modes" role="radiogroup" aria-label="Scenario">
 				<label class:selected={mode === 'simple'}>
@@ -420,6 +428,20 @@ const graph = new StateGraph(MessagesAnnotation)
 </Lesson>
 
 <style>
+	.howto {
+		margin: 0;
+		padding-left: 1.1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		font-size: 0.86rem;
+		line-height: 1.5;
+		color: var(--color-fg-muted);
+	}
+	.howto strong {
+		color: var(--color-fg);
+	}
+
 	/* In-narrative diagrams: frameless, full column width. */
 	.diagram {
 		margin: 1.8rem 0;

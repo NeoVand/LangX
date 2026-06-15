@@ -281,6 +281,14 @@ const data = JSON.parse(msg.content); // 🙈 a string — maybe fenced in \\\`\
 	{/snippet}
 
 	{#snippet demo()}
+		<Panel title="Try it" subtitle="prose in · a validated, typed record out">
+			<ol class="howto">
+				<li><strong>Extract a record.</strong> Edit the casual message and hit <em>Extract event</em> on Demo 1 — the prose becomes a filled schema with title, date, time, duration, and attendees. Open <em>raw tool call</em> to see the arguments the model emitted, since structured output is tool calling underneath.</li>
+				<li><strong>Compare the two ways.</strong> Edit the review and hit <em>Run both ways</em> on Demo 2. The left column is a raw string you must parse and pray over; the right is a validated object your types already trust.</li>
+				<li><strong>Watch the guarantee.</strong> Note the status line under each column — fenced or unvalidated JSON on the left versus a record validated against the schema on the right. Same answer, very different confidence.</li>
+			</ol>
+		</Panel>
+
 		<Panel title="Demo 1 · Prose → a typed event" subtitle="one message becomes a validated record">
 			<figure class="demo-diagram">
 				<HeroImage
@@ -358,6 +366,19 @@ const data = JSON.parse(msg.content); // 🙈 a string — maybe fenced in \\\`\
 </Lesson>
 
 <style>
+	.howto {
+		margin: 0;
+		padding-left: 1.1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		font-size: 0.86rem;
+		line-height: 1.5;
+		color: var(--color-fg-muted);
+	}
+	.howto strong {
+		color: var(--color-fg);
+	}
 	.row {
 		display: flex;
 		flex-direction: column;

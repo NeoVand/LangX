@@ -376,6 +376,14 @@ for await (const ev of chain.streamEvents({ topic }, { version: 'v2' })) {
 	{/snippet}
 
 	{#snippet demo()}
+		<Panel title="Try it" subtitle="invoke vs stream · then see inside the chain">
+			<ol class="howto">
+				<li><strong>Race the two.</strong> Hit <em>Race invoke vs stream</em> on Demo 1 — both run the same count-to-ten task on one clock. The <code>invoke</code> lane stays blank until it's done; the <code>stream</code> lane paints token by token. The timing bars then show identical total time but a much earlier first word.</li>
+				<li><strong>Look inside.</strong> Demo 2's chain answers in two passes — it <strong>plans</strong>, then <strong>writes</strong>. Type a topic and hit <em>Run the chain</em> to watch both step cards stream and time themselves, while plain <code>stream()</code> would only ever show the second.</li>
+				<li><strong>Read the trace.</strong> Open <em>full event log</em> under Demo 2 to see every typed <code>streamEvents</code> boundary — start, per-token chunk, and end — for both model calls.</li>
+			</ol>
+		</Panel>
+
 		<Panel title="Demo 1 · invoke vs stream" subtitle="a fair race — same task, two ways">
 			<figure class="demo-diagram">
 				<HeroImage
@@ -510,6 +518,19 @@ for await (const ev of chain.streamEvents({ topic }, { version: 'v2' })) {
 </Lesson>
 
 <style>
+	.howto {
+		margin: 0;
+		padding-left: 1.1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		font-size: 0.86rem;
+		line-height: 1.5;
+		color: var(--color-fg-muted);
+	}
+	.howto strong {
+		color: var(--color-fg);
+	}
 	.row {
 		display: flex;
 		gap: 0.6rem;

@@ -305,6 +305,14 @@ createDeepAgent({
 	{/snippet}
 
 	{#snippet demo()}
+		<Panel title="Try it" subtitle="one needle, a mountain of logs">
+			<ol class="howto">
+				<li><strong>Dispatch the on-call agent.</strong> It reads several genuinely huge log files to find why checkout throws 503s — every read floods the tiny window on purpose.</li>
+				<li><strong>Scrub the rounds.</strong> Drag the slider and watch the meter climb: a fat <code>read_file</code> result collapse into an <em>evicted →</em> pointer, then the early turns fold into one summary card.</li>
+				<li><strong>Track the needle.</strong> Follow the chip — <em>in the window → filed to disk → recalled in the report</em> — then let the inspector recompute the verdict against ground truth.</li>
+			</ol>
+		</Panel>
+
 		<Panel title="The incident" subtitle="INC-2207 · checkout returning 503s">
 			<p class="brief">{INCIDENT_BRIEF}</p>
 			<div class="actions">
@@ -421,6 +429,20 @@ createDeepAgent({
 	}
 	.stamp.pass {
 		color: var(--color-accent-success);
+	}
+
+	.howto {
+		margin: 0;
+		padding-left: 1.1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		font-size: 0.86rem;
+		line-height: 1.5;
+		color: var(--color-fg-muted);
+	}
+	.howto strong {
+		color: var(--color-fg);
 	}
 
 	.scrubber {

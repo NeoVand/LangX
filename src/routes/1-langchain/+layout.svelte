@@ -30,6 +30,10 @@
 		margin-top: -60px;
 		min-height: 0;
 		position: relative;
+		/* Clip to the viewport so a very tall lesson can't push the whole page (and
+		   its absolute footer) into a second, body-level scroll. The panes scroll
+		   internally instead. */
+		overflow: hidden;
 	}
 	.chapter-content {
 		flex: 1;

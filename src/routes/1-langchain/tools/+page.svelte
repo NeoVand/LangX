@@ -317,6 +317,26 @@ while (true) {
 	{/snippet}
 
 	{#snippet demo()}
+		<Panel title="Try it" subtitle="two demos, one loop — read, then act">
+			<ol class="howto">
+				<li>
+					<strong>Query the store.</strong> In <em>Demo 1</em>, ask about customers and orders, then
+					<strong>Ask the database</strong> — the agent chains <code>find_customers</code> into
+					<code>get_orders</code> and does the arithmetic from what it reads.
+				</li>
+				<li>
+					<strong>Make it act.</strong> In <em>Demo 2</em>, tell the team assistant what to do and
+					<strong>Run the assistant</strong> — these tools change state, adding and listing tasks, not
+					just reading.
+				</li>
+				<li>
+					<strong>Open the loop.</strong> Expand <em>Inspect · the agent loop</em> under either demo to
+					watch the model → <code>tool_calls</code> → <code>ToolMessage</code> → model round-trip, step
+					by step.
+				</li>
+			</ol>
+		</Panel>
+
 		<Panel title="Demo 1 · Query a database" subtitle="two tables, two tools, one question">
 			<label class="row">
 				<span>Ask about the store (customers + orders)</span>
@@ -348,6 +368,20 @@ while (true) {
 </Lesson>
 
 <style>
+	.howto {
+		margin: 0;
+		padding-left: 1.1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		font-size: 0.86rem;
+		line-height: 1.5;
+		color: var(--color-fg-muted);
+	}
+	.howto strong {
+		color: var(--color-fg);
+	}
+
 	.row {
 		display: flex;
 		flex-direction: column;

@@ -422,6 +422,14 @@ return { r: ss.sampleCorrelation(xs, ys) };`;
 	{/snippet}
 
 	{#snippet demo()}
+		<Panel title="Try it" subtitle="load data, approve, let the Engine compute">
+			<ol class="howto">
+				<li><strong>Load a deck.</strong> Pick a famous dataset or drop in your own CSV / JSON — <em>The data</em> panel profiles its shape so you can ask a sharp question (or let it auto-analyze).</li>
+				<li><strong>Approve the analysis plan.</strong> Nothing is computed until you sign off: <strong>approve &amp; run</strong>, or comment and <strong>request changes</strong> and the Engine revises the plan.</li>
+				<li><strong>Watch the Mill and Plotter.</strong> <em>The Mill</em> shows every snippet of code and its real computed result; <em>The Plotter</em> inks the charts; the certified report lands last with numbers and figures embedded.</li>
+			</ol>
+		</Panel>
+
 		<!-- 1 · The deck -->
 		<Panel title="The deck" subtitle="pick a dataset, or drop in your own CSV / JSON">
 			<div class="gallery">
@@ -662,6 +670,20 @@ return { r: ss.sampleCorrelation(xs, ys) };`;
 </Lesson>
 
 <style>
+	.howto {
+		margin: 0;
+		padding-left: 1.1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		font-size: 0.86rem;
+		line-height: 1.5;
+		color: var(--color-fg-muted);
+	}
+	.howto strong {
+		color: var(--color-fg);
+	}
+
 	.gallery {
 		display: grid;
 		grid-template-columns: 1fr 1fr;

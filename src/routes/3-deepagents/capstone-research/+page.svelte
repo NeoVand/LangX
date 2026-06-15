@@ -291,6 +291,14 @@ search_web(q)    → en.wikipedia.org  (Pregel, bulk-synchronous-parallel, paper
 	{/snippet}
 
 	{#snippet demo()}
+		<Panel title="Try it" subtitle="ask, approve, then watch it research">
+			<ol class="howto">
+				<li><strong>Commission the research.</strong> Type a question about LangChain, LangGraph, or Deep Agents (or pick an example) — the lead decomposes it into focused sub-questions.</li>
+				<li><strong>Approve the plan.</strong> Nothing is searched until you sign off: <strong>approve &amp; begin</strong>, or drop a comment and <strong>request changes</strong> to have the lead revise and re-present.</li>
+				<li><strong>Watch the bureau work.</strong> Subagents research real docs, code, and concepts in parallel; <em>Sources</em> fills with numbered live links, and the report lands with every claim carrying its <code>[S#]</code> citation.</li>
+			</ol>
+		</Panel>
+
 		<Panel title="Your question" subtitle="anything about LangChain, LangGraph, or Deep Agents">
 			<textarea class="q" bind:value={question} rows="2" spellcheck="false" disabled={busy || started}></textarea>
 			<div class="examples">
@@ -371,6 +379,20 @@ search_web(q)    → en.wikipedia.org  (Pregel, bulk-synchronous-parallel, paper
 </Lesson>
 
 <style>
+	.howto {
+		margin: 0;
+		padding-left: 1.1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		font-size: 0.86rem;
+		line-height: 1.5;
+		color: var(--color-fg-muted);
+	}
+	.howto strong {
+		color: var(--color-fg);
+	}
+
 	.q {
 		width: 100%;
 		box-sizing: border-box;

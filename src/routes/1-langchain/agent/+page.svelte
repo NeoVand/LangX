@@ -425,6 +425,26 @@ for await (const step of await agent.stream(
 	{/snippet}
 
 	{#snippet demo()}
+		<Panel title="Try it" subtitle="a real ReAct loop, run then replayed">
+			<ol class="howto">
+				<li>
+					<strong>Pick a scenario.</strong> Choose <em>Single tool</em> (one weather lookup) or
+					<em>Parallel + follow-up</em> (two lookups, then a calculation), tweak the
+					<code>systemPrompt</code> or user message, and hit <strong>Run the agent</strong>.
+				</li>
+				<li>
+					<strong>Watch the graph cycle.</strong> The live graph lights up
+					<code>model_request → tools → model_request → __end__</code> as the loop runs — the same two
+					nodes <code>createAgent</code> compiles for you.
+				</li>
+				<li>
+					<strong>Step through it.</strong> Use <strong>‹ Prev</strong> / <strong>Next ›</strong> to
+					replay node by node; <em>What happened</em> reveals exactly what the model saw and decided at
+					each step.
+				</li>
+			</ol>
+		</Panel>
+
 		<Panel title="The loop, live" subtitle="run it, then step through node by node">
 			<Toolbox tools={toolboxTools} />
 			<label class="prompt-field">
@@ -499,6 +519,20 @@ for await (const step of await agent.stream(
 </Lesson>
 
 <style>
+	.howto {
+		margin: 0;
+		padding-left: 1.1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		font-size: 0.86rem;
+		line-height: 1.5;
+		color: var(--color-fg-muted);
+	}
+	.howto strong {
+		color: var(--color-fg);
+	}
+
 	/* Editable prompts that actually feed the agent. The textareas inherit the
 	   demo-pane's gradient surface — we only style the label and full width here. */
 	.prompt-field {

@@ -146,6 +146,18 @@
 	.inspector :global(.weight-popover-title .close) {
 		display: none;
 	}
+	/* Unify the window background with the other inline demos (tokenizer / embeddings
+	   / softmax all use --color-bg-elev). The explorer's te-theme paints these a
+	   different, two-tone dark; match the clean demo card instead. */
+	.inspector :global(.weight-popover-card) {
+		background: var(--color-bg-elev) !important;
+		border: 1px solid var(--color-border) !important;
+		box-shadow: none !important;
+	}
+	.inspector :global(.weight-popover-title) {
+		background: transparent !important;
+		border-bottom: 1px solid var(--color-border) !important;
+	}
 	figcaption {
 		margin-top: 0.65rem;
 		font-family: var(--font-prose);

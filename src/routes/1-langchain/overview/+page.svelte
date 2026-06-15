@@ -2,6 +2,7 @@
 	import Lesson from '$lib/components/Lesson.svelte';
 	import Slide from '$lib/components/Slide.svelte';
 	import Term from '$lib/components/Term.svelte';
+	import Panel from '$lib/components/Panel.svelte';
 	import CodeBlock from '$lib/components/CodeBlock.svelte';
 	import HeroImage from '$lib/components/HeroImage.svelte';
 	import ChatInspector from '$lib/components/ChatInspector.svelte';
@@ -396,6 +397,25 @@ memory.push(human, new AIMessage(answer));                 // memory = the messa
 	{/snippet}
 
 	{#snippet demo()}
+		<Panel title="Try it" subtitle="a real chatbot, built from raw parts">
+			<ol class="howto">
+				<li>
+					<strong>Just chat.</strong> Type in the composer and send — then tell it a fact and ask it
+					back a turn later. It remembers, because the running message list <em>is</em> its memory.
+				</li>
+				<li>
+					<strong>Drop in a document.</strong> Use the <strong>+</strong> button to add a PDF or
+					Markdown file; it's chunked and indexed (watch the chunk count appear), and answers are
+					pulled from it by <Term t="RAG">retrieval</Term>. Attach an image to ask about a picture too.
+				</li>
+				<li>
+					<strong>Watch it think.</strong> On a Claude or Gemini model, toggle <strong>Thinking</strong>
+					up top and its reasoning streams live into a collapsible <em>Thought</em> panel. Hit
+					<strong>New</strong> to start a fresh conversation.
+				</li>
+			</ol>
+		</Panel>
+
 		<div class="chat">
 			<div class="chat-head">
 				<div class="chat-head-left">
@@ -616,6 +636,20 @@ memory.push(human, new AIMessage(answer));                 // memory = the messa
 		vertical-align: -0.18em;
 		color: var(--accent);
 		margin: 0 0.05em;
+	}
+
+	.howto {
+		margin: 0;
+		padding-left: 1.1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		font-size: 0.86rem;
+		line-height: 1.5;
+		color: var(--color-fg-muted);
+	}
+	.howto strong {
+		color: var(--color-fg);
 	}
 
 	/* ── Chat widget ───────────────────────────────────────────────────────── */

@@ -1,42 +1,34 @@
 <script lang="ts">
-	// Softmax + temperature, made tangible. A row of raw scores (logits) on top;
-	// drag temperature and watch softmax reshape them into probabilities below —
-	// low T sharpens toward one winner, high T flattens toward uniform. Adapted from
-	// Neo Vandhana's SoftMax Explainer, restyled to the LangX theme.
+	// Softmax + temperature, made tangible. A handful of candidate next-words each
+	// have a raw score (logit); softmax turns the scores into probabilities, and
+	// temperature reshapes them. The bars are on an ABSOLUTE 0–100% scale, so as you
+	// raise T the winner visibly shrinks and the field flattens toward uniform.
+	// Adapted from Neo Vandhana's SoftMax Explainer (github.com/NeoVand/SoftMaxExplainer).
 	import { softmax, generateRandomData } from '$lib/demos/softmax';
 	import Katex from '$lib/transformer-explainer/utils/Katex.svelte';
 
-	let logits = $state([2.6, 0.4, 1.7, -0.6, 1.1, -1.8, 0.1, -0.9, 0.8, -2.3]);
+	const WORDS = ['mat', 'floor', 'couch', 'table', 'roof', 'moon'];
+	let scores = $state([3.1, 1.9, 1.4, 1.1, 0.3, -1.2]);
 	let temperature = $state(1);
 
-	const probs = $derived(softmax(logits, temperature));
-	const maxAbs = $derived(Math.max(...logits.map((v) => Math.abs(v)), 0.001));
-	const maxProb = $derived(Math.max(...probs, 0.001));
+	const probs = $derived(softmax(scores, temperature));
 	const tDisp = $derived(temperature.toFixed(2));
 
 	// cold (blue) → hot (red) as temperature rises
 	const tColor = $derived.by(() => {
 		const t = Math.max(0, Math.min(1, (temperature - 0.1) / 3.9));
-		const r = Math.round(70 + (224 - 70) * t);
-		const g = Math.round(130 - 80 * t);
-		const b = Math.round(225 - 160 * t);
+		const r = Math.round(74 + (224 - 74) * t);
+		const g = Math.round(124 - 76 * t);
+		const b = Math.round(172 - 110 * t);
 		return `rgb(${r}, ${g}, ${b})`;
 	});
 
-	const H = 96; // chart height px
-	function logitBar(v: number) {
-		const half = H / 2;
-		const mag = (Math.abs(v) / maxAbs) * half;
-		return v >= 0
-			? { top: `${half - mag}px`, height: `${mag}px`, up: true }
-			: { top: `${half}px`, height: `${mag}px`, up: false };
-	}
-
 	function regenerate() {
-		logits = generateRandomData(10, 0, 1.6);
+		scores = generateRandomData(WORDS.length, 0.6, 1.5).map((v) => +v.toFixed(1));
 	}
 
-	const MATH = 'p_i = \\dfrac{e^{\\,x_i / T}}{\\sum_j e^{\\,x_j / T}}';
+	const yticks = [100, 75, 50, 25, 0];
+	const MATH = '\\operatorname{softmax}(x_i) = \\dfrac{e^{\\,x_i / T}}{\\sum_{j} e^{\\,x_j / T}}';
 </script>
 
 <figure class="sm">
@@ -45,56 +37,51 @@
 			<span class="lbl">Softmax &amp; temperature</span>
 			<button class="regen" onclick={regenerate}>↻ new scores</button>
 		</div>
+		<p class="prompt">next word after <span class="q">"The cat sat on the ___"</span></p>
 
 		<div class="chart">
-			<span class="ctag">raw scores (logits)</span>
-			<div class="bars logits" style:height="{H}px">
-				<div class="zero"></div>
-				{#each logits as v, i (i)}
-					{@const b = logitBar(v)}
+			<div class="yaxis">
+				{#each yticks as t (t)}<span style:bottom="{t}%">{t}%</span>{/each}
+			</div>
+			<div class="plot">
+				{#each WORDS as w, i (w)}
 					<div class="col">
-						<div class="bar" class:up={b.up} class:down={!b.up} style:top={b.top} style:height={b.height}></div>
+						<div class="bartrack">
+							{#each yticks as t (t)}<span class="grid" style:bottom="{t}%"></span>{/each}
+							<div class="bar" style:height="{probs[i] * 100}%">
+								<span class="pct">{(probs[i] * 100).toFixed(probs[i] < 0.1 ? 1 : 0)}%</span>
+							</div>
+						</div>
+						<div class="wlabel">{w}</div>
+						<div class="xlogit">x={scores[i].toFixed(1)}</div>
 					</div>
 				{/each}
 			</div>
 		</div>
 
-		<div class="middle">
-			<div class="formula"><Katex math={MATH} displayMode style={undefined} /></div>
-			<div class="tctl">
-				<div class="trow">
-					<span class="ticon cold">❄</span>
-					<input
-						class="trange"
-						type="range"
-						min="0.1"
-						max="4"
-						step="0.05"
-						bind:value={temperature}
-						style:--tc={tColor}
-						aria-label="temperature"
-					/>
-					<span class="ticon hot">🔥</span>
-				</div>
-				<div class="tread" style:color={tColor}>T = {tDisp}</div>
-			</div>
+		<div class="tctl">
+			<span class="ticon">❄</span>
+			<input
+				class="trange"
+				type="range"
+				min="0.1"
+				max="4"
+				step="0.05"
+				bind:value={temperature}
+				style:--tc={tColor}
+				aria-label="temperature"
+			/>
+			<span class="ticon">🔥</span>
+			<span class="tread" style:color={tColor}>T = {tDisp}</span>
 		</div>
 
-		<div class="chart">
-			<span class="ctag">probabilities after softmax</span>
-			<div class="bars probs" style:height="{H}px">
-				{#each probs as p, i (i)}
-					<div class="col">
-						<div class="pbar" style:height="{(p / maxProb) * 100}%" title="{(p * 100).toFixed(1)}%"></div>
-					</div>
-				{/each}
-			</div>
-		</div>
+		<div class="eq"><Katex math={MATH} displayMode style={undefined} /></div>
 	</div>
 	<figcaption>
-		Temperature divides every score before softmax. <b>T &lt; 1</b> sharpens the distribution toward
-		the top score (at <b>T → 0</b> it's all-or-nothing — greedy); <b>T &gt; 1</b> flattens it toward
-		uniform (more surprising, more creative). <b>T = 1</b> is plain softmax.
+		Each candidate word has a raw score; softmax turns the scores into probabilities (they always sum
+		to 100%). Temperature <b>T</b> divides every score first: <b>T &lt; 1</b> exaggerates the gaps so
+		one word runs away with it (at <b>T → 0</b>, greedy); <b>T &gt; 1</b> shrinks the gaps so the
+		field flattens toward uniform — more surprising, more "creative". <b>T = 1</b> is plain softmax.
 	</figcaption>
 </figure>
 
@@ -112,7 +99,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		margin-bottom: 0.8rem;
+		margin-bottom: 0.55rem;
 	}
 	.lbl {
 		font-family: var(--font-mono);
@@ -134,79 +121,109 @@
 	.regen:hover {
 		border-color: var(--accent-ink);
 	}
+	.prompt {
+		margin: 0 0 0.9rem;
+		font-size: 0.88rem;
+		color: var(--color-fg-muted);
+	}
+	.prompt .q {
+		font-family: var(--font-mono);
+		color: var(--accent-ink);
+	}
 
 	.chart {
-		position: relative;
+		display: flex;
+		gap: 0.4rem;
+		height: 168px;
 	}
-	.ctag {
+	.yaxis {
+		position: relative;
+		width: 2.4rem;
+		flex-shrink: 0;
+		/* the bar tracks are 140px tall under a 28px label band; align the axis to the
+		   track band */
+		margin-bottom: 28px;
+	}
+	.yaxis span {
+		position: absolute;
+		right: 0;
+		transform: translateY(50%);
 		font-family: var(--font-mono);
-		font-size: 0.64rem;
+		font-size: 0.6rem;
 		color: var(--color-fg-faint);
 	}
-	.bars {
+	.plot {
+		flex: 1;
 		display: flex;
-		gap: 3px;
-		position: relative;
-		margin-top: 0.35rem;
-	}
-	.bars.logits .zero {
-		position: absolute;
-		left: 0;
-		right: 0;
-		top: 50%;
-		border-top: 1px solid var(--color-rule);
+		gap: 0.5rem;
+		align-items: flex-end;
+		min-width: 0;
 	}
 	.col {
 		flex: 1;
-		position: relative;
 		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
 	}
-	.bar {
+	.bartrack {
+		position: relative;
+		width: 100%;
+		height: 140px;
+		display: flex;
+		align-items: flex-end;
+		justify-content: center;
+		border-bottom: 1px solid var(--color-rule);
+	}
+	.grid {
 		position: absolute;
 		left: 0;
 		right: 0;
-		border-radius: 1px;
+		border-top: 1px dashed color-mix(in oklch, var(--color-rule) 60%, transparent);
 	}
-	.bar.up {
-		background: linear-gradient(180deg, #6f9bc4, #3e6890);
-	}
-	.bar.down {
-		background: linear-gradient(0deg, #c87142, #9d5630);
-	}
-	.probs {
-		align-items: flex-end;
-	}
-	.pbar {
-		width: 100%;
-		border-radius: 1px 1px 0 0;
+	.bar {
+		position: relative;
+		width: 72%;
+		border-radius: 2px 2px 0 0;
 		background: linear-gradient(180deg, #f3dca5, #cf982f);
-		transition: height 0.18s ease;
+		transition: height 0.16s ease;
+		min-height: 1px;
+	}
+	.pct {
+		position: absolute;
+		top: -1.05rem;
+		left: 50%;
+		transform: translateX(-50%);
+		font-family: var(--font-mono);
+		font-size: 0.62rem;
+		color: var(--color-fg-muted);
+		white-space: nowrap;
+	}
+	.wlabel {
+		margin-top: 0.3rem;
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		color: var(--color-fg);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		max-width: 100%;
+	}
+	.xlogit {
+		font-family: var(--font-mono);
+		font-size: 0.58rem;
+		color: var(--color-fg-faint);
 	}
 
-	.middle {
-		display: flex;
-		align-items: center;
-		gap: 1rem;
-		margin: 0.9rem 0;
-		flex-wrap: wrap;
-	}
-	.formula {
-		flex-shrink: 0;
-		color: var(--color-fg);
-	}
 	.tctl {
-		flex: 1;
-		min-width: 11rem;
-	}
-	.trow {
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
+		margin-top: 0.6rem;
 	}
 	.ticon {
 		font-size: 0.95rem;
 		flex-shrink: 0;
-		filter: grayscale(0.2);
 	}
 	.trange {
 		flex: 1;
@@ -214,7 +231,7 @@
 		appearance: none;
 		height: 5px;
 		border-radius: 3px;
-		background: linear-gradient(90deg, #4a7cac, #7a6f8f, #c0533f);
+		background: linear-gradient(90deg, #4a7cac, #8a7a86, #c0533f);
 		cursor: pointer;
 	}
 	.trange::-webkit-slider-thumb {
@@ -234,11 +251,17 @@
 		border: 2px solid var(--color-bg-elev);
 	}
 	.tread {
+		flex-shrink: 0;
 		font-family: var(--font-mono);
-		font-size: 0.8rem;
+		font-size: 0.82rem;
 		font-weight: 600;
+		min-width: 4.2rem;
+		text-align: right;
+	}
+	.eq {
+		margin-top: 0.7rem;
+		color: var(--color-fg);
 		text-align: center;
-		margin-top: 0.35rem;
 	}
 	figcaption {
 		margin-top: 0.65rem;

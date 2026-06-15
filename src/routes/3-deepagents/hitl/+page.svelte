@@ -273,6 +273,14 @@ while (res.status === 'interrupted') {
 	{/snippet}
 
 	{#snippet demo()}
+		<Panel title="Try it" subtitle="you hold every gate">
+			<ol class="howto">
+				<li><strong>Send in the automaton.</strong> It works four garden beds toward the goal, but proposes one gated action at a time — nothing touches a bed until you decide.</li>
+				<li><strong>Use all four verbs.</strong> On each approval card: <strong>approve</strong> as-is, <strong>edit</strong> the arguments, <strong>reject</strong> with a note (it adapts), or <strong>respond</strong> when it asks a question. Try rejecting the pesticide as "we're organic".</li>
+				<li><strong>Watch the greenhouse and your decisions.</strong> Each verb visibly changes what grows; the decisions log records every call, and the inspector checks every bed against the goal.</li>
+			</ol>
+		</Panel>
+
 		<Panel title="The head gardener's brief" subtitle="you hold every approval">
 			<p class="brief">{GOAL_INPUT}</p>
 			<div class="actions">
@@ -339,6 +347,20 @@ while (res.status === 'interrupted') {
 </Lesson>
 
 <style>
+	.howto {
+		margin: 0;
+		padding-left: 1.1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		font-size: 0.86rem;
+		line-height: 1.5;
+		color: var(--color-fg-muted);
+	}
+	.howto strong {
+		color: var(--color-fg);
+	}
+
 	.brief {
 		white-space: pre-wrap;
 		font-size: 0.88rem;

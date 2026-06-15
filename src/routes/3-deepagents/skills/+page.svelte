@@ -407,6 +407,14 @@ run_script({
 	{/snippet}
 
 	{#snippet demo()}
+		<Panel title="Try it" subtitle="same question, three wardrobes">
+			<ol class="howto">
+				<li><strong>Ask all three desks.</strong> One refund request goes to the bare, crammed, and skilled clerks at once — same model, same tools, only the <code>skills</code> line differs.</li>
+				<li><strong>Read the stamps and the meter.</strong> The inspector grades each reply against the true proration; the context meter prices every round — watch the crammed desk's wide prompt segment pay rent on every bar.</li>
+				<li><strong>Follow the skilled clerk's feed.</strong> Catalog line → <code>read_file</code> the manual → <code>run_script</code> → disclosures. Then send the follow-up and watch who pays again.</li>
+			</ol>
+		</Panel>
+
 		<Panel title="The customer" subtitle="one request, dispatched to all three desks at once">
 			<p class="request">“{CUSTOMER_REQUEST}”</p>
 			<div class="actions">
@@ -553,6 +561,20 @@ run_script({
 </Lesson>
 
 <style>
+	.howto {
+		margin: 0;
+		padding-left: 1.1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		font-size: 0.86rem;
+		line-height: 1.5;
+		color: var(--color-fg-muted);
+	}
+	.howto strong {
+		color: var(--color-fg);
+	}
+
 	.request {
 		font-style: italic;
 		color: var(--color-fg-muted);

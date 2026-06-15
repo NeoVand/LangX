@@ -362,6 +362,14 @@ const answers = await chain.batch([
 	{/snippet}
 
 	{#snippet demo()}
+		<Panel title="Try it" subtitle="one input · piped · fanned out · batched">
+			<ol class="howto">
+				<li><strong>Run the pipe.</strong> Type a topic and hit run on Demo 1 — then open <em>Inspect</em> to watch the value change shape at each stop: <code>{'{ topic }'}</code> → <code>ChatPromptValue</code> → <code>AIMessage</code> → <code>string</code>. Hit <em>Watch streamEvents</em> to see the same pipe as its lifecycle timeline.</li>
+				<li><strong>Fan it out.</strong> Demo 2 sends one input to three branches at once with <code>RunnableParallel</code> — <code>short</code>, <code>bullets</code>, and <code>passthrough</code> land together. The speedup bar shows wall-clock is the slowest branch, not their sum.</li>
+				<li><strong>Batch it.</strong> Demo 3 fires three fixed questions through one chain with <code>.batch()</code> — no loop — and the timing bars compare it against running them one by one.</li>
+			</ol>
+		</Panel>
+
 		<Panel title="Demo 1 · Sequential pipe" subtitle="prompt → model → parser">
 			<figure class="demo-diagram">
 				<HeroImage
@@ -472,6 +480,19 @@ const answers = await chain.batch([
 </Lesson>
 
 <style>
+	.howto {
+		margin: 0;
+		padding-left: 1.1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		font-size: 0.86rem;
+		line-height: 1.5;
+		color: var(--color-fg-muted);
+	}
+	.howto strong {
+		color: var(--color-fg);
+	}
 	.row {
 		display: flex;
 		gap: 0.6rem;

@@ -460,6 +460,27 @@ if (result.__interrupt__) {
 	{/snippet}
 
 	{#snippet demo()}
+		<Panel title="Try it" subtitle="the agent reaches for money; you hold the gate">
+			<ol class="howto">
+				<li>
+					<strong>Run the support agent.</strong> Edit the <code>systemPrompt</code> or customer
+					message if you like, then <strong>Run the agent</strong> — it looks up the order, then pauses
+					the instant it tries the gated <code>issue_refund</code> tool.
+				</li>
+				<li>
+					<strong>Decide its fate.</strong> When it pauses, the approval gate gives you three moves:
+					<strong>Approve</strong> runs the refund as proposed, <strong>Edit</strong> changes the
+					arguments first (turn a full refund into a partial one), <strong>Reject</strong> sends it
+					back with a note so it changes course.
+				</li>
+				<li>
+					<strong>Watch the pause in the graph.</strong> The live graph holds at the
+					<code>tools</code> node while it waits for you; <em>What happened</em> shows the full trail
+					and the decision you made.
+				</li>
+			</ol>
+		</Panel>
+
 		<Panel title="Approval gate, live" subtitle="the agent proposes; you decide">
 			<Toolbox tools={toolboxTools} label="Toolbox" />
 			<label class="prompt-field">
@@ -510,6 +531,20 @@ if (result.__interrupt__) {
 </Lesson>
 
 <style>
+	.howto {
+		margin: 0;
+		padding-left: 1.1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		font-size: 0.86rem;
+		line-height: 1.5;
+		color: var(--color-fg-muted);
+	}
+	.howto strong {
+		color: var(--color-fg);
+	}
+
 	.diagram {
 		margin: 2rem 0;
 	}

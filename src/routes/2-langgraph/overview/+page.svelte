@@ -704,6 +704,14 @@ state = await graph.invoke(new Command({ resume: { decisions } }), config);`;
 	{/snippet}
 
 	{#snippet demo()}
+		<Panel title="Try it" subtitle="one paragraph in, a fact-checked report out">
+			<ol class="howto">
+				<li><strong>Write a claim — or tap a ticker.</strong> Type a sentence about any public company (or pick <code>AAPL</code>, <code>MSFT</code>, <code>KO</code>, <code>CAT</code>), then hit <em>Audit against EDGAR</em>. The graph alone works out which company you mean.</li>
+				<li><strong>Watch the graph, live.</strong> Each node lights as it runs — resolve, extract, the parallel <em>Verify</em> fan-out, then triage. Hover any node or labelled edge to read what it did and the state it wrote.</li>
+				<li><strong>Hold the pen at the pause.</strong> If anything contradicts EDGAR, the run stops at <code>interrupt()</code> — accept, edit, or reject each fix, then resume to see the corrected statement and audit table.</li>
+			</ol>
+		</Panel>
+
 		<Panel title="The statement to audit" subtitle="write a sentence or paragraph about any public company — the agent figures out which one and checks every fact against live SEC EDGAR">
 			<textarea
 				class="statement"
@@ -803,6 +811,20 @@ state = await graph.invoke(new Command({ resume: { decisions } }), config);`;
 </Lesson>
 
 <style>
+	.howto {
+		margin: 0;
+		padding-left: 1.1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		font-size: 0.86rem;
+		line-height: 1.5;
+		color: var(--color-fg-muted);
+	}
+	.howto strong {
+		color: var(--color-fg);
+	}
+
 	/* In-narrative images: show at natural size, no crop, hide HeroImage's alt overlay. */
 	.poster {
 		margin: 1.8rem 0;

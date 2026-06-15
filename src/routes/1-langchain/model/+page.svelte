@@ -3,7 +3,6 @@
 	import Slide from '$lib/components/Slide.svelte';
 	import Term from '$lib/components/Term.svelte';
 	import Panel from '$lib/components/Panel.svelte';
-	import CodeBlock from '$lib/components/CodeBlock.svelte';
 	import RunButton from '$lib/components/RunButton.svelte';
 	import Markdown from '$lib/components/Markdown.svelte';
 	import ReadMore from '$lib/components/ReadMore.svelte';
@@ -16,9 +15,35 @@
 	import SoftmaxLab from '$lib/components/model/SoftmaxLab.svelte';
 
 	import { rawCall, chainCall, type RawResult } from '$lib/demos/model-basics';
+	import modelBasicsSrc from '$lib/demos/model-basics.ts?raw';
+	import modelSkill from '$lib/demos/skills/model-basics.md?raw';
+	import type { DemoManifest } from '$lib/demos/download';
 	import { activeModelInfo } from '$lib/runtime/llm';
 
 	const active = $derived(activeModelInfo());
+
+	// Source + skill for the demo pane's toolbar (View source · Download source/skill),
+	// the house convention — so we don't dump code into the demo itself.
+	const demoSource: DemoManifest = {
+		id: 'model-basics',
+		title: 'Call a model',
+		summary:
+			'Call a chat model two ways: raw — model.invoke(messages) → one AIMessage with content + token usage — and composed — prompt | model | parser as a Runnable, invoked then streamed.',
+		entries: [{ path: 'lib/demos/model-basics.ts', code: modelBasicsSrc }],
+		runner: `import { rawCall, chainCall } from './lib/demos/model-basics';
+
+// ① raw — a list of messages in, one AIMessage out
+const r = await rawCall('Why is the sky blue?');
+console.log('content:', r.content);
+console.log('usage: ', r.usage, '·', r.provider, r.model);
+
+// ② the model as a Runnable — prompt | model | parser, streamed
+process.stdout.write('streaming: ');
+await chainCall('what a vector embedding is', (buf) => process.stdout.write('\\r  ' + buf));
+console.log('\\n');
+`,
+		skill: modelSkill
+	};
 
 	// Demo 1 — raw model.invoke: see the literal messages LangChain hides
 	let rawInput = $state('Why is the sky blue?');
@@ -51,41 +76,13 @@
 		}
 	}
 
-	const rawCode = `import { getModel } from '$lib/runtime/llm';
-
-const model = await getModel();          // whatever provider you configured
-
-// The rawest call there is: a list of messages in, ONE AIMessage out.
-const reply = await model.invoke([
-  { role: 'system', content: 'You are concise. Answer in one sentence.' },
-  { role: 'user',   content: 'Why is the sky blue?' }
-]);
-
-reply.content;          // → the text
-reply.usage_metadata;   // → { input_tokens, output_tokens, total_tokens }
-reply.response_metadata // → finish reason, model name, …`;
-
-	const chainCode = `import { ChatPromptTemplate } from '@langchain/core/prompts';
-import { StringOutputParser } from '@langchain/core/output_parsers';
-import { getModel } from '$lib/runtime/llm';
-
-const model = await getModel();
-
-// The model is just one Runnable. Pipe a prompt into it, and a parser after,
-// and you have a tiny reusable program: prompt | model | parser.
-const chain = ChatPromptTemplate
-  .fromMessages([['human', 'Explain: {topic}']])
-  .pipe(model)
-  .pipe(new StringOutputParser());
-
-await chain.invoke({ topic: 'embeddings' });   // → a plain string
-// chain.stream({ topic }) streams the same answer token by token.`;
 </script>
 
 <Lesson
 	title="The Model"
 	eyebrow="Level 1 · Lesson 02"
 	hero={{ id: 'l1-model', alt: 'An engraved brass thinking-engine turning words into a next word' }}
+	source={demoSource}
 >
 	{#snippet motivation()}
 		Everything in this course — every <Term t="Chain">chain</Term>, <Term t="Agent">agent</Term>,
@@ -234,18 +231,6 @@ await chain.invoke({ topic: 'embeddings' });   // → a plain string
 			</p>
 		</Slide>
 
-		<figure class="poster">
-			<HeroImage
-				id="model-block-tower"
-				alt="A brass tower of twelve identical transformer blocks, embeddings entering at the base, logits crowning the top"
-			/>
-			<figcaption>
-				The same block, stacked twelve times. A vector enters at the bottom and is nudged, layer by
-				layer, up a central <Term t="Residual stream">residual stream</Term> until its top reads out
-				as next-token scores.
-			</figcaption>
-		</figure>
-
 		<Slide title="A tall stack of identical blocks">
 			<p>
 				The transformer (2017's <em>"Attention Is All You Need"</em>) is a tower of identical
@@ -356,17 +341,6 @@ await chain.invoke({ topic: 'embeddings' });   // → a plain string
 			caption="MLP compression — the 3072-wide hidden vector is projected back down to 768 and added to the residual stream."
 		/>
 
-		<figure class="poster">
-			<HeroImage
-				id="model-sampling-dice"
-				alt="Probability bars feeding a glowing brass die, a flame for temperature beneath it"
-			/>
-			<figcaption>
-				At the top of the tower: a score for every word, a little controlled randomness, and one
-				token falls out.
-			</figcaption>
-		</figure>
-
 		<Slide title="From scores to a word">
 			<p>
 				At the very top, the final token's vector is projected onto the whole
@@ -379,6 +353,17 @@ await chain.invoke({ topic: 'embeddings' });   // → a plain string
 			which="logits"
 			caption="Logits — the final token's vector × the output-projection weights → a raw score for every one of the 50,257 vocabulary tokens."
 		/>
+
+		<figure class="poster">
+			<HeroImage
+				id="model-sampling-dice"
+				alt="Probability bars feeding a glowing brass die, a flame for temperature beneath it"
+			/>
+			<figcaption>
+				Turning those scores into a word: softmax makes them probabilities, temperature reshapes them,
+				a top-k / top-p cutoff trims the tail, and one token falls out.
+			</figcaption>
+		</figure>
 
 		<Slide title="Softmax: scores into probabilities">
 			<p>
@@ -481,6 +466,14 @@ await chain.invoke({ topic: 'embeddings' });   // → a plain string
 	{/snippet}
 
 	{#snippet demo()}
+		<Panel title="Try it" subtitle="messages in · one AIMessage out · then streamed">
+			<ol class="howto">
+				<li><strong>Make the raw call.</strong> Type a question and hit <em>model.invoke()</em> on Demo 1 — you get the literal <code>messages</code> in and the single <code>AIMessage</code> out, with token usage and finish reason. This is what LangChain's prompt templates and parsers normally hide.</li>
+				<li><strong>Compose and stream.</strong> Demo 2 wraps the same model in a tiny <code>prompt | model | parser</code> chain. Give it a topic, hit <em>chain.stream()</em>, and watch the answer type in token by token, then settle into rendered Markdown.</li>
+				<li><strong>Note the model.</strong> Both demos call the model you've configured — shown at the top of this column — so the output is a real, live call, not a recording.</li>
+			</ol>
+		</Panel>
+
 		<div class="demo-intro">
 			<p>
 				The windows on the left are GPT-2 frozen mid-thought. Here you call the model you've
@@ -517,7 +510,6 @@ await chain.invoke({ topic: 'embeddings' });   // → a plain string
 					<span>· {raw.model}</span>
 				</div>
 			{/if}
-			<CodeBlock code={rawCode} lang="ts" caption="The exact call this demo runs." dense />
 		</Panel>
 
 		<Panel title="Demo 2 · the model as a Runnable" subtitle="prompt | model | parser">
@@ -538,12 +530,25 @@ await chain.invoke({ topic: 'embeddings' });   // → a plain string
 					{#if chainDone}<Markdown source={chainOut} />{:else}{chainOut}{/if}
 				</div>
 			{/if}
-			<CodeBlock code={chainCode} lang="ts" caption="The exact chain this demo runs." dense />
 		</Panel>
 	{/snippet}
 </Lesson>
 
 <style>
+	.howto {
+		margin: 0;
+		padding-left: 1.1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		font-size: 0.86rem;
+		line-height: 1.5;
+		color: var(--color-fg-muted);
+	}
+	.howto strong {
+		color: var(--color-fg);
+	}
+
 	/* Prominent workshop launch card at the top of the lesson. */
 	.launch-card {
 		display: flex;

@@ -463,6 +463,14 @@ return { board, aiMove: cell, moves: [{ mark: 'o', cell }] };`
 	{/snippet}
 
 	{#snippet demo()}
+		<Panel title="Try it" subtitle="every click is one run of the graph">
+			<ol class="howto">
+				<li><strong>Play a square.</strong> You're ✕ and move first — each click hands the board to the graph and runs it once, so ◯ replies and the status line tells you whose turn it is.</li>
+				<li><strong>Watch the path light up.</strong> The live graph traces <code>referee → scan_win ∥ scan_block → decide → referee → END</code>. Hover any node or labelled edge to see what it did and the state it wrote.</li>
+				<li><strong>Win, and watch the shortcut.</strong> Complete a line and the very first <code>referee</code> routes <em>straight</em> to <code>END</code> — the conditional edge sees the game is over and skips ◯ entirely. Hit <em>New game</em> to retry.</li>
+			</ol>
+		</Panel>
+
 		<Panel title="Tic-tac-toe vs. the graph" subtitle="you’re ✕ and move first — every click runs the graph once">
 			<div class="board" class:locked={running || status !== 'continue'}>
 				{#each board as cell, i (i)}
@@ -503,6 +511,20 @@ return { board, aiMove: cell, moves: [{ mark: 'o', cell }] };`
 </Lesson>
 
 <style>
+	.howto {
+		margin: 0;
+		padding-left: 1.1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		font-size: 0.86rem;
+		line-height: 1.5;
+		color: var(--color-fg-muted);
+	}
+	.howto strong {
+		color: var(--color-fg);
+	}
+
 	/* In-narrative diagrams: frameless, full column width. */
 	.diagram {
 		margin: 1.8rem 0;
