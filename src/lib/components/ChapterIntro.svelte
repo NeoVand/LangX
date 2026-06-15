@@ -53,6 +53,9 @@
 							{#if lesson.comingSoon}
 								<div class="lesson-row">
 									<span class="num font-mono">{String(i + 1).padStart(2, '0')}</span>
+									<span class="thumb" aria-hidden="true">
+										<img src="/images/thumbs/{lesson.banner}.webp" alt="" loading="lazy" />
+									</span>
 									<span class="body">
 										<span class="title font-display">{lesson.title}</span>
 										<span class="subtitle font-prose">{lesson.subtitle}</span>
@@ -62,6 +65,9 @@
 							{:else}
 								<a class="lesson-row" href="{chapter.base}/{lesson.slug}">
 									<span class="num font-mono">{String(i + 1).padStart(2, '0')}</span>
+									<span class="thumb" aria-hidden="true">
+										<img src="/images/thumbs/{lesson.banner}.webp" alt="" loading="lazy" />
+									</span>
 									<span class="body">
 										<span class="title font-display">{lesson.title}</span>
 										<span class="subtitle font-prose">{lesson.subtitle}</span>
@@ -226,15 +232,35 @@
 
 	.lesson-row {
 		display: grid;
-		grid-template-columns: 2rem 1fr auto;
+		grid-template-columns: 1.6rem 3.6rem 1fr auto;
 		align-items: center;
 		gap: 0.85rem;
-		padding: 0.7rem 0.5rem;
+		padding: 0.6rem 0.5rem;
 		text-decoration: none;
 		color: var(--color-ink-100);
 		transition:
 			background 0.16s ease,
 			padding 0.16s ease;
+	}
+
+	/* Banner thumbnail (4:3) between the number and the title — makes the TOC graphical. */
+	.thumb {
+		display: block;
+		width: 3.6rem;
+		aspect-ratio: 4 / 3;
+		border-radius: 0.3rem;
+		overflow: hidden;
+		background: color-mix(in oklch, var(--accent) 10%, #000);
+		border: 1px solid var(--color-rule);
+	}
+	.thumb img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
+	}
+	a.lesson-row:hover .thumb {
+		border-color: color-mix(in oklch, var(--accent) 45%, var(--color-rule));
 	}
 
 	a.lesson-row:hover {
@@ -282,7 +308,8 @@
 		cursor: default;
 	}
 	.lesson-list li.soon .title,
-	.lesson-list li.soon .subtitle {
+	.lesson-list li.soon .subtitle,
+	.lesson-list li.soon .thumb {
 		opacity: 0.62;
 	}
 
