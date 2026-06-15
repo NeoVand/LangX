@@ -1,9 +1,9 @@
 import { test, expect, type Page } from '@playwright/test';
 
 /**
- * Key-free UI assertions: view-mode toggles, the DemoFrame Code tab showing the
- * real executed source, and inline diagrams rendering. None of these drive an
- * LLM, so they run in every CI environment without an API key.
+ * Key-free UI assertions: the footer pane toggles, the demo pane's View-source
+ * flip showing the real executed module source, and lesson diagrams rendering.
+ * None of these drive an LLM, so they run in every CI environment without a key.
  */
 
 const collectErrors = (page: Page) => {
@@ -23,68 +23,79 @@ const collectErrors = (page: Page) => {
 };
 
 test.describe('LangX UI (no key required)', () => {
-	test('view-mode shortcuts toggle the narrative and demo panes', async ({ page }) => {
+	test('the footer pane toggles show and hide the narrative and demo panes', async ({ page }) => {
 		const errors = collectErrors(page);
 		await page.goto('/1-langchain/tools', { waitUntil: 'networkidle' });
 
 		const narrative = page.locator('.narrative-pane');
 		const demo = page.locator('.demo-pane');
+		// The footer (LessonNav) exposes a book toggle and a wrench toggle — no
+		// keyboard shortcuts; the panes are driven by these buttons.
+		const bookToggle = page.locator('button[title="Toggle the reading pane"]');
+		const workshopToggle = page.locator('button[title="Toggle the demo pane"]');
 
 		// Default: both panes present (Workshop + Book on).
 		await expect(narrative).toHaveCount(1);
 		await expect(demo).toHaveCount(1);
 
-		// B toggles the Book (narrative) pane off, leaving the demo pane.
-		await page.locator('body').press('b');
+		// The book toggle hides the narrative pane, leaving the demo pane.
+		await bookToggle.click();
 		await expect(narrative).toHaveCount(0);
 		await expect(demo).toHaveCount(1);
 
-		// B again restores it.
-		await page.locator('body').press('b');
+		// Toggling it again restores the narrative pane.
+		await bookToggle.click();
 		await expect(narrative).toHaveCount(1);
 
-		// W toggles the Workshop (demo) pane off, leaving the narrative pane.
-		await page.locator('body').press('w');
+		// The wrench toggle hides the demo pane, leaving the narrative pane.
+		await workshopToggle.click();
 		await expect(demo).toHaveCount(0);
 		await expect(narrative).toHaveCount(1);
-		await page.locator('body').press('w');
+		await workshopToggle.click();
 		await expect(demo).toHaveCount(1);
-
-		// P enters presentation mode (overlay + in-presentation root).
-		await page.locator('body').press('p');
-		await expect(page.locator('.presentation-root.in-presentation')).toHaveCount(1);
-		await page.keyboard.press('Escape');
-		await expect(page.locator('.presentation-root.in-presentation')).toHaveCount(0);
 
 		expect(errors).toEqual([]);
 	});
 
-	test('Code tab shows the real executed module source (no drift)', async ({ page }) => {
+	test('View source shows the real executed module source (no drift)', async ({ page }) => {
 		const errors = collectErrors(page);
 		await page.goto('/1-langchain/tools', { waitUntil: 'networkidle' });
 
-		// Open the DemoFrame "Code" tab.
-		const codeTab = page.getByRole('tab', { name: /^code$/i }).first();
-		await expect(codeTab).toBeVisible({ timeout: 10_000 });
-		await codeTab.click();
+		// Flip the demo pane to its source view (the toolbar "View source" button).
+		const viewSource = page.getByRole('button', { name: /view source/i });
+		await expect(viewSource).toBeVisible({ timeout: 10_000 });
+		await viewSource.click();
 
-		// The displayed source must contain a token unique to the executed module
-		// (src/lib/demos/tools-weather.ts exports runWeatherDemo).
+		// Open the executed module's file — the page runs runDatabaseDemo from
+		// src/lib/demos/tools-database.ts, so its source must show that export.
+		await page.getByRole('tab', { name: 'tools-database.ts' }).click();
+
 		const codeText = (await page.locator('.demo-pane pre').first().textContent()) ?? '';
-		expect(codeText, 'Code tab did not show the executed module source').toContain(
-			'runWeatherDemo'
+		expect(codeText, 'View source did not show the executed module source').toContain(
+			'runDatabaseDemo'
 		);
 
 		expect(errors).toEqual([]);
 	});
 
-	test('lessons embed an inline SVG diagram', async ({ page }) => {
+	test('lessons embed a diagram image', async ({ page }) => {
 		const errors = collectErrors(page);
-		await page.goto('/1-langchain/agent', { waitUntil: 'networkidle' });
-		await expect(page.locator('.diagram svg').first()).toBeVisible({ timeout: 10_000 });
-		// The diagram should contain labelled nodes.
-		const labels = await page.locator('.diagram svg text').count();
-		expect(labels, 'diagram rendered no labels').toBeGreaterThan(2);
+		await page.goto('/1-langchain/overview', { waitUntil: 'networkidle' });
+
+		// Lessons render their diagrams as PNG HeroImages inside <figure class="diagram">.
+		const figure = page.locator('.diagram').first();
+		await figure.scrollIntoViewIfNeeded();
+		const img = figure.locator('img').first();
+
+		// The PNG must actually load: naturalWidth > 0 proves the asset resolved and
+		// rendered, not just an empty/broken <img> box.
+		await expect
+			.poll(() => img.evaluate((el) => (el as HTMLImageElement).naturalWidth), {
+				timeout: 10_000
+			})
+			.toBeGreaterThan(0);
+		await expect(img).toBeVisible();
+
 		expect(errors).toEqual([]);
 	});
 
