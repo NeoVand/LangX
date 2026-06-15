@@ -161,6 +161,6 @@ A grand painterly banner illustration in warm Victorian-steampunk style — an a
 ### Already consistent — left untouched
 
 `l1-model`, `l3-compaction`, `l3-hitl`, `l3-skills`, `l3-subagents`, `l3-capstone-research`,
-`l3-capstone-data-science`, `l3-beyond`, and the framed L2 tail (`l2-checkpointers`,
-`l2-interrupts`, `l2-streaming-modes`, `l2-send-fanout`, `l2-subgraphs`) all already carry the
-4:3 ornate frame + title/subtitle plaques.
+and the framed L2 tail (`l2-checkpointers`, `l2-interrupts`, `l2-streaming-modes`,
+`l2-send-fanout`, `l2-subgraphs`) all already carry the 4:3 ornate frame + title/subtitle
+plaques.
