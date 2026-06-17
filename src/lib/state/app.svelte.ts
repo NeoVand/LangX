@@ -435,6 +435,23 @@ export function isConfigured(): boolean {
 	return localRuntimeReady();
 }
 
+/**
+ * Can a demo actually run right now? True if any hosted key is set, an Azure chat
+ * deployment is selected, or a local model is downloaded and runnable on this machine
+ * (WebGPU permitting). Unlike `isConfigured()`, this is independent of the *preferred*
+ * provider — it answers "is the green 'ready' light on?", which is what the top-nav dot
+ * shows. A no-key user who downloads a local model from Setup flips this true.
+ */
+export function runtimeReady(): boolean {
+	if (!browser) return false;
+	if (app.keys.anthropic || app.keys.openai || app.keys.google) return true;
+	if (selectedAzureChatModel()) return true;
+	return app.downloadedModels.some((id) => {
+		const m = TJS_MODELS.find((x) => x.id === id);
+		return m ? !(m.requiresWebGpu && app.webgpuOk === false) : false;
+	});
+}
+
 export function bestAvailableProvider(): ModelProvider | null {
 	if (app.keys.anthropic) return 'anthropic';
 	if (app.keys.openai) return 'openai';

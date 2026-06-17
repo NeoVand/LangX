@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { app } from '$lib/state/app.svelte';
+	import { app, runtimeReady } from '$lib/state/app.svelte';
 	import { nav, isDetour } from '$lib/state/nav.svelte';
 	import { chapters } from '$lib/curriculum';
 	import ParrotMark from './ParrotMark.svelte';
@@ -17,9 +17,9 @@
 	// On detour pages (setup, glossary, the model explorer) offer a way back to
 	// wherever the reader came from — the root layout keeps `nav.backTo` current.
 	const showBack = $derived(isDetour(path));
-	const hasKey = $derived(
-		!!(app.keys.openai || app.keys.anthropic || app.keys.google)
-	);
+	// Green when a demo can actually run — a hosted key OR a downloaded local model
+	// (so the dot turns green once a no-key user finishes a Setup download).
+	const hasKey = $derived(runtimeReady());
 
 	// Compact-screen dropdown menu (chapter nav + actions collapse into it).
 	let menuOpen = $state(false);
@@ -70,9 +70,9 @@
 			<Icon name="gauge" size={15} />
 			<span>Setup</span>
 			{#if hasKey}
-				<span class="dot-on" aria-label="model configured"></span>
+				<span class="dot-on" aria-label="ready to run demos"></span>
 			{:else}
-				<span class="dot-off" aria-label="no key set"></span>
+				<span class="dot-off" aria-label="no model ready"></span>
 			{/if}
 		</a>
 		<a

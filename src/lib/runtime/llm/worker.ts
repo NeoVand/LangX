@@ -1,5 +1,5 @@
 /// <reference lib="webworker" />
-import { pipeline, env, type TextGenerationPipeline } from '@huggingface/transformers';
+import { pipeline, env, TextStreamer, type TextGenerationPipeline } from '@huggingface/transformers';
 
 // Persist model weights in the browser's Cache Storage so a model is fetched from the
 // network only once; every later load (including after a page refresh) reads from cache.
@@ -63,42 +63,43 @@ self.addEventListener('message', async (ev: MessageEvent<IncomingMsg>) => {
 				return;
 			}
 
-			let buffer = '';
-			const callback = (text: string) => {
-				const piece = text.slice(buffer.length);
-				if (piece) {
-					buffer = text;
-					postMessage({ type: 'token', id: msg.id, text: piece });
-				}
-			};
-
-			let stopOnEvents: { token_callback_function?: typeof callback } = {};
+			// Real token streaming uses a TextStreamer — there is NO `token_callback_function`
+			// option on transformers.js generate(), so the previous version streamed nothing and
+			// `model.stream()` yielded zero chunks (the chat demos rendered an empty reply). The
+			// streamer's callback fires with each newly-decoded piece (prompt + specials skipped).
+			let streamerOpt: { streamer?: TextStreamer } = {};
 			if (msg.stream !== false) {
-				stopOnEvents = { token_callback_function: callback };
+				const streamer = new TextStreamer(generator.tokenizer, {
+					skip_prompt: true,
+					skip_special_tokens: true,
+					callback_function: (text: string) => {
+						if (text) postMessage({ type: 'token', id: msg.id, text });
+					}
+				});
+				streamerOpt = { streamer };
 			}
 
-			// With tools, pre-render the prompt through the model's own chat template so
-			// the tools are advertised in its native format (Hermes-style for Qwen3 /
-			// SmolLM3). `enable_thinking:false` suppresses Qwen3's <think> blocks — faster
-			// and easier to parse for tool loops. Templates that don't know the option
-			// ignore it. Without tools, keep passing the message array (template applied
-			// internally as before).
-			let input: unknown = msg.messages;
-			if (msg.tools && msg.tools.length) {
-				input = generator.tokenizer.apply_chat_template(msg.messages as never, {
-					tools: msg.tools,
-					add_generation_prompt: true,
-					tokenize: false,
-					enable_thinking: false
-				} as never) as unknown as string;
-			}
+			// ALWAYS render the prompt through the model's own chat template with
+			// `enable_thinking:false`. This is the critical bit for the chat demos:
+			// reasoning models like Qwen3 default to emitting a long <think> block, and on
+			// a small in-browser token budget they can burn the whole budget thinking and
+			// return an empty visible answer — the chatbot looks broken. Disabling thinking
+			// makes them answer directly. With tools present the same call advertises them
+			// in the model's native format (Hermes-style for Qwen3 / SmolLM3). Templates
+			// that don't know `enable_thinking`/`tools` (Llama, Phi, Gemma) just ignore them.
+			const input = generator.tokenizer.apply_chat_template(msg.messages as never, {
+				...(msg.tools && msg.tools.length ? { tools: msg.tools } : {}),
+				add_generation_prompt: true,
+				tokenize: false,
+				enable_thinking: false
+			} as never) as unknown as string;
 
 			const result = (await generator(input as never, {
 				max_new_tokens: msg.max_new_tokens ?? 512,
 				temperature: msg.temperature ?? 0.7,
 				do_sample: (msg.temperature ?? 0.7) > 0,
 				return_full_text: false,
-				...stopOnEvents
+				...streamerOpt
 			} as never)) as unknown;
 
 			let final = '';

@@ -511,7 +511,7 @@
 							{:else}
 								<button
 									type="button"
-									class="m-dl btn"
+									class="m-dl go"
 									disabled={!!downloadingId}
 									onclick={(e) => {
 										e.preventDefault();
@@ -1135,16 +1135,22 @@
 		margin-top: 0.7rem;
 	}
 	.m-dl {
-		display: inline-flex;
+		/* Full-width + centered so all three states (Download / Downloading / Downloaded)
+		   occupy an identical box — the card doesn't resize or shift when the state flips. */
+		display: flex;
+		width: 100%;
+		box-sizing: border-box;
+		justify-content: center;
 		align-items: center;
 		gap: 0.4rem;
 		font-size: 0.78rem;
 		font-weight: 600;
 		font-family: var(--font-mono);
-		padding: 0.4rem 0.8rem;
+		padding: 0.45rem 0.8rem;
 		border-radius: 0.5rem;
+		line-height: 1.2;
 	}
-	.m-dl.btn {
+	.m-dl.go {
 		color: var(--accent-ink);
 		background: var(--accent-soft);
 		border: 1px solid var(--accent-rule);
