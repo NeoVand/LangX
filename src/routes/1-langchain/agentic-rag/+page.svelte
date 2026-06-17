@@ -32,7 +32,11 @@
 		type ChunkPoint,
 		type SearchEvent
 	} from '$lib/demos/agentic-rag';
-	import { EMBEDDINGS_PROVIDERS, type EmbeddingsProviderId } from '$lib/runtime/rag/registry';
+	import {
+		EMBEDDINGS_PROVIDERS,
+		defaultEmbeddingsProvider,
+		type EmbeddingsProviderId
+	} from '$lib/runtime/rag/registry';
 	import agenticRagSrc from '$lib/demos/agentic-rag.ts?raw';
 	import ragSkill from '$lib/demos/skills/agentic-rag.md?raw';
 	import ragPipelineSrc from '$lib/demos/rag-pipeline.ts?raw';
@@ -72,7 +76,9 @@ console.log(messages.at(-1)?.content);
 	// The full corpus (kept so we can add/remove docs and re-index).
 	let loadedDocs = $state<{ source: string; text: string }[]>([]);
 	let docs = $state<{ source: string; chunks: number }[]>([]);
-	let ragProvider = $state<EmbeddingsProviderId>('local');
+	// Default to the embeddings that match the configured chat provider (OpenAI/Azure/…),
+	// only falling back to the local model when no hosted key is set up.
+	let ragProvider = $state<EmbeddingsProviderId>(defaultEmbeddingsProvider());
 	let indexing = $state(false);
 	let running = $state(false);
 	let error = $state('');

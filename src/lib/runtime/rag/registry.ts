@@ -42,6 +42,27 @@ export const EMBEDDINGS_PROVIDERS: EmbeddingsProviderInfo[] = [
 	}
 ];
 
+/**
+ * The embeddings provider a RAG demo should default to — matched to the user's
+ * configured chat provider so the dropdowns don't sit on "Local" when they've set up
+ * OpenAI or Azure. Only ever returns a provider that's actually usable right now
+ * (`available()` true), falling back through any configured hosted key to local.
+ */
+export function defaultEmbeddingsProvider(): EmbeddingsProviderId {
+	const can = (id: EmbeddingsProviderId) =>
+		EMBEDDINGS_PROVIDERS.find((p) => p.id === id)?.available() ?? false;
+	const pref = app.preferredProvider;
+	// Prefer the embeddings that belong to the configured chat provider…
+	if (pref === 'azure' && can('azure')) return 'azure';
+	if (pref === 'openai' && can('openai')) return 'openai';
+	// …otherwise use any configured hosted embeddings (so a set key isn't ignored)…
+	if (can('openai')) return 'openai';
+	if (can('azure')) return 'azure';
+	if (can('voyage')) return 'voyage';
+	// …and only land on the bundled local model when nothing hosted is set up.
+	return 'local';
+}
+
 export async function makeEmbeddings(id: EmbeddingsProviderId): Promise<Embeddings> {
 	if (id === 'openai') {
 		const { OpenAIEmbeddings } = await import('@langchain/openai');

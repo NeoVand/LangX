@@ -8,7 +8,11 @@
 	 * cosine + angle for every pair.
 	 */
 	import { embedText, cosineSimilarity } from '$lib/demos/agentic-rag';
-	import { EMBEDDINGS_PROVIDERS, type EmbeddingsProviderId } from '$lib/runtime/rag/registry';
+	import {
+		EMBEDDINGS_PROVIDERS,
+		defaultEmbeddingsProvider,
+		type EmbeddingsProviderId
+	} from '$lib/runtime/rag/registry';
 
 	const SLOTS = [
 		{ id: 'A', color: 'var(--accent)' },
@@ -21,7 +25,7 @@
 		'Trekking through the hills in warm weather is my favorite pastime.',
 		'The stock market dropped sharply after the rate announcement.'
 	]);
-	let provider = $state<EmbeddingsProviderId>('local');
+	let provider = $state<EmbeddingsProviderId>(defaultEmbeddingsProvider());
 	let busy = $state(false);
 	let error = $state('');
 	let res = $state<{ vecs: (number[] | null)[]; pos3: ([number, number, number] | null)[] } | null>(
