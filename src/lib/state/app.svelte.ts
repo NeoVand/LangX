@@ -9,6 +9,9 @@ const STORAGE_KEY = 'langx.app.v2';
 
 export type ModelProvider = 'transformers-js' | 'openai' | 'anthropic' | 'google' | 'azure';
 
+/** Embeddings provider for the RAG demos (canonical type; re-exported by the registry). */
+export type EmbeddingsProviderId = 'local' | 'openai' | 'voyage' | 'azure';
+
 export interface ApiKeys {
 	openai: string;
 	anthropic: string;
@@ -204,6 +207,11 @@ export interface AppState {
 	webgpuOk: boolean | null;
 	/** Local (Transformers.js) model ids fully downloaded + cached in this browser. */
 	downloadedModels: string[];
+	/**
+	 * Explicit embeddings provider for the RAG demos, or null to auto-match the chat
+	 * provider. Lets the user pick (and switch back to) Local on the Setup page.
+	 */
+	embeddingsProvider: EmbeddingsProviderId | null;
 }
 
 const defaultState = (): AppState => ({
@@ -226,7 +234,8 @@ const defaultState = (): AppState => ({
 	theme: 'dark',
 	visited: {},
 	webgpuOk: null,
-	downloadedModels: []
+	downloadedModels: [],
+	embeddingsProvider: null
 });
 
 /**
@@ -327,6 +336,12 @@ export function setProviderModel(provider: HostedProvider, id: string) {
 /** Choose which embedding model a hosted embeddings provider should use (RAG). */
 export function setEmbeddingModel(provider: 'openai' | 'voyage', id: string) {
 	app.embeddingModels[provider] = id;
+	persist();
+}
+
+/** Pick the active embeddings provider for RAG demos (null = auto-match chat provider). */
+export function setEmbeddingsProvider(id: EmbeddingsProviderId | null) {
+	app.embeddingsProvider = id;
 	persist();
 }
 

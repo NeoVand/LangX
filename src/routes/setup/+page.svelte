@@ -5,6 +5,7 @@
 		setPreferredProvider,
 		setProviderModel,
 		setEmbeddingModel,
+		setEmbeddingsProvider,
 		setTjsModel,
 		addAzureModel,
 		removeAzureModel,
@@ -18,6 +19,7 @@
 		type TransformersJsModel
 	} from '$lib/state/app.svelte';
 	import { TransformersJsChatModel, warmActiveLocalModel } from '$lib/runtime/llm';
+	import { defaultEmbeddingsProvider } from '$lib/runtime/rag/registry';
 	import { tjsDownload } from '$lib/state/tjs.svelte';
 	import {
 		modelsForProvider,
@@ -143,6 +145,11 @@
 		{ provider: 'openai' as const, title: 'OpenAI', hasKey: !!app.keys.openai },
 		{ provider: 'voyage' as const, title: 'Voyage', hasKey: !!app.keys.voyage }
 	]);
+
+	// The embeddings provider the RAG demos will actually use — an explicit pick (incl.
+	// Local) or, when none is set, the one auto-matched to the chat provider. Drives the
+	// single "active" highlight across Step 3's cards.
+	const activeEmbed = $derived(defaultEmbeddingsProvider());
 
 	async function pingModel() {
 		if (!canPing) return;
@@ -313,14 +320,22 @@
 		{#if list.length}
 			<div class="models hosted-models az-list">
 				{#each list as m (m.id)}
-					<label class="model" class:selected={selectedId === m.id}>
+					{@const isSel =
+						kind === 'chat' ? selectedId === m.id : activeEmbed === 'azure' && selectedId === m.id}
+					<label class="model" class:selected={isSel}>
 						<input
 							type="radio"
-							name={`azure-${kind}`}
+							name={kind === 'chat' ? 'azure-chat' : 'embed-active'}
 							value={m.id}
-							checked={selectedId === m.id}
-							onchange={() =>
-								kind === 'chat' ? setAzureChatModel(m.id) : setAzureEmbeddingModel(m.id)}
+							checked={isSel}
+							onchange={() => {
+								if (kind === 'chat') {
+									setAzureChatModel(m.id);
+								} else {
+									setAzureEmbeddingModel(m.id);
+									setEmbeddingsProvider('azure');
+								}
+							}}
 						/>
 						<div class="m-head">
 							<div>
@@ -616,9 +631,47 @@
 		<h2>Step 3 · <Term t="embedding model">Embeddings</Term> (RAG)</h2>
 		<p class="muted">
 			The <a href="/1-langchain/overview">Overview chatbot</a> turns your documents into vectors with an
-			embedding model. Local <Term t="MiniLM">MiniLM</Term> runs in-browser with no key; to use a hosted
-			model, pick it below and add that provider's key.
+			embedding model. Pick the one the RAG demos use below — <Term t="MiniLM">Local MiniLM</Term> runs
+			in-browser with no key, or choose a hosted model and add that provider's key. The selected card
+			is what the lessons default to; switch back to Local any time.
 		</p>
+		<div class="embed-group">
+			<div class="embed-head">
+				<span class="embed-provider font-display">Local</span>
+				<span class="embed-key ok">no key</span>
+			</div>
+			<div class="models hosted-models">
+				<label class="model" class:selected={activeEmbed === 'local'}>
+					<input
+						type="radio"
+						name="embed-active"
+						value="local"
+						checked={activeEmbed === 'local'}
+						onchange={() => setEmbeddingsProvider('local')}
+					/>
+					<div class="m-head">
+						<div>
+							<span class="m-name font-display">MiniLM</span>
+							<span class="m-sub">all-MiniLM-L6-v2</span>
+						</div>
+						<span class="tag-rec">no key</span>
+					</div>
+					<dl class="m-stats">
+						<div>
+							<dt>Dimensions</dt>
+							<dd>384</dd>
+						</div>
+						<div>
+							<dt>Cost</dt>
+							<dd class="cost-free">free</dd>
+						</div>
+					</dl>
+					<p class="m-notes">
+						Runs fully in-browser — no key, no network. The zero-setup default for the RAG lessons.
+					</p>
+				</label>
+			</div>
+		</div>
 		{#each embedGroups as group (group.provider)}
 			<div class="embed-group" class:locked={!group.hasKey}>
 				<div class="embed-head">
@@ -643,13 +696,19 @@
 				{/if}
 				<div class="models hosted-models">
 					{#each embeddingModelsForProvider(group.provider) as model (model.id)}
-						<label class="model" class:selected={app.embeddingModels[group.provider] === model.id}>
+						{@const isSel =
+							activeEmbed === group.provider && app.embeddingModels[group.provider] === model.id}
+						<label class="model" class:selected={isSel}>
 							<input
 								type="radio"
-								name={`embed-${group.provider}`}
+								name="embed-active"
 								value={model.id}
-								checked={app.embeddingModels[group.provider] === model.id}
-								onchange={() => setEmbeddingModel(group.provider, model.id)}
+								disabled={!group.hasKey}
+								checked={isSel}
+								onchange={() => {
+									setEmbeddingModel(group.provider, model.id);
+									setEmbeddingsProvider(group.provider);
+								}}
 							/>
 							<div class="m-head">
 								<div>
@@ -685,10 +744,6 @@
 			</p>
 			{@render azurePanel('embedding')}
 		</div>
-		<p class="muted local-note">
-			<strong>Local · MiniLM</strong> (all-MiniLM-L6-v2, 384-dim) runs fully in-browser with no key — the
-			default in the RAG lesson.
-		</p>
 	</section>
 
 	<section class="block end">
@@ -1119,10 +1174,6 @@
 	.embed-key.ok {
 		color: var(--accent);
 	}
-	.local-note {
-		margin-top: 1.1rem;
-	}
-
 	.m-notes {
 		font-size: 0.86rem;
 		color: var(--color-ink-200);

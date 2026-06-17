@@ -1,11 +1,17 @@
 import type { Embeddings } from '@langchain/core/embeddings';
-import { app, selectedAzureEmbeddingModel } from '$lib/state/app.svelte';
+import {
+	app,
+	selectedAzureEmbeddingModel,
+	type EmbeddingsProviderId
+} from '$lib/state/app.svelte';
 import { findEmbeddingModel } from '$lib/models/catalog';
 import { azureProxyBaseUrl } from '$lib/models/azure';
 import { MiniLmEmbeddings } from './embeddings';
 import { VoyageEmbeddings } from './voyage';
 
-export type EmbeddingsProviderId = 'local' | 'openai' | 'voyage' | 'azure';
+// Canonical type lives in app state (so it can be persisted); re-exported here because
+// most callers import it from the registry.
+export type { EmbeddingsProviderId };
 
 export interface EmbeddingsProviderInfo {
 	id: EmbeddingsProviderId;
@@ -51,6 +57,9 @@ export const EMBEDDINGS_PROVIDERS: EmbeddingsProviderInfo[] = [
 export function defaultEmbeddingsProvider(): EmbeddingsProviderId {
 	const can = (id: EmbeddingsProviderId) =>
 		EMBEDDINGS_PROVIDERS.find((p) => p.id === id)?.available() ?? false;
+	// An explicit Setup choice wins — as long as it's still usable (key not removed).
+	const chosen = app.embeddingsProvider;
+	if (chosen && can(chosen)) return chosen;
 	const pref = app.preferredProvider;
 	// Prefer the embeddings that belong to the configured chat provider…
 	if (pref === 'azure' && can('azure')) return 'azure';
