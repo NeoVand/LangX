@@ -16,6 +16,7 @@
 	import { onMount } from 'svelte';
 	import { fade } from 'svelte/transition';
 	import { base } from '$app/paths';
+	import { dev } from '$app/environment';
 	import * as ort from 'onnxruntime-web';
 	import { AutoTokenizer } from '@huggingface/transformers';
 	import classNames from 'classnames';
@@ -60,10 +61,13 @@
 	ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.0/dist/';
 	ort.env.logLevel = 'error';
 
-	// Where the 63 model chunks live. Dev = local static; for prod set this to a
-	// Hugging Face Hub repo, e.g.
-	//   'https://huggingface.co/<user>/transformer-explainer-gpt2-onnx/resolve/main/model-v2'
-	const MODEL_BASE = `${base}/model-v2`;
+	// Where the 63 model chunks live. Dev serves them from local static/model-v2
+	// (gitignored, ~626 MB). Prod fetches them from a dedicated repo via jsDelivr's
+	// CORS-enabled CDN — keeping the deployed site small and backend-free. The @v1
+	// tag is immutably cached by jsDelivr; bump it if the chunks are ever re-exported.
+	const MODEL_BASE = dev
+		? `${base}/model-v2`
+		: 'https://cdn.jsdelivr.net/gh/NeoVand/langx-gpt2-onnx@v1';
 
 	let active = false;
 	let appStartTime = Date.now();
