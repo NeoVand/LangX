@@ -7,7 +7,18 @@
 		selectedAzureEmbeddingModel
 	} from '$lib/state/app.svelte';
 	import { findHostedModel, findEmbeddingModel, type HostedProvider } from '$lib/models/catalog';
-	import { Link2, VectorSquare, Bot, Heart, SlidersHorizontal } from '@lucide/svelte';
+	import {
+		Link2,
+		VectorSquare,
+		Bot,
+		Heart,
+		SlidersHorizontal,
+		ArrowRight,
+		Globe,
+		KeyRound,
+		Activity,
+		Boxes
+	} from '@lucide/svelte';
 
 	const configured = $derived(
 		!!(app.keys.anthropic || app.keys.openai || app.keys.google || selectedAzureChatModel())
@@ -38,52 +49,237 @@
 		deepagents: Bot
 	};
 
+	// Per-level identity — accent pulled straight from each level's artwork (amber pipes,
+	// teal orrery, violet engine) plus an objective blurb, signature topics, and the
+	// capstone you walk away having built.
+	const levelMeta: Record<
+		string,
+		{ color: string; tint: string; blurb: string; highlights: string[]; builds: string }
+	> = {
+		langchain: {
+			color: 'oklch(0.8 0.15 72)',
+			tint: 'oklch(0.8 0.15 72)',
+			blurb:
+				'The foundation layer. Six composable primitives — prompts, models, parsers, tools, and retrievers — that all speak one interface, the Runnable. Pipe them together and you get chains, RAG, and agents.',
+			highlights: [
+				'Live GPT-2 in the browser',
+				'Streaming & structured output',
+				'Tool-calling with createAgent',
+				'Middleware & hooks'
+			],
+			builds: 'A hand-wired multimodal chatbot with memory, documents, and images.'
+		},
+		langgraph: {
+			color: 'oklch(0.82 0.11 200)',
+			tint: 'oklch(0.82 0.11 200)',
+			blurb:
+				'The orchestration layer. Model an agent as a stateful graph — nodes, edges, and reducers — that loops, branches, checkpoints, forks past runs, and pauses to ask a human.',
+			highlights: [
+				'Checkpoints & time travel',
+				'Interrupts / human-in-the-loop',
+				'Send & parallel fan-out',
+				'Subgraphs'
+			],
+			builds: 'An EDGAR statement auditor that fact-checks live SEC filings.'
+		},
+		deepagents: {
+			color: 'oklch(0.72 0.16 300)',
+			tint: 'oklch(0.72 0.16 300)',
+			blurb:
+				'The cognitive harness. Planning, a virtual filesystem, parallel subagents, progressive-disclosure skills, and context compaction — the machinery that turns a brief into a long-running, self-directing agent.',
+			highlights: [
+				'Plan board & recitation',
+				'Virtual filesystem',
+				'Parallel subagents',
+				'Context compaction'
+			],
+			builds: 'Deep Research and Data Science capstones that plan, act on real sources, and cite.'
+		}
+	};
+
+	const totalLessons = chapters.reduce((n, ch) => n + ch.lessons.length, 0);
+
+	// One flat ribbon of every lesson banner, split into two marquee rows that drift
+	// in opposite directions — a glance at how much of the course is hand-illustrated.
+	const allLessons = chapters.flatMap((ch) =>
+		ch.lessons.map((l) => ({ ...l, base: ch.base, chapter: ch.id }))
+	);
+	const rowA = allLessons.filter((_, i) => i % 2 === 0);
+	const rowB = allLessons.filter((_, i) => i % 2 === 1);
+
+	const principles = [
+		{
+			icon: Globe,
+			title: 'Runs in your browser',
+			body: 'Every demo executes client-side against real model APIs. No backend to deploy, nothing to install.'
+		},
+		{
+			icon: KeyRound,
+			title: 'Bring your own model',
+			body: 'Anthropic, OpenAI, Google, Azure — or a local model via transformers.js. Your keys stay in your browser.'
+		},
+		{
+			icon: Activity,
+			title: 'Inspect the internals',
+			body: 'Watch tokens stream, state mutate, tools fire, and graphs branch — the wiring is never hidden.'
+		},
+		{
+			icon: Boxes,
+			title: 'Built on the real stack',
+			body: 'The same @langchain/* and langgraph packages you would reach for in production, nothing mocked.'
+		}
+	];
+
 	const GITHUB_URL = 'https://github.com/NeoVand';
 	const LINKEDIN_URL = 'https://www.linkedin.com/in/mohsenvand/';
 </script>
 
 <main class="landing">
-	<!-- Full-bleed banner: art builds up on the right, text reads over the fade on the left.
-	     Uses a CSS background-image so a missing file degrades to the dark backdrop (no broken icon). -->
-	<section class="banner">
-		<div class="banner-grid">
-			<div class="banner-text">
-				<h1 class="font-serif">
-					Learn <span class="g lc">LangChain</span>, <span class="g lg">LangGraph</span>, and
-					<span class="g da">Deep Agents</span> by watching them run.
+	<!-- ── Hero ──────────────────────────────────────────────────────────── -->
+	<section class="hero">
+		<div class="hero-inner">
+			<div class="hero-art">
+				<img
+					src="/images/landing-banner.webp"
+					alt="A brass steampunk tableau — amber pipework, a teal orrery, and a violet reading-engine joined as one machine, tended by a mechanical parrot, beneath the LangX wordmark"
+					fetchpriority="high"
+				/>
+			</div>
+
+			<div class="hero-copy">
+				<p class="eyebrow">An interactive course in AI engineering</p>
+				<h1 class="font-display">
+					Learn the <span class="g lc">LangChain</span>, <span class="g lg">LangGraph</span>, and
+					<span class="g da">Deep&nbsp;Agents</span> stack by watching it run.
 				</h1>
 				<p class="lead">
-					Tool-calling agents, RAG pipelines, time-traveling state graphs, and self-planning deep
-					agents — each one a live demo you run and inspect in the browser.
+					{totalLessons} lessons across three levels, each one a live demo you run and inspect in the
+					browser — from a single tool-calling loop to a self-planning deep agent that researches real
+					sources and cites them.
 				</p>
+				<div class="cta-row">
+					<a class="btn primary" href="/1-langchain">
+						Begin Level 1 <ArrowRight size={17} strokeWidth={2.4} />
+					</a>
+					<a class="btn ghost" href="/setup">Choose your model</a>
+				</div>
+				<ul class="stat-strip">
+					<li><b>3</b> levels</li>
+					<li><b>{totalLessons}</b> lessons</li>
+					<li><b>Every concept</b> a live demo</li>
+					<li><b>100%</b> in-browser</li>
+				</ul>
 			</div>
-			<div class="banner-art" aria-hidden="true"></div>
 		</div>
 	</section>
 
-	<div class="container">
-		<section class="levels">
-			{#each chapters as ch (ch.id)}
-				{@const Cmp = cardIcon[ch.id]}
-				<a class="card" href={ch.base} data-chapter={ch.id}>
-					<div class="card-art">
-						<img src="/images/thumbs/{ch.poster}.webp" alt="" loading="lazy" />
-					</div>
-					<div class="card-body">
-						<div class="card-head">
-							<Cmp size={18} strokeWidth={2} />
-							<span class="card-num font-mono">Level {ch.number}</span>
-							<span class="card-count font-mono">{ch.lessons.length} lessons</span>
-						</div>
-						<div class="card-title font-serif">{ch.title}</div>
-						<div class="card-tag">{ch.tagline}</div>
-						<div class="card-cta">Open Level {ch.number} →</div>
-					</div>
-				</a>
-			{/each}
-		</section>
-	</div>
+	<!-- ── The three levels ──────────────────────────────────────────────── -->
+	<section class="levels">
+		<header class="section-head">
+			<p class="eyebrow">The path</p>
+			<h2 class="font-display">Three levels, one continuous build.</h2>
+			<p class="section-sub">
+				Each level recombines the one before it: primitives become stateful graphs, graphs become a
+				full agent harness.
+			</p>
+		</header>
 
+		{#each chapters as ch (ch.id)}
+			{@const Cmp = cardIcon[ch.id]}
+			{@const meta = levelMeta[ch.id]}
+			<article class="level" data-chapter={ch.id} style="--lv: {meta.color}">
+				<a class="level-art" href={ch.base} aria-label="Open {ch.title}">
+					<img src="/images/thumbs/{ch.poster}.webp" alt="" loading="lazy" decoding="async" />
+				</a>
+
+				<div class="level-body">
+					<div class="level-meta">
+						<Cmp size={16} strokeWidth={2} />
+						<span class="font-mono num">Level {ch.number}</span>
+						<span class="font-mono count">{ch.lessons.length} lessons</span>
+					</div>
+
+					<h3 class="font-display">{ch.title}</h3>
+					<p class="level-blurb">{meta.blurb}</p>
+
+					<ul class="chips">
+						{#each meta.highlights as h (h)}
+							<li>{h}</li>
+						{/each}
+					</ul>
+
+					<p class="level-build">
+						<span class="kicker">You build</span>
+						{meta.builds}
+					</p>
+
+					<a class="btn ghost lv" href={ch.base}>
+						Open Level {ch.number} <ArrowRight size={16} strokeWidth={2.4} />
+					</a>
+				</div>
+			</article>
+		{/each}
+	</section>
+
+	<!-- ── Learn by running — the banner ribbon ──────────────────────────── -->
+	<section class="showcase">
+		<header class="section-head">
+			<p class="eyebrow">Learn by running</p>
+			<h2 class="font-display">Not slides about agents. Agents you can run.</h2>
+			<p class="section-sub">
+				Every lesson pairs a hand-illustrated explainer with a working demo you drive yourself —
+				stream a model, fork a graph mid-run, approve an agent's plan, audit a filing.
+			</p>
+		</header>
+
+		<div class="marquee">
+			<div class="track">
+				{#each [...rowA, ...rowA] as l, i (i)}
+					<a class="tile" href="{l.base}/{l.slug}" title={l.title} aria-label={l.title}>
+						<img src="/images/thumbs/{l.banner}.webp" alt="" width="640" height="480" loading="lazy" decoding="async" />
+					</a>
+				{/each}
+			</div>
+		</div>
+		<div class="marquee rev">
+			<div class="track">
+				{#each [...rowB, ...rowB] as l, i (i)}
+					<a class="tile" href="{l.base}/{l.slug}" title={l.title} aria-label={l.title}>
+						<img src="/images/thumbs/{l.banner}.webp" alt="" width="640" height="480" loading="lazy" decoding="async" />
+					</a>
+				{/each}
+			</div>
+		</div>
+	</section>
+
+	<!-- ── Principles ────────────────────────────────────────────────────── -->
+	<section class="principles">
+		{#each principles as p (p.title)}
+			{@const Cmp = p.icon}
+			<div class="principle">
+				<span class="p-icon"><Cmp size={20} strokeWidth={1.8} /></span>
+				<h3 class="font-display">{p.title}</h3>
+				<p>{p.body}</p>
+			</div>
+		{/each}
+	</section>
+
+	<!-- ── Final CTA ─────────────────────────────────────────────────────── -->
+	<section class="finale">
+		<h2 class="font-display">Start with the foundation.</h2>
+		<p>
+			Level 1 assumes you can read code and nothing else. By the end of Level 3 you'll have built an
+			agent that plans its own work.
+		</p>
+		<div class="cta-row">
+			<a class="btn primary" href="/1-langchain">
+				Begin Level 1 <ArrowRight size={17} strokeWidth={2.4} />
+			</a>
+			<a class="btn ghost" href="/glossary">Browse the glossary</a>
+		</div>
+	</section>
+
+	<!-- ── Footer: setup status + attribution ────────────────────────────── -->
 	<footer class="site-footer">
 		<a class="setup-link" class:warn={!configured} href="/setup" title="Choose your models">
 			<SlidersHorizontal size={13} />
@@ -132,63 +328,64 @@
 		/* Pure black so the steampunk art (which fades to #000) dissolves into the page
 		   with no seam — the theme's --color-bg is a warm ~14%-light near-black, not #000. */
 		background: #000;
+		/* Local per-level accents, pulled from each level's artwork. */
+		--c-lc: oklch(0.8 0.15 72);
+		--c-lg: oklch(0.82 0.11 200);
+		--c-da: oklch(0.72 0.16 300);
+		/* x-only clip contains any full-bleed art without creating a vertical scroll
+		   container — that would break the footer's `position: sticky`. */
+		overflow-x: clip;
 	}
 
-	/* ── Banner ─────────────────────────────────────────────────────────── */
-	.banner {
+	/* ── Hero ───────────────────────────────────────────────────────────── */
+	.hero {
 		position: relative;
-		overflow: hidden;
-		background: #000;
+		padding: 0 0 clamp(1.5rem, 4vw, 3rem);
+		/* The banner's top is a black band; tuck it slightly under the translucent nav
+		   (black on frosted-black = seamless) — but not so far it clips the wordmark. */
+		margin-top: clamp(-1.5rem, -1.6vw, -0.5rem);
 	}
 
-	/* Overlapping layout: text reads on the left at z-index 2; the square art is
-	   absolutely placed on the right and its own faded left edge slips under the text. */
-	.banner-grid {
-		position: relative;
-		max-width: 64rem;
-		margin: 0 auto;
-		/* Top padding guarantees the headline clears the 60px sticky nav even when the
-		   text wraps tall and flex-centering would otherwise overflow upward. */
-		padding: 2.25rem 2rem 0.5rem;
-		min-height: clamp(360px, 50vh, 500px);
+	.hero-inner {
 		display: flex;
+		flex-direction: column;
 		align-items: center;
 	}
 
-	.banner-text {
-		position: relative;
-		z-index: 2;
-		max-width: 44rem;
+	/* The banner already dissolves to pure black on every edge, so it just sits on the
+	   #000 page — no mask, no glow, no frame. Black-on-black is seamless at any width. */
+	.hero-art {
+		width: 100%;
+		max-width: 84rem;
+		line-height: 0;
+	}
+	.hero-art img {
+		width: 100%;
+		height: auto;
+		display: block;
 	}
 
-	/* Art fills the right half, cropped (cover) so its dark sides are trimmed. A deep
-	   left feather lets the headline read over it; light right/top/bottom feathers melt
-	   every edge into the pure-black page (invisible on #000 — no gradient line). */
-	.banner-art {
-		position: absolute;
-		z-index: 1;
-		top: 0;
-		bottom: 0;
-		right: 0;
-		width: 48%;
-		background: url('/images/home-hero.png') no-repeat center / cover;
-		pointer-events: none;
-		-webkit-mask-image:
-			linear-gradient(to right, transparent, #000 32%, #000 95%, transparent),
-			linear-gradient(to bottom, transparent, #000 9%, #000 91%, transparent);
-		-webkit-mask-composite: source-in;
-		mask-image:
-			linear-gradient(to right, transparent, #000 32%, #000 95%, transparent),
-			linear-gradient(to bottom, transparent, #000 9%, #000 91%, transparent);
-		mask-composite: intersect;
+	.hero-copy {
+		position: relative;
+		text-align: center;
+		max-width: 46rem;
+		padding: 0 1.5rem;
+		/* Pull up into the black lower band of the banner so copy and art read as one piece. */
+		margin-top: clamp(-6rem, -7vw, -3rem);
+	}
+
+	.hero-copy .eyebrow {
+		display: block;
+		margin-bottom: 1rem;
 	}
 
 	h1 {
-		font-size: clamp(2.1rem, 4.6vw, 3.6rem);
+		font-size: clamp(2.1rem, 5vw, 3.7rem);
 		font-weight: 600;
-		line-height: 1.06;
-		letter-spacing: -0.02em;
+		line-height: 1.05;
+		letter-spacing: -0.025em;
 		margin: 0;
+		color: var(--color-cream-0);
 	}
 
 	.g {
@@ -196,187 +393,415 @@
 		white-space: nowrap;
 	}
 	.g.lc {
-		color: var(--color-accent-langchain);
+		color: var(--c-lc);
 	}
 	.g.lg {
-		color: var(--color-accent-langgraph);
+		color: var(--c-lg);
 	}
 	.g.da {
-		color: var(--color-accent-deepagents);
+		color: var(--c-da);
 	}
 
 	.lead {
-		font-family: var(--font-serif);
-		font-size: clamp(1.05rem, 1.6vw, 1.25rem);
+		font-family: var(--font-prose);
+		font-size: clamp(1.05rem, 1.5vw, 1.2rem);
 		color: var(--color-fg-muted);
 		line-height: 1.6;
-		margin: 1.4rem 0 0;
-		max-width: 34rem;
+		margin: 1.3rem auto 0;
+		max-width: 40rem;
 	}
 
-	@media (max-width: 820px) {
-		/* Stack: art on top as a hero, text beneath. */
-		.banner-grid {
-			flex-direction: column;
-			padding: 1.5rem 2rem 0.5rem;
-			min-height: 0;
-		}
-		.banner-art {
-			position: relative;
-			inset: auto;
-			order: -1;
-			width: 100%;
-			height: clamp(220px, 56vw, 340px);
-			background-position: center;
-			background-size: contain;
-			-webkit-mask-image: none;
-			mask-image: none;
-		}
-		.banner-text {
-			max-width: none;
-		}
+	.cta-row {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.75rem;
+		justify-content: center;
+		margin-top: 1.8rem;
 	}
 
-	/* ── Levels: three horizontal cards, poster shown WHOLE on the left ───── */
-	.container {
+	/* ── Buttons ────────────────────────────────────────────────────────── */
+	.btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.7rem 1.3rem;
+		border-radius: 999px;
+		font-size: 0.92rem;
+		font-weight: 600;
+		text-decoration: none;
+		border: 1px solid transparent;
+		transition:
+			transform 0.16s ease,
+			box-shadow 0.18s ease,
+			background 0.18s ease,
+			border-color 0.18s ease,
+			color 0.18s ease;
+	}
+	.btn :global(svg) {
+		transition: transform 0.18s ease;
+	}
+	.btn.primary {
+		--b: var(--color-accent-langchain);
+		color: var(--color-ink-0);
+		background: linear-gradient(
+			135deg,
+			color-mix(in oklch, var(--b) 78%, var(--color-cream-0)),
+			var(--b)
+		);
+		box-shadow: 0 10px 30px -12px color-mix(in oklch, var(--b) 70%, transparent);
+	}
+	.btn.primary:hover {
+		transform: translateY(-2px);
+		box-shadow: 0 16px 38px -12px color-mix(in oklch, var(--b) 80%, transparent);
+	}
+	.btn.primary:hover :global(svg) {
+		transform: translateX(3px);
+	}
+	.btn.ghost {
+		color: var(--color-cream-1);
+		border-color: color-mix(in oklch, var(--color-fg) 22%, transparent);
+		background: color-mix(in oklch, var(--color-cream-0) 3%, transparent);
+	}
+	.btn.ghost:hover {
+		color: var(--color-cream-0);
+		border-color: color-mix(in oklch, var(--color-cream-0) 48%, transparent);
+		transform: translateY(-2px);
+	}
+	.btn.ghost.lv {
+		align-self: flex-start;
+		color: color-mix(in oklch, var(--lv) 75%, var(--color-cream-0));
+		border-color: color-mix(in oklch, var(--lv) 34%, var(--color-border));
+	}
+	.btn.ghost.lv:hover {
+		border-color: var(--lv);
+		background: color-mix(in oklch, var(--lv) 12%, transparent);
+	}
+	.btn.ghost.lv:hover :global(svg) {
+		transform: translateX(3px);
+	}
+
+	.stat-strip {
+		list-style: none;
+		margin: 2rem 0 0;
+		padding: 0;
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 0.6rem 1.6rem;
+		font-size: 0.82rem;
+		color: var(--color-fg-faint);
+	}
+	.stat-strip li {
+		display: inline-flex;
+		align-items: baseline;
+		gap: 0.4rem;
+		position: relative;
+	}
+	.stat-strip li + li::before {
+		content: '';
+		position: absolute;
+		left: -0.85rem;
+		top: 0.15rem;
+		bottom: 0.15rem;
+		width: 1px;
+		background: color-mix(in oklch, var(--color-fg) 14%, transparent);
+	}
+	.stat-strip b {
+		color: var(--color-cream-0);
+		font-weight: 600;
+	}
+
+	/* ── Section scaffolding ────────────────────────────────────────────── */
+	.section-head {
+		max-width: 42rem;
+		margin: 0 auto;
+		text-align: center;
+		padding: 0 1.5rem;
+	}
+	.section-head .eyebrow {
+		display: block;
+		margin-bottom: 0.7rem;
+	}
+	.section-head h2 {
+		font-size: clamp(1.7rem, 3.2vw, 2.5rem);
+		font-weight: 600;
+		line-height: 1.1;
+		letter-spacing: -0.02em;
+		margin: 0;
+		color: var(--color-cream-0);
+	}
+	.section-sub {
+		font-family: var(--font-prose);
+		color: var(--color-fg-muted);
+		font-size: 1.05rem;
+		line-height: 1.6;
+		margin: 0.9rem auto 0;
+		max-width: 36rem;
+	}
+
+	/* ── The three levels ───────────────────────────────────────────────── */
+	.levels {
 		max-width: 64rem;
 		margin: 0 auto;
-		padding: 2.5rem 2rem 3rem;
-	}
-
-	.levels {
+		padding: clamp(2rem, 6vw, 4.5rem) 1.5rem 0;
 		display: flex;
 		flex-direction: column;
-		gap: 0.85rem;
-		max-width: 46rem;
-		margin: 0 auto;
+		gap: clamp(1.5rem, 3vw, 2.5rem);
+	}
+	.levels .section-head {
+		margin-bottom: clamp(0.5rem, 2vw, 1.5rem);
 	}
 
-	.card {
-		--card-accent: var(--color-accent-langchain);
-		display: grid;
-		grid-template-columns: 5.25rem 1fr;
+	.level {
+		display: flex;
 		align-items: center;
-		gap: 1.25rem;
-		padding: 1rem 1.4rem 1rem 1rem;
-		border: 1px solid transparent;
-		border-radius: 0.85rem;
-		/* A soft accent glow in the corner over a tinted fill (never pure black). */
-		background:
-			radial-gradient(
-				120% 120% at 0% 0%,
-				color-mix(in oklch, var(--card-accent) 13%, transparent),
-				transparent 58%
-			),
-			linear-gradient(150deg, var(--color-bg-elev), color-mix(in oklch, var(--color-bg-elev) 62%, #000));
-		background-origin: border-box;
-		background-clip: border-box;
-		text-decoration: none;
-		color: var(--color-fg);
-		transition:
-			background 0.18s ease,
-			border-color 0.18s ease;
+		gap: clamp(1.5rem, 4vw, 3rem);
+		padding: clamp(1rem, 2vw, 1.5rem) clamp(1rem, 2.5vw, 2rem);
+		/* Transparent over the #000 page so each poster's black background dissolves in
+		   with no rectangle. Definition comes from a single hairline, brightened on hover. */
+		border: 1px solid var(--color-border);
+		border-radius: 1rem;
+		background: transparent;
+		transition: border-color 0.2s ease;
 	}
-	.card[data-chapter='langgraph'] {
-		--card-accent: var(--color-accent-langgraph);
+	.level:hover {
+		border-color: color-mix(in oklch, var(--lv) 38%, var(--color-border));
 	}
-	.card[data-chapter='deepagents'] {
-		--card-accent: var(--color-accent-deepagents);
-	}
-	/* Subtle hover: the accent fill warms slightly — a soft lift, not a hard frame. */
-	.card:hover {
-		border-color: color-mix(in oklch, var(--card-accent) 32%, var(--color-border));
-		background:
-			radial-gradient(
-				120% 120% at 0% 0%,
-				color-mix(in oklch, var(--card-accent) 20%, transparent),
-				transparent 58%
-			),
-			linear-gradient(150deg, var(--color-bg-elev), color-mix(in oklch, var(--color-bg-elev) 62%, #000));
+	/* Alternate the art side for an editorial rhythm — flex keeps it a fixed width
+	   on either side (grid `order` would have stretched it into the text column). */
+	.level:nth-child(odd of .level) {
+		flex-direction: row-reverse;
 	}
 
-	/* The whole portrait poster, contained on a black tile — never cropped. Its own
-	   black margins blend into the #000 tile, so it reads as a neat little poster. */
-	.card-art {
-		width: 5.25rem;
-		aspect-ratio: 2 / 3;
-		border-radius: 0.5rem;
-		overflow: hidden;
-		background: #000;
+	/* Poster shown whole at its native portrait ratio — no crop, no rounding, no glow.
+	   It is opaque black at the edges, so it meets the page seamlessly on its own. */
+	.level-art {
+		display: block;
+		flex: 0 0 clamp(9.5rem, 22vw, 13rem);
+		width: clamp(9.5rem, 22vw, 13rem);
+		align-self: stretch;
+		max-height: 22rem;
 	}
-	.card-art img {
+	.level-art img {
 		width: 100%;
-		height: 100%;
+		height: auto;
+		max-height: 22rem;
 		object-fit: contain;
 		display: block;
+		margin: auto;
 	}
 
-	.card-body {
+	.level-body {
+		min-width: 0;
 		display: flex;
 		flex-direction: column;
-		gap: 0.3rem;
-		min-width: 0;
+		gap: 0.7rem;
 	}
-
-	.card-head {
+	.level-meta {
 		display: flex;
 		align-items: center;
-		gap: 0.45rem;
+		gap: 0.5rem;
+		color: var(--lv);
 	}
-	[data-chapter='langchain'] .card-head {
-		color: var(--color-accent-langchain);
-	}
-	[data-chapter='langgraph'] .card-head {
-		color: var(--color-accent-langgraph);
-	}
-	[data-chapter='deepagents'] .card-head {
-		color: var(--color-accent-deepagents);
-	}
-
-	.card-num {
+	.level-meta .num {
 		font-size: 0.72rem;
 		text-transform: uppercase;
-		letter-spacing: 0.1em;
+		letter-spacing: 0.12em;
 		font-weight: 700;
-		color: inherit;
 	}
-	.card-count {
+	.level-meta .count {
 		margin-left: auto;
-		font-size: 0.68rem;
+		font-size: 0.7rem;
 		letter-spacing: 0.06em;
 		color: var(--color-fg-faint);
 	}
-
-	.card-title {
-		font-size: 1.3rem;
+	.level-body h3 {
+		font-size: clamp(1.6rem, 2.6vw, 2.1rem);
 		font-weight: 600;
-		color: var(--color-fg);
+		line-height: 1;
+		margin: 0;
+		color: var(--color-cream-0);
 	}
-
-	.card-tag {
+	.level-blurb {
+		font-family: var(--font-prose);
 		color: var(--color-fg-muted);
-		font-size: 0.9rem;
-		line-height: 1.45;
+		font-size: 1rem;
+		line-height: 1.55;
+		margin: 0;
 	}
-
-	.card-cta {
-		margin-top: 0.3rem;
-		font-size: 0.82rem;
-		color: var(--color-fg-muted);
+	.chips {
+		list-style: none;
+		margin: 0.1rem 0 0;
+		padding: 0;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+	}
+	.chips li {
+		font-size: 0.76rem;
 		font-weight: 500;
+		padding: 0.28rem 0.65rem;
+		border-radius: 999px;
+		color: color-mix(in oklch, var(--lv) 70%, var(--color-cream-0));
+		background: color-mix(in oklch, var(--lv) 11%, transparent);
+		border: 1px solid color-mix(in oklch, var(--lv) 22%, transparent);
+	}
+	.level-build {
+		font-size: 0.92rem;
+		line-height: 1.5;
+		color: var(--color-cream-1);
+		margin: 0.2rem 0 0.3rem;
+	}
+	.level-build .kicker {
+		font-family: var(--font-mono);
+		font-size: 0.64rem;
+		text-transform: uppercase;
+		letter-spacing: 0.14em;
+		color: var(--color-fg-faint);
+		margin-right: 0.5rem;
+	}
+
+	/* ── Showcase ribbon ────────────────────────────────────────────────── */
+	.showcase {
+		padding: clamp(3rem, 7vw, 5.5rem) 0 clamp(1rem, 2vw, 2rem);
+		overflow: clip;
+	}
+	.showcase .section-head {
+		margin-bottom: clamp(1.8rem, 4vw, 2.8rem);
+	}
+
+	.marquee {
+		overflow: hidden;
+		-webkit-mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent);
+		mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent);
+	}
+	.marquee + .marquee {
+		margin-top: 0.85rem;
+	}
+	.track {
+		display: flex;
+		gap: 0.85rem;
+		width: max-content;
+		padding: 0.3rem 0;
+		animation: marquee 70s linear infinite;
+	}
+	.marquee.rev .track {
+		animation-direction: reverse;
+	}
+	.marquee:hover .track {
+		animation-play-state: paused;
+	}
+	@keyframes marquee {
+		from {
+			transform: translateX(0);
+		}
+		to {
+			transform: translateX(-50%);
+		}
+	}
+
+	/* Each lesson banner carries its own painted frame — shown whole, no crop, no rounding,
+	   no extra border. Slightly dimmed at rest, lifting to full on hover. */
+	.tile {
+		flex: 0 0 auto;
+		width: clamp(10.5rem, 17vw, 13rem);
+		display: block;
+		text-decoration: none;
+		opacity: 0.9;
+		transition:
+			opacity 0.25s ease,
+			transform 0.25s ease;
+	}
+	.tile img {
+		width: 100%;
+		height: auto;
+		display: block;
+	}
+	.tile:hover {
+		opacity: 1;
+		transform: translateY(-4px);
+	}
+
+	/* ── Principles ─────────────────────────────────────────────────────── */
+	.principles {
+		max-width: 64rem;
+		margin: 0 auto;
+		padding: clamp(3rem, 7vw, 5rem) 1.5rem;
+		display: grid;
+		grid-template-columns: repeat(4, 1fr);
+		gap: 1rem;
+	}
+	.principle {
+		padding: 1.4rem 1.3rem;
+		border: 1px solid var(--color-border);
+		border-radius: 0.9rem;
+		background: linear-gradient(160deg, var(--color-bg-elev), color-mix(in oklch, var(--color-bg-elev) 55%, #000));
+	}
+	.p-icon {
+		display: inline-flex;
+		padding: 0.55rem;
+		border-radius: 0.6rem;
+		color: var(--color-accent-langchain);
+		background: color-mix(in oklch, var(--color-accent-langchain) 12%, transparent);
+		border: 1px solid color-mix(in oklch, var(--color-accent-langchain) 22%, transparent);
+		margin-bottom: 0.9rem;
+	}
+	.principle h3 {
+		font-size: 1.08rem;
+		font-weight: 600;
+		margin: 0 0 0.35rem;
+		color: var(--color-cream-0);
+	}
+	.principle p {
+		font-size: 0.88rem;
+		line-height: 1.5;
+		color: var(--color-fg-muted);
+		margin: 0;
+	}
+
+	/* ── Final CTA ──────────────────────────────────────────────────────── */
+	.finale {
+		max-width: 42rem;
+		margin: 0 auto;
+		padding: clamp(2rem, 5vw, 3.5rem) 1.5rem clamp(2rem, 4vw, 3rem);
+		text-align: center;
+	}
+	.finale h2 {
+		font-size: clamp(1.8rem, 3.6vw, 2.7rem);
+		font-weight: 600;
+		letter-spacing: -0.02em;
+		margin: 0;
+		color: var(--color-cream-0);
+	}
+	.finale p {
+		font-family: var(--font-prose);
+		color: var(--color-fg-muted);
+		font-size: 1.05rem;
+		line-height: 1.6;
+		margin: 1rem auto 0;
+		max-width: 34rem;
+	}
+	.finale .cta-row {
+		margin-top: 1.6rem;
 	}
 
 	/* ── Footer: subtle setup status + attribution ──────────────────────── */
 	.site-footer {
-		max-width: 64rem;
-		margin: 0 auto;
-		padding: 1.5rem 2rem 3rem;
+		position: sticky;
+		bottom: 0;
+		z-index: 15;
+		margin: 0;
+		padding: 0.7rem clamp(1.25rem, 4vw, 2.5rem);
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
 		flex-wrap: wrap;
-		gap: 0.9rem 1.5rem;
-		border-top: 1px solid color-mix(in oklch, var(--color-fg) 8%, transparent);
+		gap: 0.5rem 1.5rem;
+		/* Frosted chrome, mirroring the top nav — stays reachable for model setup as you scroll. */
+		background: color-mix(in oklch, var(--color-bg) 68%, transparent);
+		backdrop-filter: blur(16px) saturate(1.2);
+		-webkit-backdrop-filter: blur(16px) saturate(1.2);
+		border-top: 1px solid color-mix(in oklch, var(--color-fg) 10%, transparent);
 	}
 
 	/* Model setup, demoted to a quiet link. */
@@ -438,10 +863,54 @@
 		transform: translateY(-1px);
 	}
 
+	/* ── Responsive ─────────────────────────────────────────────────────── */
+	@media (max-width: 820px) {
+		.level,
+		.level:nth-child(odd of .level) {
+			flex-direction: column;
+			gap: 1.25rem;
+		}
+		.level-body {
+			width: 100%;
+		}
+		.level-art {
+			flex-basis: auto;
+			width: min(13rem, 60%);
+			aspect-ratio: 4 / 3;
+			margin: 0 auto;
+		}
+		.principles {
+			grid-template-columns: repeat(2, 1fr);
+		}
+	}
+
+	@media (max-width: 480px) {
+		.principles {
+			grid-template-columns: 1fr;
+		}
+		.stat-strip {
+			gap: 0.5rem 1.2rem;
+		}
+	}
+
 	@media (max-width: 560px) {
 		.site-footer {
 			justify-content: center;
 			text-align: center;
+		}
+	}
+
+	/* Freeze the ribbon when motion is reduced; tiles stay visible and scrollable. */
+	@media (prefers-reduced-motion: reduce) {
+		.hero-art {
+			animation: none;
+		}
+		.track {
+			animation: none;
+			flex-wrap: nowrap;
+		}
+		.marquee {
+			overflow-x: auto;
 		}
 	}
 </style>
