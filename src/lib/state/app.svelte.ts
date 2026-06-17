@@ -99,6 +99,19 @@ export const TJS_MODELS: TransformersJsModel[] = [
 		agenticGrade: 'good',
 		notes: 'Solid baseline. Reliable tool use, good prose quality.'
 	},
+	{
+		id: 'HuggingFaceTB/SmolLM3-3B-ONNX',
+		label: 'SmolLM3 3B',
+		family: 'smol',
+		sizeMb: 1900,
+		dtype: 'q4f16',
+		tier: 'S',
+		requiresWebGpu: true,
+		recommendedRamGb: 8,
+		bench: { ttftMs: 500, decodeTokPerSec: 18 },
+		agenticGrade: 'good',
+		notes: 'Hugging Face’s open 3B — dual-mode reasoning and Hermes-style tool calling.'
+	},
 	// tier-M
 	{
 		id: 'onnx-community/Phi-4-mini-instruct-ONNX',
@@ -157,6 +170,13 @@ export const TJS_MODELS: TransformersJsModel[] = [
 	}
 ];
 
+/**
+ * The model demos fall back to when the user has NO API key and hasn't explicitly
+ * chosen a local model. Qwen3-4B is the sweet spot for in-browser agentic work
+ * (stable tool loops); it needs WebGPU and a ~2.4 GB one-time download.
+ */
+export const FALLBACK_TJS_MODEL = 'onnx-community/Qwen3-4B-ONNX';
+
 export interface ViewMode {
 	/** Demo / workshop pane visible. */
 	workshop: boolean;
@@ -182,10 +202,12 @@ export interface AppState {
 	theme: 'dark' | 'light';
 	visited: Record<string, boolean>;
 	webgpuOk: boolean | null;
+	/** Local (Transformers.js) model ids fully downloaded + cached in this browser. */
+	downloadedModels: string[];
 }
 
 const defaultState = (): AppState => ({
-	tjsModel: TJS_MODELS[0].id,
+	tjsModel: FALLBACK_TJS_MODEL,
 	models: {
 		anthropic: defaultModelFor('anthropic'),
 		openai: defaultModelFor('openai'),
@@ -203,7 +225,8 @@ const defaultState = (): AppState => ({
 	viewMode: { workshop: true, book: true },
 	theme: 'dark',
 	visited: {},
-	webgpuOk: null
+	webgpuOk: null,
+	downloadedModels: []
 });
 
 /**
@@ -276,6 +299,23 @@ export function detectWebGpu() {
 export function setTjsModel(id: string) {
 	app.tjsModel = id;
 	persist();
+}
+
+/** Record that a local model finished downloading (cached in this browser). */
+export function markModelDownloaded(id: string) {
+	if (!app.downloadedModels.includes(id)) {
+		app.downloadedModels = [...app.downloadedModels, id];
+		persist();
+	}
+}
+
+/** Is a local model downloaded and runnable on this machine? */
+export function localRuntimeReady(): boolean {
+	const id = app.preferredProvider === 'transformers-js' ? app.tjsModel : FALLBACK_TJS_MODEL;
+	const m = TJS_MODELS.find((x) => x.id === id);
+	if (!m) return false;
+	if (m.requiresWebGpu && app.webgpuOk === false) return false;
+	return app.downloadedModels.includes(id);
 }
 
 /** Choose which hosted model a given provider should use. */
@@ -391,7 +431,8 @@ export function isConfigured(): boolean {
 	if (p === 'openai') return !!app.keys.openai;
 	if (p === 'google') return !!app.keys.google;
 	if (p === 'azure') return !!selectedAzureChatModel();
-	return false; // transformers-js needs cache check; treat as not-yet-configured.
+	// transformers-js: ready once the selected local model is downloaded.
+	return localRuntimeReady();
 }
 
 export function bestAvailableProvider(): ModelProvider | null {

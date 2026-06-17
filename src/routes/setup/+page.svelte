@@ -14,8 +14,11 @@
 		azureEmbeddingModels,
 		selectedAzureChatModel,
 		TJS_MODELS,
-		type ModelProvider
+		type ModelProvider,
+		type TransformersJsModel
 	} from '$lib/state/app.svelte';
+	import { TransformersJsChatModel } from '$lib/runtime/llm';
+	import { tjsDownload } from '$lib/state/tjs.svelte';
 	import {
 		modelsForProvider,
 		findHostedModel,
@@ -28,7 +31,29 @@
 	import { parseAzureEndpoint } from '$lib/models/azure';
 	import ParrotMark from '$lib/components/ParrotMark.svelte';
 	import Term from '$lib/components/Term.svelte';
-	import { Link2, Cpu, Cloud, Trash2 } from '@lucide/svelte';
+	import { Link2, Cpu, Cloud, Trash2, Download, Check } from '@lucide/svelte';
+
+	/** Pre-download a local model so demos don't wait at run time. */
+	let downloadingId = $state<string | null>(null);
+	let downloadError = $state<string | null>(null);
+	async function downloadModel(m: TransformersJsModel) {
+		if (downloadingId) return;
+		downloadingId = m.id;
+		downloadError = null;
+		try {
+			const model = new TransformersJsChatModel({
+				model: m.id,
+				dtype: m.dtype,
+				device: app.webgpuOk === false ? 'wasm' : 'webgpu'
+			});
+			// warm() resolves once loaded; the worker marks it downloaded + clears the banner.
+			await model.warm();
+		} catch (e) {
+			downloadError = (e as Error).message;
+		} finally {
+			downloadingId = null;
+		}
+	}
 
 	/** Provider brand marks (under static/images/brands). */
 	const brandLogo: Record<string, string> = {
@@ -468,6 +493,28 @@
 							</div>
 						</dl>
 						<p class="m-notes">{model.notes}</p>
+						<div class="m-action">
+							{#if app.downloadedModels.includes(model.id)}
+								<span class="m-dl done"><Check size={14} strokeWidth={2.5} /> Downloaded</span>
+							{:else if downloadingId === model.id}
+								<span class="m-dl busy pulse-soft">
+									Downloading… {tjsDownload.modelId === model.id ? tjsDownload.percent : 0}%
+								</span>
+							{:else}
+								<button
+									type="button"
+									class="m-dl btn"
+									disabled={!!downloadingId}
+									onclick={(e) => {
+										e.preventDefault();
+										e.stopPropagation();
+										downloadModel(model);
+									}}
+								>
+									<Download size={14} strokeWidth={2.2} /> Download
+								</button>
+							{/if}
+						</div>
 					</label>
 				{/each}
 			</div>
@@ -1074,6 +1121,47 @@
 		margin: 0;
 		line-height: 1.5;
 		font-family: var(--font-prose);
+	}
+
+	.m-action {
+		margin-top: 0.7rem;
+	}
+	.m-dl {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-size: 0.78rem;
+		font-weight: 600;
+		font-family: var(--font-mono);
+		padding: 0.4rem 0.8rem;
+		border-radius: 0.5rem;
+	}
+	.m-dl.btn {
+		color: var(--accent-ink);
+		background: var(--accent-soft);
+		border: 1px solid var(--accent-rule);
+		cursor: pointer;
+		transition:
+			background 0.15s ease,
+			border-color 0.15s ease;
+	}
+	.m-dl.btn:hover:not(:disabled) {
+		background: color-mix(in oklch, var(--accent) 22%, transparent);
+		border-color: var(--accent);
+	}
+	.m-dl.btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+	.m-dl.busy {
+		color: var(--accent-ink);
+		background: var(--accent-soft);
+		border: 1px solid var(--accent-rule);
+	}
+	.m-dl.done {
+		color: var(--color-accent-success);
+		background: color-mix(in oklch, var(--color-accent-success) 12%, transparent);
+		border: 1px solid color-mix(in oklch, var(--color-accent-success) 30%, transparent);
 	}
 
 	.keys {

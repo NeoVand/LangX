@@ -1,5 +1,10 @@
 /// <reference lib="webworker" />
-import { pipeline, type TextGenerationPipeline } from '@huggingface/transformers';
+import { pipeline, env, type TextGenerationPipeline } from '@huggingface/transformers';
+
+// Persist model weights in the browser's Cache Storage so a model is fetched from the
+// network only once; every later load (including after a page refresh) reads from cache.
+env.useBrowserCache = true;
+env.allowLocalModels = false;
 
 interface InitMsg {
 	type: 'init';
@@ -16,6 +21,8 @@ interface GenerateMsg {
 	max_new_tokens?: number;
 	temperature?: number;
 	stream?: boolean;
+	/** OpenAI-style tool schemas; when present the chat template advertises them. */
+	tools?: unknown[];
 }
 
 type IncomingMsg = InitMsg | GenerateMsg;
@@ -70,7 +77,23 @@ self.addEventListener('message', async (ev: MessageEvent<IncomingMsg>) => {
 				stopOnEvents = { token_callback_function: callback };
 			}
 
-			const result = (await generator(msg.messages as never, {
+			// With tools, pre-render the prompt through the model's own chat template so
+			// the tools are advertised in its native format (Hermes-style for Qwen3 /
+			// SmolLM3). `enable_thinking:false` suppresses Qwen3's <think> blocks — faster
+			// and easier to parse for tool loops. Templates that don't know the option
+			// ignore it. Without tools, keep passing the message array (template applied
+			// internally as before).
+			let input: unknown = msg.messages;
+			if (msg.tools && msg.tools.length) {
+				input = generator.tokenizer.apply_chat_template(msg.messages as never, {
+					tools: msg.tools,
+					add_generation_prompt: true,
+					tokenize: false,
+					enable_thinking: false
+				} as never) as unknown as string;
+			}
+
+			const result = (await generator(input as never, {
 				max_new_tokens: msg.max_new_tokens ?? 512,
 				temperature: msg.temperature ?? 0.7,
 				do_sample: (msg.temperature ?? 0.7) > 0,

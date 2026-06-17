@@ -1,5 +1,11 @@
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import { app, type ModelProvider, TJS_MODELS, selectedAzureChatModel } from '$lib/state/app.svelte';
+import {
+	app,
+	type ModelProvider,
+	TJS_MODELS,
+	FALLBACK_TJS_MODEL,
+	selectedAzureChatModel
+} from '$lib/state/app.svelte';
 import { findHostedModel, thinkingMode, type ThinkingMode } from '$lib/models/catalog';
 import { azureProxyBaseUrl, isReasoningDeployment } from '$lib/models/azure';
 import { TransformersJsChatModel, type TjsProgress } from './transformers-js';
@@ -46,7 +52,14 @@ export async function getModel(opts: GetModelOptions = {}): Promise<BaseChatMode
 	const provider = resolveProvider(opts.provider);
 
 	if (provider === 'transformers-js') {
-		const tjs = TJS_MODELS.find((m) => m.id === app.tjsModel) ?? TJS_MODELS[0];
+		// Explicit local pick → the user's chosen model; auto-fallback (no key) → Qwen3-4B.
+		const explicitLocal =
+			app.preferredProvider === 'transformers-js' || opts.provider === 'transformers-js';
+		const wantId = explicitLocal ? app.tjsModel : FALLBACK_TJS_MODEL;
+		const tjs =
+			TJS_MODELS.find((m) => m.id === wantId) ??
+			TJS_MODELS.find((m) => m.id === FALLBACK_TJS_MODEL) ??
+			TJS_MODELS[0];
 		return new TransformersJsChatModel({
 			model: tjs.id,
 			dtype: tjs.dtype,
@@ -175,6 +188,20 @@ export async function getModel(opts: GetModelOptions = {}): Promise<BaseChatMode
 	}
 
 	throw new Error(`Unknown provider: ${provider}`);
+}
+
+/**
+ * If the active runtime is a *downloaded* local model, load it into memory now so the
+ * first demo run is instant. No-op when a hosted provider is configured or the local
+ * model isn't cached yet (so we never trigger a multi-GB download on page load). Safe to
+ * call repeatedly — the worker is a singleton and `warm()` returns early once ready.
+ */
+export async function warmActiveLocalModel(onProgress?: (p: TjsProgress) => void): Promise<void> {
+	if (resolveProvider('auto') !== 'transformers-js') return;
+	const id = app.preferredProvider === 'transformers-js' ? app.tjsModel : FALLBACK_TJS_MODEL;
+	if (!app.downloadedModels.includes(id)) return;
+	const model = await getModel({ provider: 'transformers-js', onProgress });
+	if (model instanceof TransformersJsChatModel) await model.warm(onProgress);
 }
 
 export interface ActiveModelInfo {
