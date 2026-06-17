@@ -99,13 +99,15 @@
 
 	const totalLessons = chapters.reduce((n, ch) => n + ch.lessons.length, 0);
 
-	// One flat ribbon of every lesson banner, split into two marquee rows that drift
-	// in opposite directions — a glance at how much of the course is hand-illustrated.
-	const allLessons = chapters.flatMap((ch) =>
-		ch.lessons.map((l) => ({ ...l, base: ch.base, chapter: ch.id }))
-	);
-	const rowA = allLessons.filter((_, i) => i % 2 === 0);
-	const rowB = allLessons.filter((_, i) => i % 2 === 1);
+	// One drifting ribbon per chapter — LangChain, then LangGraph, then Deep Agents.
+	// Each row's lessons are repeated so a single half always overflows the viewport;
+	// rendering it twice (×4 total) gives two identical halves for a seamless loop.
+	const ribbons = chapters.map((ch) => ({
+		id: ch.id,
+		tiles: Array.from({ length: 4 }, () =>
+			ch.lessons.map((l) => ({ ...l, base: ch.base }))
+		).flat()
+	}));
 
 	const principles = [
 		{
@@ -232,24 +234,17 @@
 			</p>
 		</header>
 
-		<div class="marquee">
-			<div class="track">
-				{#each [...rowA, ...rowA] as l, i (i)}
-					<a class="tile" href="{l.base}/{l.slug}" title={l.title} aria-label={l.title}>
-						<img src="/images/thumbs/{l.banner}.webp" alt="" width="640" height="480" loading="lazy" decoding="async" />
-					</a>
-				{/each}
+		{#each ribbons as row, ri (row.id)}
+			<div class="marquee" class:rev={ri % 2 === 1}>
+				<div class="track">
+					{#each row.tiles as l, i (i)}
+						<a class="tile" href="{l.base}/{l.slug}" title={l.title} aria-label={l.title}>
+							<img src="/images/thumbs/{l.banner}.webp" alt="" width="640" height="480" loading="eager" decoding="async" />
+						</a>
+					{/each}
+				</div>
 			</div>
-		</div>
-		<div class="marquee rev">
-			<div class="track">
-				{#each [...rowB, ...rowB] as l, i (i)}
-					<a class="tile" href="{l.base}/{l.slug}" title={l.title} aria-label={l.title}>
-						<img src="/images/thumbs/{l.banner}.webp" alt="" width="640" height="480" loading="lazy" decoding="async" />
-					</a>
-				{/each}
-			</div>
-		</div>
+		{/each}
 	</section>
 
 	<!-- ── Principles ────────────────────────────────────────────────────── -->
@@ -691,12 +686,15 @@
 	.marquee:hover .track {
 		animation-play-state: paused;
 	}
+	/* The track holds two identical halves. -50% lands half a gap short of the seam
+	   (the gap sits *between* the halves too), so subtract half the gap for a pixel-perfect,
+	   truly infinite loop with no jump. 0.425rem = half of the 0.85rem track gap. */
 	@keyframes marquee {
 		from {
 			transform: translateX(0);
 		}
 		to {
-			transform: translateX(-50%);
+			transform: translateX(calc(-50% - 0.425rem));
 		}
 	}
 
