@@ -53,3 +53,23 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  # After a successful deploy, kick the learnlangx.github.io mirror so the
+  # work-accessible URL updates immediately instead of waiting for its cron.
+  # Needs a fine-grained PAT with "Actions: read and write" on
+  # learnlangx/learnlangx.github.io, stored as the MIRROR_DISPATCH_TOKEN secret.
+  # If the secret is absent, this step no-ops (the mirror still catches up on schedule).
+  trigger-mirror:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger learnlangx.github.io rebuild
+        env:
+          GH_TOKEN: ${{ secrets.MIRROR_DISPATCH_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "MIRROR_DISPATCH_TOKEN not set — skipping mirror trigger (it will catch up on its schedule)."
+            exit 0
+          fi
+          gh workflow run deploy.yml --repo learnlangx/learnlangx.github.io --ref main
+          echo "Triggered learnlangx.github.io rebuild."
