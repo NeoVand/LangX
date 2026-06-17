@@ -3,19 +3,17 @@
 	import TopNav from '$lib/components/TopNav.svelte';
 	import ModelDownloadBanner from '$lib/components/ModelDownloadBanner.svelte';
 	import { detectWebGpu, markVisited } from '$lib/state/app.svelte';
-	import { warmActiveLocalModel } from '$lib/runtime/llm';
 	import { trackRoute } from '$lib/state/nav.svelte';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 
 	let { children } = $props();
 
-	// Root layout mounts once for the whole app. Detect WebGPU, then — if the user is
-	// relying on a downloaded local model — load it into memory now so the first demo is
-	// instant. The worker is a global singleton, so it stays warm across lesson navigation.
+	// Detect WebGPU once. The local model is NOT pre-warmed here — it's warmed from the
+	// Setup page (when picked/downloaded) and otherwise loads lazily on the first demo
+	// run, then stays in memory (global worker singleton) across lesson navigation.
 	onMount(() => {
 		detectWebGpu();
-		void warmActiveLocalModel();
 	});
 
 	$effect(() => {

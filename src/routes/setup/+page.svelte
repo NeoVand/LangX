@@ -17,7 +17,7 @@
 		type ModelProvider,
 		type TransformersJsModel
 	} from '$lib/state/app.svelte';
-	import { TransformersJsChatModel } from '$lib/runtime/llm';
+	import { TransformersJsChatModel, warmActiveLocalModel } from '$lib/runtime/llm';
 	import { tjsDownload } from '$lib/state/tjs.svelte';
 	import {
 		modelsForProvider,
@@ -71,6 +71,9 @@
 
 	onMount(() => {
 		provider = app.preferredProvider;
+		// Landing on Setup with a downloaded local model active → load it into memory now,
+		// so by the time the reader reaches a demo it's already warm.
+		void warmActiveLocalModel();
 	});
 
 	let testing = $state(false);
@@ -457,7 +460,12 @@
 							name="tjs-model"
 							value={model.id}
 							checked={app.tjsModel === model.id}
-							onchange={() => setTjsModel(model.id)}
+							onchange={() => {
+								setTjsModel(model.id);
+								// Picking an already-downloaded model loads it into memory now, so the
+								// first demo is instant. (Not-yet-downloaded models stay lazy.)
+								if (app.downloadedModels.includes(model.id)) void warmActiveLocalModel();
+							}}
 						/>
 						<div class="m-head">
 							<div>
