@@ -17,7 +17,7 @@
 		Globe,
 		KeyRound,
 		Activity,
-		Boxes
+		Download
 	} from '@lucide/svelte';
 
 	const configured = $derived(
@@ -126,9 +126,9 @@
 			body: 'Watch tokens stream, state mutate, tools fire, and graphs branch — the wiring is never hidden.'
 		},
 		{
-			icon: Boxes,
-			title: 'Built on the real stack',
-			body: 'The same @langchain/* and langgraph packages you would reach for in production, nothing mocked.'
+			icon: Download,
+			title: 'Download and keep every demo',
+			body: 'Each demo exports as a standalone project you run with npm start — or as an Agent Skill (a SKILL.md) that teaches a coding agent to rebuild it.'
 		}
 	];
 
@@ -165,12 +165,6 @@
 					</a>
 					<a class="btn ghost" href="/setup">Choose your model</a>
 				</div>
-				<ul class="stat-strip">
-					<li><b>3</b> levels</li>
-					<li><b>{totalLessons}</b> lessons</li>
-					<li><b>Every concept</b> a live demo</li>
-					<li><b>100%</b> in-browser</li>
-				</ul>
 			</div>
 		</div>
 	</section>
@@ -475,37 +469,6 @@
 		transform: translateX(3px);
 	}
 
-	.stat-strip {
-		list-style: none;
-		margin: 2rem 0 0;
-		padding: 0;
-		display: flex;
-		flex-wrap: wrap;
-		justify-content: center;
-		gap: 0.6rem 1.6rem;
-		font-size: 0.82rem;
-		color: var(--color-fg-faint);
-	}
-	.stat-strip li {
-		display: inline-flex;
-		align-items: baseline;
-		gap: 0.4rem;
-		position: relative;
-	}
-	.stat-strip li + li::before {
-		content: '';
-		position: absolute;
-		left: -0.85rem;
-		top: 0.15rem;
-		bottom: 0.15rem;
-		width: 1px;
-		background: color-mix(in oklch, var(--color-fg) 14%, transparent);
-	}
-	.stat-strip b {
-		color: var(--color-cream-0);
-		font-weight: 600;
-	}
-
 	/* ── Section scaffolding ────────────────────────────────────────────── */
 	.section-head {
 		max-width: 42rem;
@@ -666,10 +629,13 @@
 	}
 
 	.marquee {
-		overflow: hidden;
+		/* x-only clip keeps the horizontal mask + containment but lets the tiles' hover
+		   lift show vertically (and avoids creating a vertical scroll container). */
+		overflow-x: clip;
 		-webkit-mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent);
 		mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent);
 	}
+	/* Row gap matches the inter-tile gap exactly for an even grid. */
 	.marquee + .marquee {
 		margin-top: 0.85rem;
 	}
@@ -677,7 +643,6 @@
 		display: flex;
 		gap: 0.85rem;
 		width: max-content;
-		padding: 0.3rem 0;
 		animation: marquee 70s linear infinite;
 	}
 	.marquee.rev .track {
@@ -885,9 +850,6 @@
 	@media (max-width: 480px) {
 		.principles {
 			grid-template-columns: 1fr;
-		}
-		.stat-strip {
-			gap: 0.5rem 1.2rem;
 		}
 	}
 
