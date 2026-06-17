@@ -11,8 +11,8 @@
 	let { id, alt, banner = false, focal = '50% 50%' }: Props = $props();
 
 	const candidates = $derived([
-		`/images/${id}.png`,
 		`/images/${id}.webp`,
+		`/images/${id}.png`,
 		`/heroes/${id}.webp`,
 		`/banners/${id}.webp`
 	]);

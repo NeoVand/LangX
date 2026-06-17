@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="static/images/landing-banner.png" alt="LangX — a brass steampunk tableau: amber pipework, a teal orrery, and a violet reading-engine joined as one machine, tended by a mechanical parrot" width="100%">
+<img src="static/images/landing-banner.webp" alt="LangX — a brass steampunk tableau: amber pipework, a teal orrery, and a violet reading-engine joined as one machine, tended by a mechanical parrot" width="100%">
 
 # LangX
 
