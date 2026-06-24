@@ -56,8 +56,7 @@
 		padding: 0.5rem 1rem 0.6rem;
 		color: var(--color-cream-1);
 		background: color-mix(in oklch, var(--color-bg) 78%, transparent);
-		backdrop-filter: blur(16px) saturate(1.2);
-		-webkit-backdrop-filter: blur(16px) saturate(1.2);
+		backdrop-filter: var(--frost);
 		border-bottom: 1px solid color-mix(in oklch, var(--accent) 30%, var(--color-border));
 	}
 	.dl-banner :global(svg) {

@@ -148,8 +148,7 @@
 		padding: 0 1.4rem;
 		/* Translucent so the frosted blur actually reveals content scrolling beneath. */
 		background: color-mix(in oklch, var(--color-bg) 64%, transparent);
-		backdrop-filter: blur(16px) saturate(1.2);
-		-webkit-backdrop-filter: blur(16px) saturate(1.2);
+		backdrop-filter: var(--frost);
 		border-bottom: 1px solid color-mix(in oklch, var(--color-fg) 8%, transparent);
 		position: sticky;
 		top: 0;

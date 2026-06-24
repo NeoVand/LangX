@@ -74,6 +74,13 @@
 	--surface-radius: 0.75rem;
 	--surface-shadow: 0 18px 52px -22px color-mix(in oklch, black 58%, transparent);
 	--surface-shadow-soft: 0 10px 32px -18px color-mix(in oklch, black 50%, transparent);
+	/* The frosted-glass filter for sticky chrome (header, footer, banners). Held in a
+	   custom property on purpose: the CSS minifier (Lightning CSS) re-serializes a literal
+	   multi-function `backdrop-filter` and drops the space — `blur(16px)saturate(1.2)` —
+	   which is invalid and kills the blur in the production build. A var() value is treated
+	   opaquely, so the space survives. Keep both the prefixed and unprefixed declarations
+	   referencing this. */
+	--frost: blur(16px) saturate(1.2);
 }
 
 [data-chapter='langchain'],

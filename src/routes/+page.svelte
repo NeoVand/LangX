@@ -762,8 +762,7 @@
 		gap: 0.5rem 1.5rem;
 		/* Frosted chrome, mirroring the top nav — stays reachable for model setup as you scroll. */
 		background: color-mix(in oklch, var(--color-bg) 68%, transparent);
-		backdrop-filter: blur(16px) saturate(1.2);
-		-webkit-backdrop-filter: blur(16px) saturate(1.2);
+		backdrop-filter: var(--frost);
 		border-top: 1px solid color-mix(in oklch, var(--color-fg) 10%, transparent);
 	}
 
