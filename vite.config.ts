@@ -6,6 +6,15 @@ import { azureKeylessProxy } from './vite-plugins/azure-keyless-proxy';
 
 export default defineConfig({
 	plugins: [azureKeylessProxy(), tailwindcss(), sveltekit()],
+	// kokoro-js + its bundled transformers.js load ONNX/WASM and large model files at
+	// runtime and are imported only in the browser (lazily, on the first "Listen"). Keep
+	// Vite from pre-bundling them and from trying to externalize/run them during SSR.
+	optimizeDeps: {
+		exclude: ['kokoro-js']
+	},
+	ssr: {
+		external: ['kokoro-js']
+	},
 	test: {
 		expect: { requireAssertions: true },
 		projects: [

@@ -33,6 +33,7 @@
 	import { parseAzureEndpoint } from '$lib/models/azure';
 	import ParrotMark from '$lib/components/ParrotMark.svelte';
 	import Term from '$lib/components/Term.svelte';
+	import { voicePref } from '$lib/state/voice.svelte';
 	import { Link2, Cpu, Cloud, Trash2, Download, Check } from '@lucide/svelte';
 
 	/** Pre-download a local model so demos don't wait at run time. */
@@ -743,6 +744,59 @@
 				<code>az login</code>, no key. Pick one to use it for RAG.
 			</p>
 			{@render azurePanel('embedding')}
+		</div>
+	</section>
+
+	<!-- Listen — the book side can read each chapter aloud like an audiobook. -->
+	<section class="block">
+		<h2>Listen · Narration voice</h2>
+		<p class="muted">
+			Every chapter's text can be read aloud from a <strong>Listen</strong> button on the book side.
+			Choose the voice it uses — the on-device AI voice is warmer, the browser voice is instant and
+			works everywhere. Code blocks are skipped; only the prose is narrated.
+		</p>
+		<div class="models hosted-models">
+			<label class="model" class:selected={voicePref.engine === 'model'}>
+				<input
+					type="radio"
+					name="voice-engine"
+					value="model"
+					checked={voicePref.engine === 'model'}
+					onchange={() => voicePref.set('model')}
+				/>
+				<div class="m-head">
+					<div>
+						<span class="m-name font-display">On-device AI voice</span>
+						<span class="m-sub">Kokoro · Heart</span>
+					</div>
+					<span class="tag-rec">no key</span>
+				</div>
+				<p class="m-notes">
+					Warm, natural narration that runs fully in your browser on <Term t="WebGPU">WebGPU</Term>.
+					Downloads a small voice model once on first use — best on desktop. Falls back to the
+					browser voice automatically if it can't start.
+				</p>
+			</label>
+			<label class="model" class:selected={voicePref.engine === 'browser'}>
+				<input
+					type="radio"
+					name="voice-engine"
+					value="browser"
+					checked={voicePref.engine === 'browser'}
+					onchange={() => voicePref.set('browser')}
+				/>
+				<div class="m-head">
+					<div>
+						<span class="m-name font-display">Browser voice</span>
+						<span class="m-sub">Web Speech API</span>
+					</div>
+					<span class="tag-rec">instant</span>
+				</div>
+				<p class="m-notes">
+					Your operating system's built-in speech. No download, starts immediately, and works
+					everywhere — including iPhone and iPad. Quality varies by device.
+				</p>
+			</label>
 		</div>
 	</section>
 

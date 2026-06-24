@@ -2,6 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import HeroImage from './HeroImage.svelte';
 	import DemoSourceView from './DemoSourceView.svelte';
+	import ListenPlayer from './ListenPlayer.svelte';
 	import Icon from './Icon.svelte';
 	import { app, ui } from '$lib/state/app.svelte';
 	import { downloadDemo, downloadSkill, type DemoManifest } from '$lib/demos/download';
@@ -80,6 +81,7 @@
 							<HeroImage id={hero.id} alt={hero.alt} />
 						</div>
 					{/if}
+					<ListenPlayer />
 					<h1 class="font-display">{title}</h1>
 					{#if motivation}
 						<p class="motivation font-prose">
