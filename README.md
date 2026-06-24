@@ -15,6 +15,8 @@ LangChain · LangGraph · Deep Agents — 29 lessons, 3 levels, every concept a 
 ![LangChain](https://img.shields.io/badge/LangChain-v1-1C3C3C)
 ![Runs in the browser](https://img.shields.io/badge/runs-100%25_in_the_browser-success)
 
+**[▶ Open the live course at langx.lol](https://langx.lol)**
+
 </div>
 
 ---
@@ -29,9 +31,10 @@ The whole thing runs as a static site. There is no backend to deploy and nothing
 
 - **Every concept is executable.** Around two dozen runnable demos, one per idea — from a single tool-calling loop to a self-planning deep-research agent.
 - **The wiring is never hidden.** Watch tokens stream, state mutate, tools fire, and graphs branch in real time.
-- **Bring your own model.** Anthropic, OpenAI, Google, or Azure — or a local model in-browser via `transformers.js`. Your keys stay in your browser.
+- **Bring your own model.** Anthropic, OpenAI, Google, or Azure — or a local model in-browser via `transformers.js`. Your keys stay in your browser. No key at all? The agent demos fall back to a local tool-calling model (Qwen3-4B) that downloads once and runs on WebGPU.
 - **Built on the real stack.** The same `@langchain/*` and `langgraph` packages you'd reach for in production, nothing mocked.
 - **Live, not canned.** Embedded GPT-2 runs in the browser, the auditor reads real EDGAR filings, and the research capstone fetches real sources.
+- **Take any demo with you.** Each demo exports as a standalone project you run with `npm start`, or as an Agent Skill (a `SKILL.md`) that teaches a coding agent to rebuild it from scratch.
 
 ---
 
@@ -125,22 +128,24 @@ Planning, a virtual filesystem, parallel subagents, skills, and context compacti
 
 ## Getting started
 
+Requires **Node 20.19+** (Vite 8) and npm. No `.env` and no API keys are needed to build or run the site — you add a model key from inside the app.
+
 ```sh
 # install
 npm install
 
-# run the dev server
+# run the dev server (http://localhost:5173)
 npm run dev
 
-# build the static site, then preview it
+# build the static site, then preview the production build
 npm run build && npm run preview
 ```
 
-LangX builds with `@sveltejs/adapter-static`, so `npm run build` produces a fully static site you can host anywhere (GitHub Pages, Netlify, Cloudflare Pages, an S3 bucket).
+LangX builds with `@sveltejs/adapter-static`, so `npm run build` produces a fully static site (flat `.html` files, no server) you can host anywhere — GitHub Pages, Netlify, Cloudflare Pages, or an S3 bucket. The live site at [langx.lol](https://langx.lol) is deployed from `main` to GitHub Pages on every push.
 
 ### Choosing a model
 
-Open **Setup** in the app and add a key for any supported provider — Anthropic, OpenAI, Google, or Azure. Keys are kept in your browser (IndexedDB) and are only ever sent to the provider you choose. Prefer to run nothing externally? Pick a local model and it runs in-browser via `transformers.js` (WebGPU where available).
+Open **Setup** in the app and add a key for any supported provider — Anthropic, OpenAI, Google, or Azure. Keys are kept in your browser's `localStorage` and are only ever sent to the provider you choose. Prefer to run nothing externally? Pick a local model and it runs in-browser via `transformers.js` (WebGPU where available); the same local model is also the automatic fallback whenever you run a demo without a key. Uploaded documents for the RAG lessons are embedded and stored locally too (IndexedDB via Dexie), so they never leave the browser either.
 
 ---
 
